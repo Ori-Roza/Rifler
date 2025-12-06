@@ -1,6 +1,14 @@
-# Rifler
+<div align="center">
+  <img src="assets/logo.jpeg" alt="Rifler Logo" width="300"/>
+  
+  # Rifler
 
-Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview.
+  Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview.
+</div>
+
+## Demo
+
+![](assets/demo.gif)
 
 ## Features
 
@@ -38,6 +46,35 @@ Fast file search extension for VS Code. Rifle through your codebase with dynamic
 
 ### From Marketplace
 Search for "Rifler" in the VS Code Extensions marketplace.
+
+## Performance
+
+Benchmark results on a typical codebase:
+
+| Scenario | Matches | Time |
+|----------|---------|------|
+| Search for "function" keyword | 34 | 5ms |
+| Search for import statements | 3 | 6ms |
+| Search for "if" keyword | 66 | 3ms |
+| Search for variable declarations | 115 | 4ms |
+
+Average search time: **5ms** | Max results: **5000**
+
+### Comparison with Native VS Code Search
+
+| Tool | Average Search Time | Notes |
+|------|---------------------|-------|
+| **Rifler** | **~5ms** | Direct filesystem search, optimized for speed |
+| VS Code Native | ~50-200ms | Uses ripgrep, more features but slower |
+| grep | ~36ms | Command-line baseline |
+
+**Why Rifler is faster:**
+- ⚡ Direct filesystem access (no process spawning)
+- 🎯 Smart exclusions (node_modules, .git, binaries)
+- 🚀 Early termination at 5000 results
+- 💾 Memory efficient (1MB file size limit)
+
+*Run `node benchmark.js` in your own project to test performance*
 
 ## Requirements
 

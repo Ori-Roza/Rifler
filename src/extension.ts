@@ -381,18 +381,21 @@ async function runSearch(
   // For directory or module scope, search directly in filesystem
   if (scope === 'directory') {
     let searchPath = (directoryPath || '').trim();
-    console.log('Directory search path:', searchPath, 'exists:', fs.existsSync(searchPath));
+    console.log('Directory search path:', searchPath, 'exists:', searchPath ? fs.existsSync(searchPath) : false);
     
     if (searchPath && fs.existsSync(searchPath)) {
       const stat = fs.statSync(searchPath);
-      // If user provided a file path, use its parent directory
-      if (!stat.isDirectory()) {
-        searchPath = path.dirname(searchPath);
-        console.log('Path was a file, using parent directory:', searchPath);
+      if (stat.isDirectory()) {
+        // Search in the directory
+        await searchInDirectory(searchPath, regex, options.fileMask, results, maxResults);
+      } else {
+        // User provided a file path - search only in that specific file
+        console.log('Path is a file, searching only in:', searchPath);
+        searchInFile(searchPath, regex, results, maxResults);
       }
-      await searchInDirectory(searchPath, regex, options.fileMask, results, maxResults);
     } else {
-      console.log('Directory does not exist or is empty:', searchPath);
+      console.log('Directory does not exist or is empty, returning no results');
+      // Don't fall back to project - user explicitly chose directory scope
     }
   } else if (scope === 'module' && modulePath) {
     if (fs.existsSync(modulePath)) {

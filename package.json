@@ -1,0 +1,45 @@
+{
+  "name": "jetbrains-find-in-files",
+  "displayName": "JetBrains-style Find in Files",
+  "description": "A VS Code extension that mimics JetBrains' Find in Files dialog with a floating panel UI",
+  "version": "0.0.1",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "jetbrainsFindInFiles.open",
+        "title": "Find in Files (JetBrains style)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "jetbrainsFindInFiles.open",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.55.0",
+    "typescript": "^5.3.0"
+  }
+}

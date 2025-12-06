@@ -1,7 +1,7 @@
 {
-  "name": "jetbrains-find-in-files",
-  "displayName": "JetBrains-style Find in Files",
-  "description": "A VS Code extension that mimics JetBrains' Find in Files dialog with a floating panel UI",
+  "name": "findx",
+  "displayName": "FindX",
+  "description": "Advanced Find in Files with dynamic search, regex, file mask, and full preview",
   "version": "0.0.1",
   "publisher": "your-publisher-name",
   "engines": {
@@ -15,13 +15,13 @@
   "contributes": {
     "commands": [
       {
-        "command": "jetbrainsFindInFiles.open",
-        "title": "Find in Files (JetBrains style)"
+        "command": "findx.open",
+        "title": "FindX: Open"
       }
     ],
     "keybindings": [
       {
-        "command": "jetbrainsFindInFiles.open",
+        "command": "findx.open",
         "key": "ctrl+shift+f",
         "mac": "cmd+shift+f",
         "when": "editorTextFocus"
@@ -32,7 +32,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

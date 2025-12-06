@@ -1,6 +1,6 @@
-# Find in Files (JetBrains Style)
+# FindX
 
-A VS Code extension that provides a JetBrains-style "Find in Files" dialog with advanced search capabilities.
+An advanced "Find in Files" extension for VS Code with dynamic search, regex support, file masking, and full file preview.
 
 ## Features
 
@@ -37,7 +37,7 @@ A VS Code extension that provides a JetBrains-style "Find in Files" dialog with 
 4. Select the downloaded file
 
 ### From Marketplace
-Search for "Find in Files (JetBrains Style)" in the VS Code Extensions marketplace.
+Search for "FindX" in the VS Code Extensions marketplace.
 
 ## Requirements
 

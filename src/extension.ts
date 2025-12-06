@@ -102,10 +102,10 @@ interface FileContentMessage {
 let currentPanel: vscode.WebviewPanel | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('JetBrains Find in Files extension is now active');
+  console.log('FindX extension is now active');
 
   const openCommand = vscode.commands.registerCommand(
-    'jetbrainsFindInFiles.open',
+    'findx.open',
     () => openSearchPanel(context)
   );
 
@@ -131,8 +131,8 @@ function openSearchPanel(context: vscode.ExtensionContext): void {
 
   // Create a new webview panel - positioned beside current editor
   currentPanel = vscode.window.createWebviewPanel(
-    'jetbrainsFindInFiles',
-    'Find in Files',
+    'findx',
+    'FindX',
     {
       viewColumn: vscode.ViewColumn.Beside,
       preserveFocus: true

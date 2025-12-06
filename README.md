@@ -1,6 +1,6 @@
-# FindX
+# Rifler
 
-An advanced "Find in Files" extension for VS Code with dynamic search, regex support, file masking, and full file preview.
+Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview.
 
 ## Features
 
@@ -37,7 +37,7 @@ An advanced "Find in Files" extension for VS Code with dynamic search, regex sup
 4. Select the downloaded file
 
 ### From Marketplace
-Search for "FindX" in the VS Code Extensions marketplace.
+Search for "Rifler" in the VS Code Extensions marketplace.
 
 ## Requirements
 

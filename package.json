@@ -1,7 +1,7 @@
 {
-  "name": "findx",
-  "displayName": "FindX",
-  "description": "Advanced Find in Files with dynamic search, regex, file mask, and full preview",
+  "name": "rifler",
+  "displayName": "Rifler",
+  "description": "Fast file search with dynamic results, regex, file mask, and full preview",
   "version": "0.0.1",
   "publisher": "your-publisher-name",
   "engines": {
@@ -15,13 +15,13 @@
   "contributes": {
     "commands": [
       {
-        "command": "findx.open",
-        "title": "FindX: Open"
+        "command": "rifler.open",
+        "title": "Rifler: Open"
       }
     ],
     "keybindings": [
       {
-        "command": "findx.open",
+        "command": "rifler.open",
         "key": "ctrl+shift+f",
         "mac": "cmd+shift+f",
         "when": "editorTextFocus"

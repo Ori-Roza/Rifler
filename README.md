@@ -1,6 +1,7 @@
 <div align="center">
   <img src="assets/logo.jpeg" alt="Rifler Logo" width="300"/>
   
+  
   # Rifler
 
   Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview.

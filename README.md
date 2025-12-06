@@ -6,10 +6,6 @@
   Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview.
 </div>
 
-## Demo
-
-![](assets/demo.gif)
-
 ## Features
 
 - **Dynamic Search** - Results appear as you type (no Find button needed)

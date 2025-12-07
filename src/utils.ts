@@ -27,7 +27,7 @@ export interface SearchResult {
 }
 
 /** Scope options for search */
-export type SearchScope = 'project' | 'directory' | 'module';
+export type SearchScope = 'project' | 'directory' | 'module' | 'file';
 
 // ============================================================================
 // Search Utilities

@@ -16,9 +16,10 @@ export async function performSearch(
   scope: SearchScope,
   options: SearchOptions,
   directoryPath?: string,
-  modulePath?: string
+  modulePath?: string,
+  filePath?: string
 ): Promise<SearchResult[]> {
-  console.log('performSearch called:', { query, scope, directoryPath, modulePath, options });
+  console.log('performSearch called:', { query, scope, directoryPath, modulePath, filePath, options });
   
   if (!query.trim() || query.length < 2) {
     return [];
@@ -33,7 +34,9 @@ export async function performSearch(
   const maxResults = 5000;
 
   // For directory or module scope, search directly in filesystem
-  if (scope === 'directory') {
+  if (scope === 'file' && filePath) {
+    searchInFile(filePath, regex, results, maxResults);
+  } else if (scope === 'directory') {
     let searchPath = (directoryPath || '').trim();
     console.log('Directory search path:', searchPath, 'exists:', searchPath ? fs.existsSync(searchPath) : false);
     
@@ -43,7 +46,7 @@ export async function performSearch(
         // Search in the directory
         await searchInDirectory(searchPath, regex, options.fileMask, results, maxResults);
       } else {
-        // User provided a file path - search only in that specific file
+
         console.log('Path is a file, searching only in:', searchPath);
         searchInFile(searchPath, regex, results, maxResults);
       }
@@ -58,9 +61,11 @@ export async function performSearch(
   } else {
     // Project scope - use workspace
     const workspaceFolders = vscode.workspace.workspaceFolders;
+    console.log('Workspace folders:', workspaceFolders ? workspaceFolders.map(f => f.uri.fsPath) : 'None');
     if (workspaceFolders) {
       for (const folder of workspaceFolders) {
         if (results.length >= maxResults) break;
+        console.log('Searching in folder:', folder.uri.fsPath);
         await searchInDirectory(folder.uri.fsPath, regex, options.fileMask, results, maxResults);
       }
     }
@@ -77,6 +82,7 @@ async function searchInDirectory(
   results: SearchResult[],
   maxResults: number
 ): Promise<void> {
+  // console.log('Searching directory:', dirPath);
   try {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
 
@@ -92,12 +98,13 @@ async function searchInDirectory(
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
         if (!BINARY_EXTENSIONS.has(ext) && matchesFileMask(entry.name, fileMask)) {
+          // console.log('Searching file:', fullPath);
           searchInFile(fullPath, regex, results, maxResults);
         }
       }
     }
-  } catch {
-    // Skip directories we can't read
+  } catch (error) {
+    console.error('Error reading directory:', dirPath, error);
   }
 }
 

@@ -19,10 +19,15 @@
   - **Words** - Match whole words only
   - **Regex** - Use regular expressions
   - **File Mask** - Filter by file patterns (e.g., `*.ts`, `*.js, *.py`)
+- **Search & Replace**
+  - **Replace One** - Replace current match and move to next
+  - **Replace All** - Replace all occurrences in search results
+  - **Undo Support** - Full undo support for all replacements
 - **Full File Preview** - View entire file with all matches highlighted
 - **Keyboard Navigation**
   - `↑/↓` - Navigate results
   - `Enter` - Open selected result
+  - `Option+Shift+F` (Mac) / `Alt+Shift+F` - Toggle Replace mode
   - `Escape` - Focus search box
 
 ## Usage
@@ -32,6 +37,11 @@
 3. Toggle search options as needed
 4. Select scope (Project/Module/Directory)
 5. Navigate results and preview files
+
+### Replace
+1. Press `Option+Shift+F` (Mac) or `Alt+Shift+F` (Windows/Linux) to toggle replace mode
+2. Enter replacement text
+3. Press `Enter` to replace current match, or `Cmd+Enter` to replace all
 
 ## Installation
 

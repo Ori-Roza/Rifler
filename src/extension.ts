@@ -1,24 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { SearchResult, SearchScope, SearchOptions, buildSearchRegex, matchesFileMask } from './utils';
+import { performSearch } from './search';
+import { replaceOne, replaceAll } from './replacer';
 
 // ============================================================================
 // Types
 // ============================================================================
-
-/** Represents a single search result match */
-interface SearchResult {
-  uri: string;
-  fileName: string;
-  relativePath: string;
-  line: number;
-  character: number;
-  preview: string;
-  previewMatchRange: {
-    start: number;
-    end: number;
-  };
-}
 
 /** Represents a module in the workspace */
 interface ModuleInfo {
@@ -26,21 +15,29 @@ interface ModuleInfo {
   path: string;
 }
 
-/** Scope options for search */
-type SearchScope = 'project' | 'directory' | 'module';
-
-/** Search options */
-interface SearchOptions {
-  matchCase: boolean;
-  wholeWord: boolean;
-  useRegex: boolean;
-  fileMask: string;
-}
-
 /** Messages from Webview to Extension */
 interface RunSearchMessage {
   type: 'runSearch';
   query: string;
+  scope: SearchScope;
+  directoryPath?: string;
+  modulePath?: string;
+  options: SearchOptions;
+}
+
+interface ReplaceOneMessage {
+  type: 'replaceOne';
+  uri: string;
+  line: number;
+  character: number;
+  length: number;
+  replaceText: string;
+}
+
+interface ReplaceAllMessage {
+  type: 'replaceAll';
+  query: string;
+  replaceText: string;
   scope: SearchScope;
   directoryPath?: string;
   modulePath?: string;
@@ -69,7 +66,7 @@ interface GetFileContentMessage {
   options: SearchOptions;
 }
 
-type WebviewMessage = RunSearchMessage | OpenLocationMessage | GetModulesMessage | GetCurrentDirectoryMessage | GetFileContentMessage;
+type WebviewMessage = RunSearchMessage | OpenLocationMessage | GetModulesMessage | GetCurrentDirectoryMessage | GetFileContentMessage | ReplaceOneMessage | ReplaceAllMessage;
 
 /** Messages from Extension to Webview */
 interface SearchResultsMessage {
@@ -109,7 +106,12 @@ export function activate(context: vscode.ExtensionContext) {
     () => openSearchPanel(context)
   );
 
-  context.subscriptions.push(openCommand);
+  const openReplaceCommand = vscode.commands.registerCommand(
+    'rifler.openReplace',
+    () => openSearchPanel(context, true)
+  );
+
+  context.subscriptions.push(openCommand, openReplaceCommand);
 }
 
 export function deactivate() {
@@ -122,10 +124,13 @@ export function deactivate() {
 // Panel Management
 // ============================================================================
 
-function openSearchPanel(context: vscode.ExtensionContext): void {
+function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean = false): void {
   // If panel already exists, reveal it
   if (currentPanel) {
     currentPanel.reveal(vscode.ViewColumn.Beside);
+    if (showReplace) {
+      currentPanel.webview.postMessage({ type: 'showReplace' });
+    }
     return;
   }
 
@@ -145,6 +150,14 @@ function openSearchPanel(context: vscode.ExtensionContext): void {
   );
 
   currentPanel.webview.html = getWebviewHtml(currentPanel.webview);
+
+  // If opening in replace mode, send message once webview is ready
+  if (showReplace) {
+    // We need to wait a bit for the webview to initialize its listeners
+    setTimeout(() => {
+      currentPanel?.webview.postMessage({ type: 'showReplace' });
+    }, 500);
+  }
 
   currentPanel.webview.onDidReceiveMessage(
     async (message: WebviewMessage) => {
@@ -170,6 +183,31 @@ function openSearchPanel(context: vscode.ExtensionContext): void {
           break;
         case 'getFileContent':
           await sendFileContent(currentPanel!, message.uri, message.query, message.options);
+          break;
+        case 'replaceOne':
+          await replaceOne(message.uri, message.line, message.character, message.length, message.replaceText);
+          break;
+        case 'replaceAll':
+          await replaceAll(
+            message.query,
+            message.replaceText,
+            message.scope,
+            message.options,
+            message.directoryPath,
+            message.modulePath,
+            async () => {
+              if (currentPanel) {
+                await runSearch(
+                  currentPanel,
+                  message.query,
+                  message.scope,
+                  message.options,
+                  message.directoryPath,
+                  message.modulePath
+                );
+              }
+            }
+          );
           break;
       }
     },
@@ -310,50 +348,6 @@ async function sendFileContent(panel: vscode.WebviewPanel, uriString: string, qu
 // Search Implementation
 // ============================================================================
 
-function buildSearchRegex(query: string, options: SearchOptions): RegExp | null {
-  if (!query) return null;
-  
-  try {
-    let pattern: string;
-    
-    if (options.useRegex) {
-      pattern = query;
-    } else {
-      // Escape special regex characters
-      pattern = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-    
-    if (options.wholeWord) {
-      pattern = `\\b${pattern}\\b`;
-    }
-    
-    const flags = options.matchCase ? 'g' : 'gi';
-    return new RegExp(pattern, flags);
-  } catch {
-    // Invalid regex
-    return null;
-  }
-}
-
-function matchesFileMask(fileName: string, fileMask: string): boolean {
-  if (!fileMask.trim()) return true;
-  
-  // Support multiple masks separated by comma or semicolon
-  const masks = fileMask.split(/[,;]/).map(m => m.trim()).filter(m => m);
-  if (masks.length === 0) return true;
-  
-  return masks.some(mask => {
-    // Convert glob pattern to regex
-    const regexPattern = mask
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // Escape special chars except * and ?
-      .replace(/\*/g, '.*')                    // * matches any characters
-      .replace(/\?/g, '.');                    // ? matches single character
-    
-    const regex = new RegExp(`^${regexPattern}$`, 'i');
-    return regex.test(fileName);
-  });
-}
-
 async function runSearch(
   panel: vscode.WebviewPanel,
   query: string,
@@ -362,158 +356,12 @@ async function runSearch(
   directoryPath?: string,
   modulePath?: string
 ): Promise<void> {
-  console.log('runSearch called:', { query, scope, directoryPath, modulePath, options });
-  
-  if (!query.trim() || query.length < 2) {
-    panel.webview.postMessage({ type: 'searchResults', results: [] });
-    return;
-  }
-
-  const regex = buildSearchRegex(query, options);
-  if (!regex) {
-    panel.webview.postMessage({ type: 'searchResults', results: [] });
-    return;
-  }
-
-  const results: SearchResult[] = [];
-  const maxResults = 5000;
-
-  // For directory or module scope, search directly in filesystem
-  if (scope === 'directory') {
-    let searchPath = (directoryPath || '').trim();
-    console.log('Directory search path:', searchPath, 'exists:', searchPath ? fs.existsSync(searchPath) : false);
-    
-    if (searchPath && fs.existsSync(searchPath)) {
-      const stat = fs.statSync(searchPath);
-      if (stat.isDirectory()) {
-        // Search in the directory
-        await searchInDirectory(searchPath, regex, options.fileMask, results, maxResults);
-      } else {
-        // User provided a file path - search only in that specific file
-        console.log('Path is a file, searching only in:', searchPath);
-        searchInFile(searchPath, regex, results, maxResults);
-      }
-    } else {
-      console.log('Directory does not exist or is empty, returning no results');
-      // Don't fall back to project - user explicitly chose directory scope
-    }
-  } else if (scope === 'module' && modulePath) {
-    if (fs.existsSync(modulePath)) {
-      await searchInDirectory(modulePath, regex, options.fileMask, results, maxResults);
-    }
-  } else {
-    // Project scope - use workspace
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (workspaceFolders) {
-      for (const folder of workspaceFolders) {
-        if (results.length >= maxResults) break;
-        await searchInDirectory(folder.uri.fsPath, regex, options.fileMask, results, maxResults);
-      }
-    }
-  }
-
-  console.log('Search completed, results:', results.length);
+  const results = await performSearch(query, scope, options, directoryPath, modulePath);
   
   panel.webview.postMessage({
     type: 'searchResults',
     results
   } as SearchResultsMessage);
-}
-
-async function searchInDirectory(
-  dirPath: string,
-  regex: RegExp,
-  fileMask: string,
-  results: SearchResult[],
-  maxResults: number
-): Promise<void> {
-  const excludeDirs = new Set([
-    'node_modules', '.git', 'dist', 'out', '__pycache__', '.venv', 'venv',
-    '.idea', '.vscode', 'coverage', '.nyc_output', 'build', '.next',
-    '.nuxt', '.cache', 'tmp', 'temp', '.pytest_cache', '.tox'
-  ]);
-
-  const binaryExts = new Set([
-    '.png', '.jpg', '.jpeg', '.gif', '.ico', '.pdf', '.zip', '.tar', '.gz',
-    '.exe', '.dll', '.so', '.dylib', '.woff', '.woff2', '.ttf', '.eot',
-    '.mp3', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.svg',
-    '.lock', '.bin', '.dat', '.db', '.sqlite', '.sqlite3'
-  ]);
-
-  try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (results.length >= maxResults) break;
-
-      const fullPath = path.join(dirPath, entry.name);
-
-      if (entry.isDirectory()) {
-        if (!excludeDirs.has(entry.name) && !entry.name.startsWith('.')) {
-          await searchInDirectory(fullPath, regex, fileMask, results, maxResults);
-        }
-      } else if (entry.isFile()) {
-        const ext = path.extname(entry.name).toLowerCase();
-        if (!binaryExts.has(ext) && matchesFileMask(entry.name, fileMask)) {
-          searchInFile(fullPath, regex, results, maxResults);
-        }
-      }
-    }
-  } catch {
-    // Skip directories we can't read
-  }
-}
-
-function searchInFile(
-  filePath: string,
-  regex: RegExp,
-  results: SearchResult[],
-  maxResults: number
-): void {
-  try {
-    // Check file size - skip files larger than 1MB
-    const stats = fs.statSync(filePath);
-    if (stats.size > 1024 * 1024) return;
-
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.split('\n');
-    const fileName = path.basename(filePath);
-
-    for (let lineIndex = 0; lineIndex < lines.length && results.length < maxResults; lineIndex++) {
-      const line = lines[lineIndex];
-      let match: RegExpExecArray | null;
-      
-      // Reset regex for each line
-      regex.lastIndex = 0;
-
-      while ((match = regex.exec(line)) !== null) {
-        if (results.length >= maxResults) break;
-
-        // Calculate the leading whitespace that will be trimmed
-        const leadingWhitespace = line.length - line.trimStart().length;
-        const adjustedStart = match.index - leadingWhitespace;
-        const adjustedEnd = match.index + match[0].length - leadingWhitespace;
-
-        results.push({
-          uri: vscode.Uri.file(filePath).toString(),
-          fileName,
-          relativePath: filePath,
-          line: lineIndex,
-          character: match.index,
-          preview: line.trim(),
-          previewMatchRange: {
-            start: Math.max(0, adjustedStart),
-            end: Math.max(0, adjustedEnd)
-          }
-        });
-
-        // Prevent infinite loop for zero-length matches
-        if (match[0].length === 0) regex.lastIndex++;
-      }
-    }
-  } catch {
-    // Skip files that can't be read
-  }
 }
 
 // ============================================================================
@@ -588,6 +436,28 @@ function getWebviewHtml(webview: vscode.Webview): string {
       align-items: center;
     }
 
+    .search-row button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: 1px solid var(--vscode-widget-border);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 2px;
+      font-size: 11px;
+    }
+    
+    .search-row button:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    #replace-row {
+      display: none;
+    }
+
+    #replace-row.visible {
+      display: flex;
+    }
+
     .search-label {
       font-size: 11px;
       font-weight: 500;
@@ -595,7 +465,7 @@ function getWebviewHtml(webview: vscode.Webview): string {
       min-width: 50px;
     }
 
-    #query {
+    #query, #replace-input {
       flex: 1;
       padding: 6px 10px;
       font-size: 13px;
@@ -607,7 +477,7 @@ function getWebviewHtml(webview: vscode.Webview): string {
       outline: none;
     }
 
-    #query:focus {
+    #query:focus, #replace-input:focus {
       border-color: var(--vscode-focusBorder);
     }
 
@@ -912,6 +782,13 @@ function getWebviewHtml(webview: vscode.Webview): string {
     <div class="search-row">
       <span class="search-label">Find:</span>
       <input type="text" id="query" placeholder="Type to search..." autofocus />
+      <button id="toggle-replace" title="Toggle Replace (Option+Shift+F)">&#x2195;</button>
+    </div>
+    <div class="search-row" id="replace-row">
+      <span class="search-label">Replace:</span>
+      <input type="text" id="replace-input" placeholder="Replace with..." />
+      <button id="replace-btn" title="Replace (Enter)">Replace</button>
+      <button id="replace-all-btn" title="Replace All (Cmd+Enter)">Replace All</button>
     </div>
     <div class="options-row">
       <div class="option-group">
@@ -994,6 +871,11 @@ function getWebviewHtml(webview: vscode.Webview): string {
 
       // DOM Elements
       const queryInput = document.getElementById('query');
+      const replaceRow = document.getElementById('replace-row');
+      const replaceInput = document.getElementById('replace-input');
+      const replaceBtn = document.getElementById('replace-btn');
+      const replaceAllBtn = document.getElementById('replace-all-btn');
+      const toggleReplaceBtn = document.getElementById('toggle-replace');
       const resultsList = document.getElementById('results-list');
       const resultsCount = document.getElementById('results-count');
       const previewContent = document.getElementById('preview-content');
@@ -1011,6 +893,98 @@ function getWebviewHtml(webview: vscode.Webview): string {
       // Initialize
       vscode.postMessage({ type: 'getModules' });
       vscode.postMessage({ type: 'getCurrentDirectory' });
+
+      // Toggle Replace
+      function toggleReplace() {
+        const isVisible = replaceRow.classList.toggle('visible');
+        if (isVisible) {
+          replaceInput.focus();
+        } else {
+          queryInput.focus();
+        }
+      }
+
+      toggleReplaceBtn.addEventListener('click', toggleReplace);
+
+      // Replace Actions
+      replaceBtn.addEventListener('click', replaceOne);
+      replaceAllBtn.addEventListener('click', replaceAll);
+      
+      replaceInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          if (e.metaKey || e.ctrlKey) {
+            replaceAll();
+          } else {
+            replaceOne();
+          }
+        }
+      });
+
+      function replaceOne() {
+        if (state.activeIndex < 0 || state.activeIndex >= state.results.length) return;
+        const result = state.results[state.activeIndex];
+        const replaceText = replaceInput.value;
+        
+        vscode.postMessage({
+          type: 'replaceOne',
+          uri: result.uri,
+          line: result.line,
+          character: result.character,
+          length: result.length,
+          replaceText: replaceText
+        });
+
+        // Optimistic update: Remove result and adjust offsets
+        const currentUri = result.uri;
+        const currentLine = result.line;
+        const currentChar = result.character;
+        const delta = replaceText.length - result.length;
+
+        state.results.splice(state.activeIndex, 1);
+
+        // Adjust subsequent matches on same line
+        if (delta !== 0) {
+          for (let i = state.activeIndex; i < state.results.length; i++) {
+            const r = state.results[i];
+            if (r.uri === currentUri && r.line === currentLine && r.character > currentChar) {
+              r.character += delta;
+            }
+          }
+        }
+
+        // Update UI
+        resultsCount.textContent = state.results.length + ' results';
+        
+        if (state.results.length === 0) {
+          resultsList.innerHTML = '<div class="empty-state">No results found</div>';
+          previewContent.innerHTML = '<div class="empty-state">No results</div>';
+          previewFilename.textContent = '';
+          state.activeIndex = -1;
+        } else {
+          if (state.activeIndex >= state.results.length) {
+            state.activeIndex = state.results.length - 1;
+          }
+          renderResults();
+          if (state.activeIndex >= 0) {
+            loadFileContent(state.results[state.activeIndex]);
+          }
+        }
+        
+        // Re-run search after a short delay to update results
+        setTimeout(runSearch, 200);
+      }
+
+      function replaceAll() {
+        vscode.postMessage({
+          type: 'replaceAll',
+          query: state.currentQuery,
+          replaceText: replaceInput.value,
+          scope: state.currentScope,
+          options: state.options,
+          directoryPath: state.currentScope === 'directory' ? directoryInput.value.trim() : undefined,
+          modulePath: state.currentScope === 'module' ? moduleSelect.value : undefined
+        });
+      }
 
       // Dynamic search on input
       queryInput.addEventListener('input', () => {
@@ -1068,13 +1042,16 @@ function getWebviewHtml(webview: vscode.Webview): string {
 
       // Keyboard navigation
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowDown') {
+        if (e.altKey && e.shiftKey && e.code === 'KeyF') {
+          e.preventDefault();
+          toggleReplace();
+        } else if (e.key === 'ArrowDown') {
           e.preventDefault();
           navigateResults(1);
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
           navigateResults(-1);
-        } else if (e.key === 'Enter' && document.activeElement !== directoryInput) {
+        } else if (e.key === 'Enter' && document.activeElement !== directoryInput && document.activeElement !== replaceInput) {
           e.preventDefault();
           openActiveResult();
         } else if (e.key === 'Escape') {
@@ -1098,6 +1075,14 @@ function getWebviewHtml(webview: vscode.Webview): string {
             break;
           case 'fileContent':
             handleFileContent(message);
+            break;
+          case 'showReplace':
+            if (!replaceRow.classList.contains('visible')) {
+              toggleReplace();
+            } else {
+              replaceInput.focus();
+              replaceInput.select();
+            }
             break;
         }
       });

@@ -1,0 +1,10 @@
+# Code owners for Rifler VS Code Extension
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners - responsible for all files
+* @ori-roza
+
+# Specific areas (examples for future organization)
+# src/ @ori-roza
+# test/ @ori-roza
+# docs/ @ori-roza

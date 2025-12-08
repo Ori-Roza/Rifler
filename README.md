@@ -4,7 +4,7 @@
   
   # Rifler
 
-  Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview.
+  Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview with inline editing.
 </div>
 
 ## Features
@@ -14,6 +14,7 @@
   - **Project** - Search entire workspace
   - **Module** - Search in detected modules (package.json, tsconfig.json, etc.)
   - **Directory** - Search in a specific directory (with editable path)
+  - **File** - Search in a specific file (auto-enabled when file is opened from results)
 - **Search Options**
   - **Match Case** - Case-sensitive search
   - **Words** - Match whole words only
@@ -23,31 +24,53 @@
   - **Replace One** - Replace current match and move to next
   - **Replace All** - Replace all occurrences in search results
   - **Undo Support** - Full undo support for all replacements
-- **Full File Preview** - View entire file with all matches highlighted
+- **Full File Preview**
+  - View entire file with all matches highlighted
+  - **Syntax Highlighting** - Code highlighting for 50+ languages (powered by highlight.js)
+  - **Click to Edit** - Click anywhere in preview to start editing inline
+  - **Auto-save** - Changes auto-save as you type
+- **Inline File Editing**
+  - Edit files directly in the preview panel
+  - Real-time syntax highlighting while editing
+  - Integrated search & replace within the file
+  - Line numbers with synchronized scrolling
 - **Keyboard Navigation**
   - `↑/↓` - Navigate results
-  - `Enter` - Open selected result
+  - `Enter` - Open selected result in editor
+  - `Double-click` - Open file at clicked line
   - `Option+Shift+F` (Mac) / `Alt+Shift+F` - Toggle Replace mode
-  - `Escape` - Focus search box
+  - `Alt+R` - Open Replace in File widget
+  - `Cmd+S` / `Ctrl+S` - Save current file (in edit mode)
+  - `Escape` - Exit edit mode or focus search box
 
 ## Usage
 
 1. Press `Cmd+Shift+F` (Mac) or `Ctrl+Shift+F` (Windows/Linux)
-2. Type your search query
-3. Toggle search options as needed
-4. Select scope (Project/Module/Directory)
-5. Navigate results and preview files
+2. Type your search query (results appear dynamically after 2+ characters)
+3. Toggle search options as needed (Match Case, Words, Regex)
+4. Use File Mask to filter results (e.g., `*.ts, *.js`)
+5. Select scope (Project/Module/Directory)
+6. Navigate results with arrow keys and preview files
+7. Click on preview to edit inline, or double-click to open in main editor
 
-### Replace
+### Replace in Search Results
 1. Press `Option+Shift+F` (Mac) or `Alt+Shift+F` (Windows/Linux) to toggle replace mode
 2. Enter replacement text
-3. Press `Enter` to replace current match, or `Cmd+Enter` to replace all
+3. Press `Enter` to replace current match, or `Cmd+Enter` / `Ctrl+Enter` to replace all
+
+### Inline Editing
+Click anywhere in the file preview to enter edit mode:
+- Edit directly with full syntax highlighting
+- Changes auto-save after 1 second of inactivity
+- Press `Escape` to exit edit mode
+- Press `Cmd+S` / `Ctrl+S` to save immediately
 
 ### Replace in Preview Editor
 While editing a file in the preview panel:
-1. Press `Ctrl+Shift+R` (default) to open the replace widget
+1. Press `Alt+R` or the configured keybinding (default: `Ctrl+Shift+R`) to open the replace widget
 2. Use `↑/↓` arrows or `Enter/Shift+Enter` to navigate between matches
-3. Press `Enter` to replace current match, or `Cmd+Enter` to replace all
+3. Press `Enter` to replace current match, or `Cmd+Enter` / `Ctrl+Enter` to replace all
+4. Press `Escape` or `✕` to close the replace widget
 
 ## Customizing Keybindings
 
@@ -88,32 +111,26 @@ Search for "Rifler" in the VS Code Extensions marketplace.
 
 ## Performance
 
-Benchmark results on a typical codebase:
+Benchmark results on a large production codebase (~100k+ files):
 
 | Scenario | Matches | Time |
 |----------|---------|------|
-| Search for "function" keyword | 34 | 5ms |
-| Search for import statements | 3 | 6ms |
-| Search for "if" keyword | 66 | 3ms |
-| Search for variable declarations | 115 | 4ms |
+| Search for "function" keyword | 5000+ | ~1.7s |
+| Search for import statements (regex) | 5000+ | ~1.5s |
+| Search for "if" keyword | 5000+ | ~0.4s |
+| Search for variable declarations (regex) | 5000+ | ~1.3s |
 
-Average search time: **5ms** | Max results: **5000**
+**Average search time: ~1.2s** on large codebases | Max results: **5000**
 
-### Comparison with Native VS Code Search
+On smaller codebases (< 10k files), search times are typically **under 100ms**.
 
-| Tool | Average Search Time | Notes |
-|------|---------------------|-------|
-| **Rifler** | **~5ms** | Direct filesystem search, optimized for speed |
-| VS Code Native | ~50-200ms | Uses ripgrep, more features but slower |
-| grep | ~36ms | Command-line baseline |
-
-**Why Rifler is faster:**
-- ⚡ Direct filesystem access (no process spawning)
-- 🎯 Smart exclusions (node_modules, .git, binaries)
+**Optimizations:**
+- 🎯 Smart exclusions (node_modules, .git, binaries, hidden folders)
 - 🚀 Early termination at 5000 results
-- 💾 Memory efficient (1MB file size limit)
+- 💾 Memory efficient (skips files > 1MB)
+- ⚡ Parallel async I/O with concurrency limiter
 
-*Run `node benchmark.js` in your own project to test performance*
+*Run `node benchmark.js [path]` to test performance on your own codebase*
 
 ## Testing
 

@@ -730,6 +730,13 @@ function getWebviewHtml(webview: vscode.Webview): string {
       display: flex;
       flex-direction: column;
       min-height: 0;
+      position: relative;
+    }
+
+    .preview-body {
+      flex: 1;
+      position: relative;
+      min-height: 0;
     }
 
     .preview-header {
@@ -774,20 +781,27 @@ function getWebviewHtml(webview: vscode.Webview): string {
     }
 
     .preview-content {
-      flex: 1;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       overflow: auto;
       font-family: var(--vscode-editor-font-family, monospace);
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: 13px;
+      line-height: 20px;
       background-color: var(--vscode-editor-background);
-      position: relative;
       cursor: text;
+      padding: 10px 0;
     }
 
     /* ===== Editor & Highlighting ===== */
     .editor-container {
-      position: relative;
-      flex: 1;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       overflow: hidden;
       background-color: var(--vscode-editor-background);
       display: none;
@@ -845,8 +859,7 @@ function getWebviewHtml(webview: vscode.Webview): string {
       letter-spacing: 0px;
       box-sizing: border-box;
       overflow: auto;
-      white-space: pre-wrap;
-      word-wrap: break-word;
+      white-space: pre;
       tab-size: 4;
     }
 
@@ -989,7 +1002,9 @@ function getWebviewHtml(webview: vscode.Webview): string {
     .code-line {
       display: flex;
       padding: 0 8px;
-      min-height: 18px;
+      height: 20px;
+      line-height: 20px;
+      box-sizing: border-box;
     }
 
     .code-line:hover {
@@ -1010,12 +1025,14 @@ function getWebviewHtml(webview: vscode.Webview): string {
       text-align: right;
       color: var(--vscode-editorLineNumber-foreground, #858585);
       user-select: none;
+      line-height: 20px;
     }
 
     .line-content {
       flex: 1;
       white-space: pre;
       overflow-x: visible;
+      line-height: 20px;
     }
 
     .line-content .match {
@@ -1183,11 +1200,12 @@ function getWebviewHtml(webview: vscode.Webview): string {
           <button id="replace-in-file-btn" title="Replace in this file (Cmd+Shift+R)">Replace in File</button>
         </div>
       </div>
-      <div class="preview-content" id="preview-content">
-        <div class="empty-state">Select a result to preview file</div>
-      </div>
-      
-      <div class="editor-container" id="editor-container">
+      <div class="preview-body">
+        <div class="preview-content" id="preview-content">
+          <div class="empty-state">Select a result to preview file</div>
+        </div>
+        
+        <div class="editor-container" id="editor-container">
         <div class="editor-wrapper">
           <div class="editor-line-numbers" id="editor-line-numbers"></div>
           <div class="editor-content-wrapper">
@@ -1213,6 +1231,7 @@ function getWebviewHtml(webview: vscode.Webview): string {
           <button id="local-replace-close" title="Close (Esc)">✕</button>
         </div>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -1519,7 +1538,7 @@ function getWebviewHtml(webview: vscode.Webview): string {
         // Scroll textarea to selection
         var textBefore = fileEditor.value.substring(0, match.start);
         var lines = textBefore.split('\\n');
-        var lineHeight = 18; // approx line height
+        var lineHeight = 20; // approx line height
         var scrollTop = (lines.length - 5) * lineHeight;
         fileEditor.scrollTop = Math.max(0, scrollTop);
         editorBackdrop.scrollTop = fileEditor.scrollTop;
@@ -1617,12 +1636,26 @@ function getWebviewHtml(webview: vscode.Webview): string {
       function enterEditMode() {
         if (!state.fileContent || isEditMode) return;
         
+        // Capture the exact scroll position from preview
+        const scrollTop = previewContent.scrollTop;
+        
         isEditMode = true;
-        previewContent.style.display = 'none';
+        // Editor overlaps preview, so just show editor (no need to hide preview)
         editorContainer.classList.add('visible');
         fileEditor.value = state.fileContent.content;
         updateHighlights();
-        fileEditor.focus();
+        
+        // Apply same scroll position to editor
+        // Use double requestAnimationFrame to ensure layout is complete
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            fileEditor.scrollTop = scrollTop;
+            if (editorBackdrop) editorBackdrop.scrollTop = scrollTop;
+            if (editorLineNumbers) editorLineNumbers.scrollTop = scrollTop;
+            
+            fileEditor.focus({ preventScroll: true });
+          });
+        });
       }
 
       function saveFile() {
@@ -1646,7 +1679,6 @@ function getWebviewHtml(webview: vscode.Webview): string {
         saveFile();
         
         isEditMode = false;
-        previewContent.style.display = 'block';
         editorContainer.classList.remove('visible');
         
         // Re-render preview with new content

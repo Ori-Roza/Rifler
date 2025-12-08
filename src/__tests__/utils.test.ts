@@ -6,10 +6,14 @@ import {
   searchInContent,
   escapeHtml,
   escapeAttr,
+  collectFiles,
   EXCLUDE_DIRS,
   BINARY_EXTENSIONS,
   SearchOptions
 } from '../utils';
+
+// Mock fs for collectFiles tests
+jest.mock('fs');
 
 describe('buildSearchRegex', () => {
   const defaultOptions: SearchOptions = {
@@ -267,5 +271,129 @@ describe('BINARY_EXTENSIONS constant', () => {
     expect(BINARY_EXTENSIONS.has('.jpg')).toBe(true);
     expect(BINARY_EXTENSIONS.has('.exe')).toBe(true);
     expect(BINARY_EXTENSIONS.has('.lock')).toBe(true);
+  });
+});
+
+describe('collectFiles', () => {
+  const mockFs = require('fs');
+  
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('should collect files from directory', () => {
+    mockFs.readdirSync.mockReturnValue([
+      { name: 'file1.ts', isDirectory: () => false, isFile: () => true },
+      { name: 'file2.ts', isDirectory: () => false, isFile: () => true }
+    ]);
+
+    const files = collectFiles('/test/dir');
+
+    expect(files.length).toBe(2);
+    expect(files).toContain('/test/dir/file1.ts');
+    expect(files).toContain('/test/dir/file2.ts');
+  });
+
+  test('should recursively search subdirectories', () => {
+    mockFs.readdirSync.mockImplementation((dirPath: string) => {
+      if (dirPath === '/test/dir') {
+        return [
+          { name: 'subdir', isDirectory: () => true, isFile: () => false },
+          { name: 'file1.ts', isDirectory: () => false, isFile: () => true }
+        ];
+      }
+      if (dirPath === '/test/dir/subdir') {
+        return [
+          { name: 'file2.ts', isDirectory: () => false, isFile: () => true }
+        ];
+      }
+      return [];
+    });
+
+    const files = collectFiles('/test/dir');
+
+    expect(files.length).toBe(2);
+    expect(files).toContain('/test/dir/file1.ts');
+    expect(files).toContain('/test/dir/subdir/file2.ts');
+  });
+
+  test('should exclude node_modules directory', () => {
+    mockFs.readdirSync.mockImplementation((dirPath: string) => {
+      if (dirPath === '/test/dir') {
+        return [
+          { name: 'node_modules', isDirectory: () => true, isFile: () => false },
+          { name: 'src', isDirectory: () => true, isFile: () => false }
+        ];
+      }
+      if (dirPath === '/test/dir/src') {
+        return [
+          { name: 'file.ts', isDirectory: () => false, isFile: () => true }
+        ];
+      }
+      return [];
+    });
+
+    const files = collectFiles('/test/dir');
+
+    expect(files.length).toBe(1);
+    expect(files).toContain('/test/dir/src/file.ts');
+  });
+
+  test('should exclude binary files', () => {
+    mockFs.readdirSync.mockReturnValue([
+      { name: 'file.ts', isDirectory: () => false, isFile: () => true },
+      { name: 'image.png', isDirectory: () => false, isFile: () => true },
+      { name: 'binary.exe', isDirectory: () => false, isFile: () => true }
+    ]);
+
+    const files = collectFiles('/test/dir');
+
+    expect(files.length).toBe(1);
+    expect(files).toContain('/test/dir/file.ts');
+  });
+
+  test('should respect file mask', () => {
+    mockFs.readdirSync.mockReturnValue([
+      { name: 'file.ts', isDirectory: () => false, isFile: () => true },
+      { name: 'file.js', isDirectory: () => false, isFile: () => true },
+      { name: 'style.css', isDirectory: () => false, isFile: () => true }
+    ]);
+
+    const files = collectFiles('/test/dir', '*.ts');
+
+    expect(files.length).toBe(1);
+    expect(files).toContain('/test/dir/file.ts');
+  });
+
+  test('should respect maxFiles limit', () => {
+    mockFs.readdirSync.mockReturnValue([
+      { name: 'file1.ts', isDirectory: () => false, isFile: () => true },
+      { name: 'file2.ts', isDirectory: () => false, isFile: () => true },
+      { name: 'file3.ts', isDirectory: () => false, isFile: () => true },
+      { name: 'file4.ts', isDirectory: () => false, isFile: () => true },
+      { name: 'file5.ts', isDirectory: () => false, isFile: () => true }
+    ]);
+
+    const files = collectFiles('/test/dir', '', 3);
+
+    expect(files.length).toBe(3);
+  });
+
+  test('should handle directory read errors gracefully', () => {
+    mockFs.readdirSync.mockImplementation(() => {
+      throw new Error('Permission denied');
+    });
+
+    const files = collectFiles('/test/dir');
+
+    expect(files).toEqual([]);
+  });
+
+  test('should handle empty directory', () => {
+    mockFs.readdirSync.mockReturnValue([]);
+
+    const files = collectFiles('/test/dir');
+
+    expect(files).toEqual([]);
   });
 });

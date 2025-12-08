@@ -18,12 +18,16 @@ export interface SearchResult {
   relativePath: string;
   line: number;
   character: number;
+  length: number;
   preview: string;
   previewMatchRange: {
     start: number;
     end: number;
   };
 }
+
+/** Scope options for search */
+export type SearchScope = 'project' | 'directory' | 'module' | 'file';
 
 // ============================================================================
 // Search Utilities
@@ -144,6 +148,7 @@ export function searchInContent(
         relativePath: filePath,
         line: lineIndex,
         character: match.index,
+        length: match[0].length,
         preview: line.trim(),
         previewMatchRange: {
           start: Math.max(0, adjustedStart),
@@ -198,6 +203,31 @@ export function collectFiles(
   
   walk(dirPath);
   return files;
+}
+
+/**
+ * Simple concurrency limiter
+ */
+export class Limiter {
+  private active = 0;
+  private queue: (() => void)[] = [];
+  
+  constructor(private max: number) {}
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.active >= this.max) {
+      await new Promise<void>(resolve => this.queue.push(resolve));
+    }
+    this.active++;
+    try {
+      return await fn();
+    } finally {
+      this.active--;
+      if (this.queue.length > 0) {
+        this.queue.shift()!();
+      }
+    }
+  }
 }
 
 /**

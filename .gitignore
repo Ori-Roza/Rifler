@@ -5,3 +5,9 @@ out/
 .DS_Store
 .code-workspace
 .idea/
+.nyc_output/
+coverage/
+dist/
+logs/
+*.log
+npm-debug.log*

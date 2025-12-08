@@ -1,0 +1,12 @@
+{
+  "folders": [
+    {
+      "name": "test-workspace",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "editor.wordWrap": "off",
+    "editor.minimap.enabled": false
+  }
+}

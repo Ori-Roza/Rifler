@@ -112,7 +112,7 @@
     }
 
     .hero-logo {
-      width: 200px;
+      width: 350px;
       height: auto;
       animation: float 3s ease-in-out infinite;
     }
@@ -464,7 +464,7 @@
       <a href="#" class="logo">
         <span class="logo-text">Rifler</span>
       </a>
-      <ul class="nav-links">
+            <ul class="nav-links">
         <li><a href="#features">Features</a></li>
         <li><a href="#performance">Performance</a></li>
         <li><a href="#install">Install</a></li>
@@ -476,7 +476,7 @@
   <section class="hero">
     <div class="hero-content">
       <img src="https://raw.githubusercontent.com/ori-roza/rifler/master/assets/logo.jpeg" alt="Rifler" class="hero-logo">
-      <h1>Search Your Code 10x Faster</h1>
+      <h1>Search Your Code Instantly</h1>
       <p>Rifler is a lightning-fast file search extension for VS Code. Find what you need with dynamic results, regex support, and instant file preview.</p>
       <div class="hero-buttons">
         <a href="https://marketplace.visualstudio.com/items?itemName=Ori-Roza.rifler" class="btn btn-primary">Install from Marketplace</a>
@@ -495,7 +495,7 @@
       <div class="feature-card">
         <div class="feature-icon">⚡</div>
         <h3>Lightning Fast</h3>
-        <p>Average search time of ~5ms. Direct filesystem access means results appear instantly as you type.</p>
+        <p>Average search time of ~1.1s. Direct filesystem access means results appear instantly as you type.</p>
       </div>
 
       <div class="feature-card">
@@ -541,24 +541,35 @@
     <div class="performance-content">
       <div>
         <h2 class="section-title" style="text-align: left;">Blazing Fast Performance</h2>
+        <p style="margin-bottom: 1.5rem; color: #555;">
+          We have completely rewritten the search core to be asynchronous and non-blocking.
+        </p>
+        <ul style="list-style: none; margin-bottom: 2rem; display: grid; gap: 0.5rem;">
+          <li style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="color: #667eea;">✓</span> <strong>Parallel Execution</strong> across files
+          </li>
+          <li style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="color: #667eea;">✓</span> <strong>Non-Blocking UI</strong> while searching
+          </li>
+          <li style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="color: #667eea;">✓</span> <strong>Smart Concurrency Control</strong>
+          </li>
+        </ul>
+
         <div class="performance-stats">
           <div class="stat">
-            <div class="stat-value">~5ms</div>
-            <div class="stat-label">Average search time</div>
+            <div class="stat-value">~1.1s</div>
+            <div class="stat-label">Average search time (120k+ files)</div>
           </div>
           <div class="stat">
-            <div class="stat-value">5,000+</div>
+            <div class="stat-value">20,000+</div>
             <div class="stat-label">Maximum results supported</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value">10x</div>
-            <div class="stat-label">Faster than native VS Code search</div>
           </div>
         </div>
       </div>
 
       <div>
-        <h3 style="margin-bottom: 1rem; color: #333;">Benchmark Results</h3>
+        <h3 style="margin-bottom: 1rem; color: #333;">Benchmark Results (120k files)</h3>
         <table class="benchmark-table">
           <thead>
             <tr>
@@ -569,19 +580,19 @@
           <tbody>
             <tr>
               <td>Search "function" keyword</td>
-              <td><strong style="color: #667eea;">5ms</strong></td>
+              <td><strong style="color: #667eea;">1689ms</strong></td>
             </tr>
             <tr>
               <td>Search import statements</td>
-              <td><strong style="color: #667eea;">6ms</strong></td>
+              <td><strong style="color: #667eea;">1210ms</strong></td>
             </tr>
             <tr>
               <td>Search "if" keyword</td>
-              <td><strong style="color: #667eea;">3ms</strong></td>
+              <td><strong style="color: #667eea;">345ms</strong></td>
             </tr>
             <tr>
               <td>Search variable declarations</td>
-              <td><strong style="color: #667eea;">4ms</strong></td>
+              <td><strong style="color: #667eea;">1118ms</strong></td>
             </tr>
           </tbody>
         </table>

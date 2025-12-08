@@ -357,7 +357,7 @@ function sendCurrentDirectory(panel: vscode.WebviewPanel): void {
 async function sendFileContent(panel: vscode.WebviewPanel, uriString: string, query: string, options: SearchOptions): Promise<void> {
   try {
     const uri = vscode.Uri.parse(uriString);
-    const content = fs.readFileSync(uri.fsPath, 'utf-8');
+    const content = await fs.promises.readFile(uri.fsPath, 'utf-8');
     const fileName = path.basename(uri.fsPath);
     
     // Find all matches in the file

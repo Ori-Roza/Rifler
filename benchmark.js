@@ -19,11 +19,39 @@ const binaryExts = new Set([
   '.lock', '.bin', '.dat', '.db', '.sqlite', '.sqlite3'
 ]);
 
-function searchInDirectory(dirPath, regex, results, maxResults) {
+/**
+ * Simple concurrency limiter
+ */
+class Limiter {
+  constructor(max) {
+    this.max = max;
+    this.active = 0;
+    this.queue = [];
+  }
+
+  async run(fn) {
+    if (this.active >= this.max) {
+      await new Promise(resolve => this.queue.push(resolve));
+    }
+    this.active++;
+    try {
+      return await fn();
+    } finally {
+      this.active--;
+      if (this.queue.length > 0) {
+        this.queue.shift()();
+      }
+    }
+  }
+}
+
+async function searchInDirectory(dirPath, regex, results, maxResults, limiter) {
   if (results.length >= maxResults) return;
 
   try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    // Use limiter for directory reading
+    const entries = await limiter.run(() => fs.promises.readdir(dirPath, { withFileTypes: true }));
+    const tasks = [];
 
     for (const entry of entries) {
       if (results.length >= maxResults) break;
@@ -32,26 +60,30 @@ function searchInDirectory(dirPath, regex, results, maxResults) {
 
       if (entry.isDirectory()) {
         if (!excludeDirs.has(entry.name) && !entry.name.startsWith('.')) {
-          searchInDirectory(fullPath, regex, results, maxResults);
+          // Recursively search subdirectories in parallel
+          tasks.push(searchInDirectory(fullPath, regex, results, maxResults, limiter));
         }
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
         if (!binaryExts.has(ext)) {
-          searchInFile(fullPath, regex, results, maxResults);
+          // Search files in parallel, controlled by limiter
+          tasks.push(limiter.run(() => searchInFile(fullPath, regex, results, maxResults)));
         }
       }
     }
-  } catch {
+    
+    await Promise.all(tasks);
+  } catch (e) {
     // Skip directories we can't read
   }
 }
 
-function searchInFile(filePath, regex, results, maxResults) {
+async function searchInFile(filePath, regex, results, maxResults) {
   try {
-    const stats = fs.statSync(filePath);
+    const stats = await fs.promises.stat(filePath);
     if (stats.size > 1024 * 1024) return; // Skip files > 1MB
 
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = await fs.promises.readFile(filePath, 'utf-8');
     const lines = content.split('\n');
 
     for (let lineIndex = 0; lineIndex < lines.length && results.length < maxResults; lineIndex++) {
@@ -79,55 +111,48 @@ const scenarios = [
   { name: 'Complex regex', pattern: /(?:const|let|var)\s+\w+\s*=/gi, description: 'Search for variable declarations' }
 ];
 
-console.log('🔍 Rifler Search Benchmark\n');
-console.log('Running benchmarks on current directory...\n');
+async function runBenchmark() {
+  const targetDir = process.argv[2] || process.cwd();
+  console.log('🔍 Rifler Search Benchmark');
+  console.log(`📂 Target: ${targetDir}`);
+  console.log('🚀 Mode: Parallel Execution (Async I/O)\n');
 
-const results = [];
+  const results = [];
+  const limiter = new Limiter(100); // Concurrency limit
 
-for (const scenario of scenarios) {
-  const searchResults = [];
-  const startTime = Date.now();
-  
-  searchInDirectory(process.cwd(), scenario.pattern, searchResults, 5000);
-  
-  const duration = Date.now() - startTime;
-  
-  results.push({
-    name: scenario.name,
-    description: scenario.description,
-    matches: searchResults.length,
-    duration: duration
-  });
-  
-  console.log(`✓ ${scenario.name}`);
-  console.log(`  ${scenario.description}`);
-  console.log(`  Found: ${searchResults.length} matches`);
-  console.log(`  Time: ${duration}ms`);
-  console.log();
+  for (const scenario of scenarios) {
+    const searchResults = [];
+    const startTime = Date.now();
+    
+    await searchInDirectory(targetDir, scenario.pattern, searchResults, 5000, limiter);
+    
+    const duration = Date.now() - startTime;
+    
+    results.push({
+      name: scenario.name,
+      description: scenario.description,
+      matches: searchResults.length,
+      duration: duration
+    });
+    
+    console.log(`✓ ${scenario.name}`);
+    console.log(`  ${scenario.description}`);
+    console.log(`  Found: ${searchResults.length} matches`);
+    console.log(`  Time: ${duration}ms`);
+    console.log();
+  }
+
+  // Calculate stats
+  const avgTime = Math.round(results.reduce((sum, r) => sum + r.duration, 0) / results.length);
+  const minTime = Math.min(...results.map(r => r.duration));
+  const maxTime = Math.max(...results.map(r => r.duration));
+  const totalMatches = results.reduce((sum, r) => sum + r.matches, 0);
+
+  console.log('📊 Summary');
+  console.log(`  Average time: ${avgTime}ms`);
+  console.log(`  Fastest: ${minTime}ms`);
+  console.log(`  Slowest: ${maxTime}ms`);
+  console.log(`  Total matches: ${totalMatches}`);
 }
 
-// Calculate stats
-const avgTime = Math.round(results.reduce((sum, r) => sum + r.duration, 0) / results.length);
-const minTime = Math.min(...results.map(r => r.duration));
-const maxTime = Math.max(...results.map(r => r.duration));
-const totalMatches = results.reduce((sum, r) => sum + r.matches, 0);
-
-console.log('📊 Summary');
-console.log(`  Average time: ${avgTime}ms`);
-console.log(`  Fastest: ${minTime}ms`);
-console.log(`  Slowest: ${maxTime}ms`);
-console.log(`  Total matches: ${totalMatches}`);
-
-// Output for README
-console.log('\n📝 README Format:\n');
-console.log('## Performance');
-console.log('');
-console.log('Benchmark results on a typical codebase:');
-console.log('');
-console.log('| Scenario | Matches | Time |');
-console.log('|----------|---------|------|');
-results.forEach(r => {
-  console.log(`| ${r.description} | ${r.matches} | ${r.duration}ms |`);
-});
-console.log('');
-console.log(`Average search time: **${avgTime}ms** | Max results: **5000**`);
+runBenchmark().catch(console.error);

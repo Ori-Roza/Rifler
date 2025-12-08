@@ -8,9 +8,33 @@ import { SearchOptions, SearchScope } from '../utils';
 jest.mock('vscode', () => require('../../__mocks__/vscode'), { virtual: true });
 
 // Mock fs module
-jest.mock('fs');
+jest.mock('fs', () => {
+  return {
+    existsSync: jest.fn(),
+    statSync: jest.fn(),
+    readdirSync: jest.fn(),
+    readFileSync: jest.fn(),
+    promises: {
+      readdir: jest.fn(),
+      readFile: jest.fn(),
+      stat: jest.fn(),
+      access: jest.fn()
+    }
+  };
+});
 
-const mockFs = fs as jest.Mocked<typeof fs>;
+const mockFs = fs as unknown as {
+  existsSync: jest.Mock;
+  statSync: jest.Mock;
+  readdirSync: jest.Mock;
+  readFileSync: jest.Mock;
+  promises: {
+    readdir: jest.Mock;
+    readFile: jest.Mock;
+    stat: jest.Mock;
+    access: jest.Mock;
+  }
+};
 
 describe('Search', () => {
   const defaultOptions: SearchOptions = {
@@ -55,8 +79,8 @@ describe('Search', () => {
         const fileContent = 'const test = "hello";\nconst test2 = "world";';
         
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockReturnValue({ size: 100 } as fs.Stats);
-        mockFs.readFileSync.mockReturnValue(fileContent);
+        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
+        mockFs.promises.readFile.mockResolvedValue(fileContent);
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -78,16 +102,16 @@ describe('Search', () => {
         const fileContent = 'const test = "hello";';
         
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockImplementation((p: fs.PathLike) => {
+        mockFs.promises.stat.mockImplementation(async (p: fs.PathLike) => {
           if (p === testDir) {
             return { isDirectory: () => true, isFile: () => false } as fs.Stats;
           }
           return { size: 100, isDirectory: () => false, isFile: () => true } as fs.Stats;
         });
-        mockFs.readdirSync.mockReturnValue([
+        mockFs.promises.readdir.mockResolvedValue([
           { name: 'file.ts', isDirectory: () => false, isFile: () => true }
         ] as any);
-        mockFs.readFileSync.mockReturnValue(fileContent);
+        mockFs.promises.readFile.mockResolvedValue(fileContent);
 
         const results = await performSearch('test', 'directory', defaultOptions, testDir);
 
@@ -97,6 +121,7 @@ describe('Search', () => {
 
       test('should return empty for non-existent directory', async () => {
         mockFs.existsSync.mockReturnValue(false);
+        mockFs.promises.stat.mockRejectedValue(new Error('ENOENT'));
 
         const results = await performSearch('test', 'directory', defaultOptions, '/nonexistent');
 
@@ -113,12 +138,12 @@ describe('Search', () => {
         const fileContent = 'const test = "hello";';
         
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockImplementation(() => ({ 
+        mockFs.promises.stat.mockImplementation(async () => ({ 
           isDirectory: () => false, 
           isFile: () => true,
           size: 100 
         } as fs.Stats));
-        mockFs.readFileSync.mockReturnValue(fileContent);
+        mockFs.promises.readFile.mockResolvedValue(fileContent);
 
         const results = await performSearch('test', 'directory', defaultOptions, testFilePath);
 
@@ -132,15 +157,16 @@ describe('Search', () => {
         const fileContent = 'function test() {}';
         
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockImplementation(() => ({ 
+        mockFs.promises.access.mockResolvedValue(undefined);
+        mockFs.promises.stat.mockImplementation(async () => ({ 
           isDirectory: () => false, 
           isFile: () => true,
           size: 100 
         } as fs.Stats));
-        mockFs.readdirSync.mockReturnValue([
+        mockFs.promises.readdir.mockResolvedValue([
           { name: 'index.ts', isDirectory: () => false, isFile: () => true }
         ] as any);
-        mockFs.readFileSync.mockReturnValue(fileContent);
+        mockFs.promises.readFile.mockResolvedValue(fileContent);
 
         const results = await performSearch('test', 'module', defaultOptions, undefined, modulePath);
 
@@ -149,6 +175,7 @@ describe('Search', () => {
 
       test('should return empty for non-existent module path', async () => {
         mockFs.existsSync.mockReturnValue(false);
+        mockFs.promises.access.mockRejectedValue(new Error('ENOENT'));
 
         const results = await performSearch('test', 'module', defaultOptions, undefined, '/nonexistent/module');
 
@@ -174,10 +201,11 @@ describe('Search', () => {
           isFile: () => true,
           size: 100 
         } as fs.Stats));
-        mockFs.readdirSync.mockReturnValue([
+        mockFs.promises.readdir.mockResolvedValue([
           { name: 'app.ts', isDirectory: () => false, isFile: () => true }
         ] as any);
-        mockFs.readFileSync.mockReturnValue(fileContent);
+        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
+        mockFs.promises.readFile.mockResolvedValue(fileContent);
 
         const results = await performSearch('test', 'project', defaultOptions);
 
@@ -204,15 +232,22 @@ describe('Search', () => {
           isFile: () => true,
           size: 100 
         } as fs.Stats));
-        mockFs.readdirSync.mockReturnValue([
-          { name: 'node_modules', isDirectory: () => true, isFile: () => false },
-          { name: 'src', isDirectory: () => true, isFile: () => false }
-        ] as any);
+        
+        // Setup mock to return different results based on path to avoid infinite recursion
+        mockFs.promises.readdir.mockImplementation((path: string) => {
+          if (path === '/workspace') {
+            return Promise.resolve([
+              { name: 'node_modules', isDirectory: () => true, isFile: () => false },
+              { name: 'src', isDirectory: () => true, isFile: () => false }
+            ] as any);
+          }
+          return Promise.resolve([]);
+        });
 
         await performSearch('test', 'project', defaultOptions);
 
         // readdirSync should be called for /workspace and /workspace/src, but not node_modules
-        const calls = mockFs.readdirSync.mock.calls.map(c => c[0]);
+        const calls = mockFs.promises.readdir.mock.calls.map(c => c[0]);
         expect(calls).toContain('/workspace');
         expect(calls).not.toContain('/workspace/node_modules');
       });
@@ -227,14 +262,21 @@ describe('Search', () => {
           isFile: () => true,
           size: 100 
         } as fs.Stats));
-        mockFs.readdirSync.mockReturnValue([
-          { name: '.git', isDirectory: () => true, isFile: () => false },
-          { name: 'src', isDirectory: () => true, isFile: () => false }
-        ] as any);
+        
+        // Setup mock to return different results based on path to avoid infinite recursion
+        mockFs.promises.readdir.mockImplementation((path: string) => {
+          if (path === '/workspace') {
+            return Promise.resolve([
+              { name: '.git', isDirectory: () => true, isFile: () => false },
+              { name: 'src', isDirectory: () => true, isFile: () => false }
+            ] as any);
+          }
+          return Promise.resolve([]);
+        });
 
         await performSearch('test', 'project', defaultOptions);
 
-        const calls = mockFs.readdirSync.mock.calls.map(c => c[0]);
+        const calls = mockFs.promises.readdir.mock.calls.map(c => c[0]);
         expect(calls).not.toContain('/workspace/.git');
       });
     });
@@ -250,27 +292,28 @@ describe('Search', () => {
           isFile: () => true,
           size: 100 
         } as fs.Stats));
-        mockFs.readdirSync.mockReturnValue([
+        mockFs.promises.readdir.mockResolvedValue([
           { name: 'image.png', isDirectory: () => false, isFile: () => true },
           { name: 'app.ts', isDirectory: () => false, isFile: () => true }
         ] as any);
-        mockFs.readFileSync.mockReturnValue('const test = 1;');
+        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
+        mockFs.promises.readFile.mockResolvedValue('const test = 1;');
 
         const results = await performSearch('test', 'project', defaultOptions);
 
         // Only app.ts should be searched, not image.png
-        expect(mockFs.readFileSync).toHaveBeenCalledTimes(1);
+        expect(mockFs.promises.readFile).toHaveBeenCalledTimes(1);
       });
 
       test('should skip large files (> 1MB)', async () => {
         const testFilePath = '/test/large.ts';
         
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockReturnValue({ size: 2 * 1024 * 1024 } as fs.Stats); // 2MB
+        mockFs.promises.stat.mockResolvedValue({ size: 2 * 1024 * 1024 } as fs.Stats); // 2MB
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
-        expect(mockFs.readFileSync).not.toHaveBeenCalled();
+        expect(mockFs.promises.readFile).not.toHaveBeenCalled();
         expect(results).toEqual([]);
       });
 
@@ -284,17 +327,18 @@ describe('Search', () => {
           isFile: () => true,
           size: 100 
         } as fs.Stats));
-        mockFs.readdirSync.mockReturnValue([
+        mockFs.promises.readdir.mockResolvedValue([
           { name: 'app.ts', isDirectory: () => false, isFile: () => true },
           { name: 'style.css', isDirectory: () => false, isFile: () => true }
         ] as any);
-        mockFs.readFileSync.mockReturnValue('const test = 1;');
+        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
+        mockFs.promises.readFile.mockResolvedValue('const test = 1;');
 
         const results = await performSearch('test', 'project', { ...defaultOptions, fileMask: '*.ts' });
 
         // Only .ts files should be searched
-        expect(mockFs.readFileSync).toHaveBeenCalledTimes(1);
-        expect(mockFs.readFileSync).toHaveBeenCalledWith(expect.stringContaining('app.ts'), 'utf-8');
+        expect(mockFs.promises.readFile).toHaveBeenCalledTimes(1);
+        expect(mockFs.promises.readFile).toHaveBeenCalledWith(expect.stringContaining('app.ts'), 'utf-8');
       });
     });
 
@@ -310,8 +354,7 @@ describe('Search', () => {
         }];
         
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockReturnValue({ size: 100 } as fs.Stats);
-        mockFs.readFileSync.mockReturnValue(diskContent);
+        mockFs.promises.readFile.mockResolvedValue(diskContent);
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -328,8 +371,8 @@ describe('Search', () => {
         const fileContent = lines.join('\n');
         
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockReturnValue({ size: 100 } as fs.Stats);
-        mockFs.readFileSync.mockReturnValue(fileContent);
+        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
+        mockFs.promises.readFile.mockResolvedValue(fileContent);
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -345,8 +388,8 @@ describe('Search', () => {
         const fileContent = '  const test = "hello";';
         
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockReturnValue({ size: 100 } as fs.Stats);
-        mockFs.readFileSync.mockReturnValue(fileContent);
+        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
+        mockFs.promises.readFile.mockResolvedValue(fileContent);
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -368,8 +411,8 @@ describe('Search', () => {
         const fileContent = 'test test test';
         
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockReturnValue({ size: 100 } as fs.Stats);
-        mockFs.readFileSync.mockReturnValue(fileContent);
+        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
+        mockFs.promises.readFile.mockResolvedValue(fileContent);
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -387,32 +430,28 @@ describe('Search', () => {
 
         // Mock fs functions to simulate permission denied
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.readdirSync.mockImplementation(() => {
-          throw new Error('Permission denied');
-        });
+        mockFs.promises.readdir.mockRejectedValue(new Error('Permission denied'));
 
         const results = await performSearch('test', 'project', defaultOptions);
 
         // Should not throw, just return empty results
         expect(results).toEqual([]);
         // The readdirSync should have been called with the correct parameters
-        expect(mockFs.readdirSync).toHaveBeenCalledWith('/workspace', { withFileTypes: true });
+        expect(mockFs.promises.readdir).toHaveBeenCalledWith('/workspace', { withFileTypes: true });
       });
 
       test('should handle file read errors gracefully', async () => {
         const testFilePath = '/test/file.ts';
 
         mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockReturnValue({ size: 100, isFile: () => true, isDirectory: () => false } as fs.Stats);
-        mockFs.readFileSync.mockImplementation(() => {
-          throw new Error('Permission denied');
-        });
+        mockFs.promises.stat.mockResolvedValue({ size: 100, isFile: () => true, isDirectory: () => false } as fs.Stats);
+        mockFs.promises.readFile.mockRejectedValue(new Error('Permission denied'));
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
         // Should not throw, just return empty results
         expect(results).toEqual([]);
-        expect(mockFs.readFileSync).toHaveBeenCalledWith(testFilePath, 'utf-8');
+        expect(mockFs.promises.readFile).toHaveBeenCalledWith(testFilePath, 'utf-8');
       });
     });
   });

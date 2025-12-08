@@ -110,6 +110,9 @@ interface FileContentMessage {
 
 let currentPanel: vscode.WebviewPanel | undefined;
 
+// Export for testing
+export { currentPanel as __test_currentPanel };
+
 export function activate(context: vscode.ExtensionContext) {
   console.log('Rifler extension is now active');
 
@@ -1855,6 +1858,14 @@ function getWebviewHtml(webview: vscode.Webview): string {
               state.replaceKeybinding = message.replaceKeybinding;
             }
             break;
+          case '__test_searchCompleted': // Test confirmation: search results received by webview
+            // Re-send to extension host for test to receive
+            vscode.postMessage({ type: '__test_searchResultsReceived', results: message.results });
+            break;
+          case '__test_setSearchInput': // Test utility: set search input and trigger search
+            queryInput.value = message.value;
+            runSearch();
+            break;
         }
       });
 
@@ -1917,6 +1928,9 @@ function getWebviewHtml(webview: vscode.Webview): string {
         state.activeIndex = results.length > 0 ? 0 : -1;
 
         resultsCount.textContent = results.length + (results.length >= 5000 ? '+' : '') + ' results';
+
+        // Send test confirmation message back to extension host
+        vscode.postMessage({ type: '__test_searchCompleted', results: results });
 
         if (results.length === 0) {
           resultsList.innerHTML = '<div class="empty-state">No results found</div>';

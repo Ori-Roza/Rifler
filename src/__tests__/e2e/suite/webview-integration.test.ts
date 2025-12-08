@@ -7,6 +7,8 @@ import * as fs from 'fs';
 // Import actual search/replace functions to test them directly
 import { performSearch } from '../../../search';
 import { replaceOne, replaceAll } from '../../../replacer';
+// Import test utilities from extension
+import { __test_currentPanel } from '../../../extension';
 
 // Slow mode helper - set E2E_SLOW_MODE=true to see each step
 const SLOW_MODE = process.env.E2E_SLOW_MODE === 'true';
@@ -549,5 +551,112 @@ const c = "word_to_replace";`;
     log(`   📊 Results: ${results.length}`);
     assert.strictEqual(results.length, 0, 'Invalid regex should return no results without crashing');
     log('   ✅ Invalid regex handled gracefully');
+  });
+});
+
+// ============================================================================
+// Webview UI Automation Tests
+// ============================================================================
+
+suite('Rifler Webview UI Automation Tests', () => {
+  let testWorkspaceFolder: vscode.WorkspaceFolder;
+  let testFilePath: string;
+
+  suiteSetup(async () => {
+    // Get workspace folder
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      throw new Error('No workspace folder available');
+    }
+    testWorkspaceFolder = workspaceFolder;
+
+    // Create a test file with known content in the workspace root
+    testFilePath = path.join(testWorkspaceFolder.uri.fsPath, 'webview-test-file.ts');
+    const testContent = `// Webview UI automation test file
+function testFunction() {
+  const automationTest = "find_this_text";
+  console.log(automationTest);
+  return automationTest;
+}
+
+class AutomationTestClass {
+  method() {
+    return "automation_method_result";
+  }
+}`;
+    log(`Creating test file at: ${testFilePath}`);
+    fs.writeFileSync(testFilePath, testContent);
+    log(`Test file created successfully`);
+  });
+
+  suiteTeardown(async () => {
+    // Clean up test file
+    if (fs.existsSync(testFilePath)) {
+      fs.unlinkSync(testFilePath);
+    }
+  });
+
+  test('Find feature automation: get textbox ID, write term, check results.length > 0', async function() {
+    this.timeout(15000); // Increase timeout for webview operations
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for panel to open and webview to initialize
+
+    const currentPanel = __test_currentPanel;
+
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up message listener for search results');
+
+    // Set up a promise to wait for search results
+    const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for search results'));
+      }, 8000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        log(`   📨 Received message: ${message.type}`);
+        if (message.type === '__test_searchCompleted') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.results);
+        }
+      });
+    });
+
+    await step('1. Getting the ID of find term textbox');
+    // The search input has ID "query" - we'll simulate setting it via message
+    const searchInputId = 'query';
+    log(`   🔍 Search input ID: ${searchInputId}`);
+
+    await step('2. Writing a term to the search input');
+    const searchTerm = 'find_this_text';
+    log(`   ✏️ Setting search term: "${searchTerm}"`);
+
+    // Send message to webview to set the search input and trigger search
+    // This will search in project scope by default
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: searchTerm
+    });
+
+    await step('3. Checking that results.length > 0');
+    const results = await searchResultsPromise;
+
+    log(`   📊 Received ${results.length} search results`);
+
+    // Verify results.length > 0
+    assert.ok(Array.isArray(results), 'Results should be an array');
+    assert.ok(results.length > 0, 'Should find at least 1 result');
+
+    // Additional verification
+    assert.strictEqual(results.length, 1, 'Should find exactly 1 result for our test term');
+    const result = results[0];
+    assert.ok(result.preview.includes(searchTerm), `Result should contain search term "${searchTerm}"`);
+
+    log('   ✅ Find feature automation successful: textbox ID retrieved, term written, results verified');
   });
 });

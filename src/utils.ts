@@ -206,6 +206,31 @@ export function collectFiles(
 }
 
 /**
+ * Simple concurrency limiter
+ */
+export class Limiter {
+  private active = 0;
+  private queue: (() => void)[] = [];
+  
+  constructor(private max: number) {}
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.active >= this.max) {
+      await new Promise<void>(resolve => this.queue.push(resolve));
+    }
+    this.active++;
+    try {
+      return await fn();
+    } finally {
+      this.active--;
+      if (this.queue.length > 0) {
+        this.queue.shift()!();
+      }
+    }
+  }
+}
+
+/**
  * Escape HTML special characters
  */
 export function escapeHtml(text: string): string {

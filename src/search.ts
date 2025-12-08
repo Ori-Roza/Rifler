@@ -8,7 +8,8 @@ import {
   buildSearchRegex, 
   matchesFileMask,
   EXCLUDE_DIRS,
-  BINARY_EXTENSIONS
+  BINARY_EXTENSIONS,
+  Limiter
 } from './utils';
 
 export async function performSearch(
@@ -32,42 +33,50 @@ export async function performSearch(
 
   const results: SearchResult[] = [];
   const maxResults = 5000;
+  const limiter = new Limiter(100);
 
   // For directory or module scope, search directly in filesystem
   if (scope === 'file' && filePath) {
-    searchInFile(filePath, regex, results, maxResults);
+    await searchInFileAsync(filePath, regex, results, maxResults);
   } else if (scope === 'directory') {
     let searchPath = (directoryPath || '').trim();
-    console.log('Directory search path:', searchPath, 'exists:', searchPath ? fs.existsSync(searchPath) : false);
     
-    if (searchPath && fs.existsSync(searchPath)) {
-      const stat = fs.statSync(searchPath);
-      if (stat.isDirectory()) {
-        // Search in the directory
-        await searchInDirectory(searchPath, regex, options.fileMask, results, maxResults);
+    try {
+      if (searchPath) {
+        const stat = await fs.promises.stat(searchPath);
+        console.log('Directory search path:', searchPath, 'exists: true');
+        
+        if (stat.isDirectory()) {
+          // Search in the directory
+          await searchInDirectory(searchPath, regex, options.fileMask, results, maxResults, limiter);
+        } else {
+          console.log('Path is a file, searching only in:', searchPath);
+          await searchInFileAsync(searchPath, regex, results, maxResults);
+        }
       } else {
-
-        console.log('Path is a file, searching only in:', searchPath);
-        searchInFile(searchPath, regex, results, maxResults);
+        console.log('Directory path is empty');
       }
-    } else {
-      console.log('Directory does not exist or is empty, returning no results');
-      // Don't fall back to project - user explicitly chose directory scope
+    } catch (error) {
+      console.log('Directory does not exist or cannot be accessed:', searchPath);
     }
   } else if (scope === 'module' && modulePath) {
-    if (fs.existsSync(modulePath)) {
-      await searchInDirectory(modulePath, regex, options.fileMask, results, maxResults);
+    try {
+      await fs.promises.access(modulePath);
+      await searchInDirectory(modulePath, regex, options.fileMask, results, maxResults, limiter);
+    } catch {
+      // Module path doesn't exist
     }
   } else {
     // Project scope - use workspace
     const workspaceFolders = vscode.workspace.workspaceFolders;
     console.log('Workspace folders:', workspaceFolders ? workspaceFolders.map(f => f.uri.fsPath) : 'None');
     if (workspaceFolders) {
-      for (const folder of workspaceFolders) {
-        if (results.length >= maxResults) break;
+      const tasks = workspaceFolders.map(folder => {
+        if (results.length >= maxResults) return Promise.resolve();
         console.log('Searching in folder:', folder.uri.fsPath);
-        await searchInDirectory(folder.uri.fsPath, regex, options.fileMask, results, maxResults);
-      }
+        return searchInDirectory(folder.uri.fsPath, regex, options.fileMask, results, maxResults, limiter);
+      });
+      await Promise.all(tasks);
     }
   }
 
@@ -80,11 +89,14 @@ async function searchInDirectory(
   regex: RegExp,
   fileMask: string,
   results: SearchResult[],
-  maxResults: number
+  maxResults: number,
+  limiter: Limiter
 ): Promise<void> {
   // console.log('Searching directory:', dirPath);
   try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    const entries = await limiter.run(() => fs.promises.readdir(dirPath, { withFileTypes: true }));
+
+    const tasks: Promise<void>[] = [];
 
     for (const entry of entries) {
       if (results.length >= maxResults) break;
@@ -93,27 +105,29 @@ async function searchInDirectory(
 
       if (entry.isDirectory()) {
         if (!EXCLUDE_DIRS.has(entry.name) && !entry.name.startsWith('.')) {
-          await searchInDirectory(fullPath, regex, fileMask, results, maxResults);
+          tasks.push(searchInDirectory(fullPath, regex, fileMask, results, maxResults, limiter));
         }
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
         if (!BINARY_EXTENSIONS.has(ext) && matchesFileMask(entry.name, fileMask)) {
           // console.log('Searching file:', fullPath);
-          searchInFile(fullPath, regex, results, maxResults);
+          tasks.push(limiter.run(() => searchInFileAsync(fullPath, regex, results, maxResults)));
         }
       }
     }
+    
+    await Promise.all(tasks);
   } catch (error) {
     console.error('Error reading directory:', dirPath, error);
   }
 }
 
-function searchInFile(
+async function searchInFileAsync(
   filePath: string,
   regex: RegExp,
   results: SearchResult[],
   maxResults: number
-): void {
+): Promise<void> {
   try {
     let content: string;
     
@@ -124,9 +138,9 @@ function searchInFile(
       content = openDoc.getText();
     } else {
       // Check file size - skip files larger than 1MB
-      const stats = fs.statSync(filePath);
+      const stats = await fs.promises.stat(filePath);
       if (stats.size > 1024 * 1024) return;
-      content = fs.readFileSync(filePath, 'utf-8');
+      content = await fs.promises.readFile(filePath, 'utf-8');
     }
 
     const lines = content.split('\n');

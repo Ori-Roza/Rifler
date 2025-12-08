@@ -43,6 +43,38 @@
 2. Enter replacement text
 3. Press `Enter` to replace current match, or `Cmd+Enter` to replace all
 
+### Replace in Preview Editor
+While editing a file in the preview panel:
+1. Press `Ctrl+Shift+R` (default) to open the replace widget
+2. Use `↑/↓` arrows or `Enter/Shift+Enter` to navigate between matches
+3. Press `Enter` to replace current match, or `Cmd+Enter` to replace all
+
+## Customizing Keybindings
+
+### Replace in Preview Keybinding
+The keybinding to open the replace widget while editing in the preview can be customized via VS Code settings:
+
+1. Open Settings (`Cmd+,` on Mac / `Ctrl+,` on Windows/Linux)
+2. Search for "rifler"
+3. Change **Rifler: Replace In Preview Keybinding** to your preferred keybinding
+
+Or add to your `settings.json`:
+```json
+{
+  "rifler.replaceInPreviewKeybinding": "ctrl+shift+r"
+}
+```
+
+**Format:** `modifier+key` (e.g., `ctrl+shift+r`, `cmd+r`, `alt+h`, `ctrl+h`)
+
+### Global Keybindings
+To customize the main Rifler keybindings, open Keyboard Shortcuts (`Cmd+K Cmd+S`) and search for "rifler":
+
+| Command | Default (Mac) | Default (Windows/Linux) |
+|---------|---------------|------------------------|
+| Rifler: Open | `Cmd+Shift+F` | `Ctrl+Shift+F` |
+| Rifler: Open Replace | `Option+Shift+F` | `Alt+Shift+F` |
+
 ## Installation
 
 ### From VSIX
@@ -82,6 +114,66 @@ Average search time: **5ms** | Max results: **5000**
 - 💾 Memory efficient (1MB file size limit)
 
 *Run `node benchmark.js` in your own project to test performance*
+
+## Testing
+
+### Unit Tests
+Run the unit test suite:
+```bash
+npm test
+```
+
+### Coverage Report
+Generate test coverage:
+```bash
+npm run test:coverage
+```
+
+### End-to-End Tests
+Run automated E2E tests that simulate user interactions using the official VS Code testing CLI:
+```bash
+npm run test:e2e
+```
+
+**Watch E2E tests live** (like Selenium browser testing):
+```bash
+npm run test:e2e:visible
+```
+This opens VS Code windows where you can see the tests running in real-time, perfect for debugging and understanding test behavior.
+
+**Debug E2E tests** with inspector:
+```bash
+npm run test:e2e:debug
+```
+
+**Analyze E2E test coverage** (feature coverage analysis):
+```bash
+npm run test:e2e:coverage
+```
+
+**Run combined coverage** (unit tests + E2E tests):
+```bash
+npm run test:combined-coverage
+```
+
+The E2E tests automatically:
+- Download and launch the specified version of VS Code
+- Load your extension in development mode
+- Test command registration and execution
+- Verify webview panel creation
+- Test configuration handling
+- Validate search and replace functionality
+- Run on Windows, macOS, and Linux via GitHub Actions
+
+Tests are configured using `.vscode-test.js` for maximum flexibility and CI/CD compatibility.
+
+### CI/CD Automation
+Tests run automatically on:
+- Every push to main/develop branches
+- All pull requests
+- Multiple operating systems (Windows, macOS, Linux)
+
+View test results and coverage in the Actions tab.
 
 ## Requirements
 

@@ -94,9 +94,9 @@ describe('Replacer', () => {
 
       (search.performSearch as jest.Mock).mockResolvedValue(mockResults);
 
-      await replaceAll(query, replaceText, scope, defaultOptions, undefined, undefined, onRefresh);
+      await replaceAll(query, replaceText, scope, defaultOptions, undefined, undefined, undefined, onRefresh);
 
-      expect(search.performSearch).toHaveBeenCalledWith(query, scope, defaultOptions, undefined, undefined);
+      expect(search.performSearch).toHaveBeenCalledWith(query, scope, defaultOptions, undefined, undefined, undefined);
       expect(vscode.WorkspaceEdit).toHaveBeenCalled();
       expect(mockEdit.replace).toHaveBeenCalledTimes(2);
       expect(vscode.workspace.applyEdit).toHaveBeenCalledWith(mockEdit);
@@ -113,7 +113,7 @@ describe('Replacer', () => {
       (search.performSearch as jest.Mock).mockResolvedValue([]);
       const onRefresh = jest.fn();
 
-      await replaceAll('query', 'replace', 'project', defaultOptions, undefined, undefined, onRefresh);
+      await replaceAll('query', 'replace', 'project', defaultOptions, undefined, undefined, undefined, onRefresh);
 
       expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('No occurrences found to replace.');
       expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
@@ -135,10 +135,73 @@ describe('Replacer', () => {
       (vscode.workspace.applyEdit as unknown as jest.Mock).mockResolvedValue(false);
       const onRefresh = jest.fn();
 
-      await replaceAll('query', 'replace', 'project', defaultOptions, undefined, undefined, onRefresh);
+      await replaceAll('query', 'replace', 'project', defaultOptions, undefined, undefined, undefined, onRefresh);
 
       expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('Failed to apply replacements.');
       expect(onRefresh).not.toHaveBeenCalled();
+    });
+
+    test('should handle save errors gracefully', async () => {
+      const mockResults = [
+        {
+          uri: 'file:///test/file1.ts',
+          line: 1,
+          character: 5,
+          length: 3,
+          fileName: 'file1.ts',
+          relativePath: 'test/file1.ts',
+          preview: 'some old text',
+          previewMatchRange: { start: 5, end: 8 }
+        }
+      ];
+
+      (search.performSearch as jest.Mock).mockResolvedValue(mockResults);
+      
+      // Mock save to throw error
+      const mockDocWithError = {
+        save: jest.fn().mockRejectedValue(new Error('Save failed'))
+      };
+      (vscode.workspace.openTextDocument as unknown as jest.Mock).mockResolvedValue(mockDocWithError);
+      
+      const onRefresh = jest.fn().mockResolvedValue(undefined);
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      await replaceAll('query', 'replace', 'project', defaultOptions, undefined, undefined, undefined, onRefresh);
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to save'), expect.any(Error));
+      // Should still show success and call refresh
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(expect.stringContaining('Replaced 1 occurrences'));
+      expect(onRefresh).toHaveBeenCalled();
+      
+      consoleSpy.mockRestore();
+    });
+
+    test('should handle performSearch error', async () => {
+      (search.performSearch as jest.Mock).mockRejectedValue(new Error('Search failed'));
+      const onRefresh = jest.fn();
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      await replaceAll('query', 'replace', 'project', defaultOptions, undefined, undefined, undefined, onRefresh);
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Error replacing all'), expect.any(Error));
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(expect.stringContaining('Could not replace all'));
+      expect(onRefresh).not.toHaveBeenCalled();
+      
+      consoleSpy.mockRestore();
+    });
+
+    test('should pass directory, module, and file paths to performSearch', async () => {
+      (search.performSearch as jest.Mock).mockResolvedValue([]);
+      const onRefresh = jest.fn();
+
+      await replaceAll('query', 'replace', 'directory', defaultOptions, '/test/dir', undefined, undefined, onRefresh);
+      expect(search.performSearch).toHaveBeenCalledWith('query', 'directory', defaultOptions, '/test/dir', undefined, undefined);
+
+      await replaceAll('query', 'replace', 'module', defaultOptions, undefined, '/test/module', undefined, onRefresh);
+      expect(search.performSearch).toHaveBeenCalledWith('query', 'module', defaultOptions, undefined, '/test/module', undefined);
+
+      await replaceAll('query', 'replace', 'file', defaultOptions, undefined, undefined, '/test/file.ts', onRefresh);
+      expect(search.performSearch).toHaveBeenCalledWith('query', 'file', defaultOptions, undefined, undefined, '/test/file.ts');
     });
   });
 });

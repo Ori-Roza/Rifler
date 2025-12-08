@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
@@ -11,6 +11,22 @@
   },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "search",
+    "regex",
+    "rifler",
+    "file mask",
+    "preview",
+    "file search",
+    "quick open",
+    "file opener",
+    "navigation",
+    "go to file",
+    "productivity",
+    "speed",
+    "fuzzy search",
+    "fast search"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
@@ -37,7 +53,17 @@
         "key": "alt+shift+f",
         "mac": "alt+shift+f"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Rifler",
+      "properties": {
+        "rifler.replaceInPreviewKeybinding": {
+          "type": "string",
+          "default": "ctrl+shift+r",
+          "description": "Keybinding to open Replace in Preview while editing a file in Rifler. Format: modifier+key (e.g., ctrl+shift+r, cmd+r)"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -47,18 +73,31 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:e2e": "vscode-test --label e2e-tests",
+    "test:e2e:debug": "vscode-test --label e2e-tests --debug",
+    "test:e2e:visible": "vscode-test --label e2e-tests-visible",
+    "test:e2e:slow": "E2E_SLOW_MODE=true vscode-test --label e2e-tests-visible",
+    "test:e2e:coverage": "node scripts/analyze-e2e-coverage.js",
+    "test:combined-coverage": "npm run test:coverage && echo '\\n=== UNIT TEST COVERAGE ABOVE ===\\n' && npm run test:e2e && echo '\\n=== E2E TESTS PASSED ===\\n'",
     "package": "vsce package",
     "build:package": "npm run vscode:prepublish && vsce package"
   },
   "devDependencies": {
     "@types/jest": "^29.5.11",
-    "@types/node": "^20.10.0",
+    "@types/mocha": "^10.0.10",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "eslint": "^8.55.0",
+    "glob": "^13.0.0",
     "jest": "^29.7.0",
+    "mocha": "^11.7.5",
     "ts-jest": "^29.1.1",
     "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "highlight.js": "^11.11.1"
   }
 }

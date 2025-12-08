@@ -609,23 +609,40 @@ class AutomationTestClass {
       throw new Error('Rifler panel was not created');
     }
 
+    log(`   Panel visible: ${currentPanel.visible}`);
+    log(`   Panel active: ${currentPanel.active}`);
+
     await step('Setting up message listener for search results');
+
+    let messageCount = 0;
 
     // Set up a promise to wait for search results
     const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
       const timeout = setTimeout(() => {
+        console.log(`   ⏰ Timeout reached. Total messages received: ${messageCount}`);
         reject(new Error('Timeout waiting for search results'));
       }, 8000);
 
       const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
-        log(`   📨 Received message: ${message.type}`);
+        messageCount++;
+        console.log(`   📨 Received message #${messageCount}: ${message.type}`);
         if (message.type === '__test_searchCompleted') {
+          console.log(`   🎉 Got search results! Count: ${message.results?.length}`);
           clearTimeout(timeout);
           disposable.dispose();
           resolve(message.results);
+        } else if (message.type === 'webviewReady') {
+          console.log(`   ✅ Webview is ready`);
+        } else if (message.type === 'runSearch') {
+          console.log(`   🔍 Search request received by extension: ${JSON.stringify(message)}`);
         }
       });
+      
+      console.log(`   📡 Message listener registered`);
     });
+
+    // Wait a bit more to ensure webview JS is fully loaded
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     await step('1. Getting the ID of find term textbox');
     // The search input has ID "query" - we'll simulate setting it via message

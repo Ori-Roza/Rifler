@@ -145,6 +145,27 @@ async function searchInFileAsync(
 
     const lines = content.split('\n');
     const fileName = path.basename(filePath);
+    
+    // Calculate relative path including workspace folder name
+    // e.g., "rifler/src/utils/helper.ts" instead of full absolute path
+    let relativePath = fileName; // Default to just filename if no workspace match
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (workspaceFolders) {
+      for (const folder of workspaceFolders) {
+        const folderPath = folder.uri.fsPath;
+        const folderName = path.basename(folderPath);
+        // Normalize paths for comparison
+        const normalizedFilePath = path.normalize(filePath);
+        const normalizedFolderPath = path.normalize(folderPath);
+        
+        if (normalizedFilePath.startsWith(normalizedFolderPath + path.sep) || normalizedFilePath === normalizedFolderPath) {
+          // Get path relative to workspace folder, then prepend folder name
+          const pathFromFolder = path.relative(normalizedFolderPath, normalizedFilePath);
+          relativePath = path.join(folderName, pathFromFolder);
+          break;
+        }
+      }
+    }
 
     for (let lineIndex = 0; lineIndex < lines.length && results.length < maxResults; lineIndex++) {
       const line = lines[lineIndex];
@@ -164,7 +185,7 @@ async function searchInFileAsync(
         results.push({
           uri: vscode.Uri.file(filePath).toString(),
           fileName,
-          relativePath: filePath,
+          relativePath,
           line: lineIndex,
           character: match.index,
           length: match[0].length,

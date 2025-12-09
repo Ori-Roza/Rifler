@@ -109,8 +109,9 @@ async function searchInDirectory(
         }
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
-        if (!BINARY_EXTENSIONS.has(ext) && matchesFileMask(entry.name, fileMask)) {
-          // console.log('Searching file:', fullPath);
+        const isBinary = BINARY_EXTENSIONS.has(ext);
+        const matchesMask = matchesFileMask(entry.name, fileMask);
+        if (!isBinary && matchesMask) {
           tasks.push(limiter.run(() => searchInFileAsync(fullPath, regex, results, maxResults)));
         }
       }

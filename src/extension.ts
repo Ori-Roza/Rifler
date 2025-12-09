@@ -154,12 +154,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   const openCommand = vscode.commands.registerCommand(
     'rifler.open',
-    () => openSearchPanel(context)
+    () => {
+      const selectedText = getSelectedText();
+      openSearchPanel(context, false, undefined, selectedText);
+    }
   );
 
   const openReplaceCommand = vscode.commands.registerCommand(
     'rifler.openReplace',
-    () => openSearchPanel(context, true)
+    () => {
+      const selectedText = getSelectedText();
+      openSearchPanel(context, true, undefined, selectedText);
+    }
   );
 
   const restoreCommand = vscode.commands.registerCommand(
@@ -187,6 +193,20 @@ export function deactivate() {
   if (statusBarItem) {
     statusBarItem.dispose();
   }
+}
+
+/**
+ * Get the currently selected text from the active editor
+ */
+function getSelectedText(): string | undefined {
+  const editor = vscode.window.activeTextEditor;
+  if (editor) {
+    const selection = editor.selection;
+    if (!selection.isEmpty) {
+      return editor.document.getText(selection);
+    }
+  }
+  return undefined;
 }
 
 // ============================================================================
@@ -240,12 +260,15 @@ function restorePanel(context: vscode.ExtensionContext): void {
 // Panel Management
 // ============================================================================
 
-function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean = false, restoreState?: MinimizeMessage['state']): void {
-  // If panel already exists, reveal it
+function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean = false, restoreState?: MinimizeMessage['state'], initialQuery?: string): void {
+  // If panel already exists, reveal it and send initial query if provided
   if (currentPanel) {
     currentPanel.reveal(vscode.ViewColumn.Beside);
     if (showReplace) {
       currentPanel.webview.postMessage({ type: 'showReplace' });
+    }
+    if (initialQuery) {
+      currentPanel.webview.postMessage({ type: 'setSearchQuery', query: initialQuery });
     }
     return;
   }
@@ -270,6 +293,7 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
   // Store the replace mode state to send it when webview is ready
   const shouldShowReplace = showReplace;
   const stateToRestore = restoreState;
+  const queryToSet = initialQuery;
 
   currentPanel.webview.onDidReceiveMessage(
     async (message: WebviewMessage) => {
@@ -287,6 +311,11 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
           // Restore state if available
           if (stateToRestore) {
             currentPanel?.webview.postMessage({ type: 'restoreState', state: stateToRestore });
+          }
+          
+          // Set initial query if provided (from selected text)
+          if (queryToSet) {
+            currentPanel?.webview.postMessage({ type: 'setSearchQuery', query: queryToSet });
           }
           break;
         case 'runSearch':
@@ -537,16 +566,7 @@ async function runSearch(
     return;
   }
 
-  // Get the currently active editor's file to exclude from results (like PyCharm)
-  const activeEditor = vscode.window.activeTextEditor;
-  const activeFileUri = activeEditor?.document.uri.toString();
-
-  let results = await performSearch(query, scope, options, directoryPath, modulePath, filePath);
-  
-  // Exclude the active file from results
-  if (activeFileUri) {
-    results = results.filter(r => r.uri !== activeFileUri);
-  }
+  const results = await performSearch(query, scope, options, directoryPath, modulePath, filePath);
   
   console.log('Sending searchResults to webview:', results.length, 'results');
   panel.webview.postMessage({
@@ -2149,6 +2169,22 @@ function getWebviewHtml(webview: vscode.Webview): string {
             } else {
               replaceInput.focus();
               replaceInput.select();
+            }
+            break;
+          case 'setSearchQuery':
+            // Set query from selected text and trigger search
+            if (message.query) {
+              queryInput.value = message.query;
+              state.currentQuery = message.query;
+              queryInput.focus();
+              queryInput.select();
+              if (message.query.length >= 2) {
+                // Small delay to ensure UI is fully ready, then trigger search
+                setTimeout(() => {
+                  console.log('Triggering search for:', message.query);
+                  runSearch();
+                }, 100);
+              }
             }
             break;
           case 'config':

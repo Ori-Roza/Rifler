@@ -7,6 +7,10 @@
   Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview with inline editing.
 </div>
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_v2.gif" alt="Rifler Demo" width="100%"/>
+</div>
+
 ## Features
 
 - **Dynamic Search** - Results appear as you type (no Find button needed)

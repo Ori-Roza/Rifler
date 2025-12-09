@@ -63,22 +63,38 @@ export function buildSearchRegex(query: string, options: SearchOptions): RegExp 
  * Check if a filename matches a file mask pattern
  */
 export function matchesFileMask(fileName: string, fileMask: string): boolean {
-  if (!fileMask.trim()) return true;
-  
-  // Support multiple masks separated by comma or semicolon
-  const masks = fileMask.split(/[,;]/).map(m => m.trim()).filter(m => m);
-  if (masks.length === 0) return true;
-  
-  return masks.some(mask => {
-    // Convert glob pattern to regex
-    const regexPattern = mask
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // Escape special chars except * and ?
-      .replace(/\*/g, '.*')                    // * matches any characters
-      .replace(/\?/g, '.');                    // ? matches single character
-    
+  const trimmed = fileMask.trim();
+  if (!trimmed) return true;
+
+  // Split on comma/semicolon, support include and exclude masks (leading !)
+  const tokens = trimmed.split(/[,;]/).map(m => m.trim()).filter(Boolean);
+  if (tokens.length === 0) return true;
+
+  const includes: RegExp[] = [];
+  const excludes: RegExp[] = [];
+
+  for (const token of tokens) {
+    const isExclude = token.startsWith('!');
+    const pattern = isExclude ? token.slice(1).trim() : token;
+    if (!pattern) continue;
+
+    const regexPattern = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special chars except * and ?
+      .replace(/\*/g, '.*')                   // * matches any characters
+      .replace(/\?/g, '.');                   // ? matches a single character
+
     const regex = new RegExp(`^${regexPattern}$`, 'i');
-    return regex.test(fileName);
-  });
+    if (isExclude) {
+      excludes.push(regex);
+    } else {
+      includes.push(regex);
+    }
+  }
+
+  const matchesInclude = includes.length === 0 || includes.some(r => r.test(fileName));
+  const matchesExclude = excludes.some(r => r.test(fileName));
+
+  return matchesInclude && !matchesExclude; // Excludes always win
 }
 
 /**

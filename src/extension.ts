@@ -78,6 +78,20 @@ interface WebviewReadyMessage {
   type: 'webviewReady';
 }
 
+interface MinimizeMessage {
+  type: 'minimize';
+  state: {
+    query: string;
+    replaceText: string;
+    scope: string;
+    directoryPath: string;
+    modulePath: string;
+    filePath: string;
+    options: SearchOptions;
+    showReplace: boolean;
+  };
+}
+
 // Test-only message types
 interface TestSearchCompletedMessage {
   type: '__test_searchCompleted';
@@ -98,7 +112,7 @@ interface TestErrorMessage {
   error?: unknown;
 }
 
-type WebviewMessage = RunSearchMessage | OpenLocationMessage | GetModulesMessage | GetCurrentDirectoryMessage | GetFileContentMessage | ReplaceOneMessage | ReplaceAllMessage | WebviewReadyMessage | SaveFileMessage | TestSearchCompletedMessage | TestSearchResultsReceivedMessage | TestErrorMessage;
+type WebviewMessage = RunSearchMessage | OpenLocationMessage | GetModulesMessage | GetCurrentDirectoryMessage | GetFileContentMessage | ReplaceOneMessage | ReplaceAllMessage | WebviewReadyMessage | SaveFileMessage | MinimizeMessage | TestSearchCompletedMessage | TestSearchResultsReceivedMessage | TestErrorMessage;
 
 /** Messages from Extension to Webview */
 interface SearchResultsMessage {
@@ -129,6 +143,8 @@ interface FileContentMessage {
 // ============================================================================
 
 let currentPanel: vscode.WebviewPanel | undefined;
+let statusBarItem: vscode.StatusBarItem | undefined;
+let savedState: MinimizeMessage['state'] | undefined;
 
 // Export for testing
 export { currentPanel as __test_currentPanel };
@@ -146,12 +162,77 @@ export function activate(context: vscode.ExtensionContext) {
     () => openSearchPanel(context, true)
   );
 
-  context.subscriptions.push(openCommand, openReplaceCommand);
+  const restoreCommand = vscode.commands.registerCommand(
+    'rifler.restore',
+    () => restorePanel(context)
+  );
+
+  const minimizeCommand = vscode.commands.registerCommand(
+    'rifler.minimize',
+    () => {
+      if (currentPanel) {
+        // Request state from webview before minimizing
+        currentPanel.webview.postMessage({ type: 'requestStateForMinimize' });
+      }
+    }
+  );
+
+  context.subscriptions.push(openCommand, openReplaceCommand, restoreCommand, minimizeCommand);
 }
 
 export function deactivate() {
   if (currentPanel) {
     currentPanel.dispose();
+  }
+  if (statusBarItem) {
+    statusBarItem.dispose();
+  }
+}
+
+// ============================================================================
+// Status Bar Minimize/Restore
+// ============================================================================
+
+function minimizeToStatusBar(context: vscode.ExtensionContext, state?: MinimizeMessage['state']): void {
+  // Save the state before closing
+  if (state) {
+    savedState = state;
+  }
+
+  // Hide the panel
+  if (currentPanel) {
+    currentPanel.dispose();
+    currentPanel = undefined;
+  }
+
+  // Create status bar item if it doesn't exist
+  if (!statusBarItem) {
+    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    statusBarItem.command = 'rifler.restore';
+    context.subscriptions.push(statusBarItem);
+  }
+
+  statusBarItem.text = '$(bookmark) Rifler';
+  statusBarItem.tooltip = 'Click to restore Rifler';
+  statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+  statusBarItem.show();
+}
+
+function restorePanel(context: vscode.ExtensionContext): void {
+  // Hide status bar item
+  if (statusBarItem) {
+    statusBarItem.hide();
+  }
+
+  // Open the panel and restore state
+  openSearchPanel(context, false, savedState);
+  
+  // Clear saved state after restoring
+  savedState = undefined;
+  
+  // Ensure the panel is focused so the editor title button appears
+  if (currentPanel) {
+    currentPanel.reveal(vscode.ViewColumn.Beside, false); // false = take focus
   }
 }
 
@@ -159,7 +240,7 @@ export function deactivate() {
 // Panel Management
 // ============================================================================
 
-function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean = false): void {
+function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean = false, restoreState?: MinimizeMessage['state']): void {
   // If panel already exists, reveal it
   if (currentPanel) {
     currentPanel.reveal(vscode.ViewColumn.Beside);
@@ -188,6 +269,7 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
 
   // Store the replace mode state to send it when webview is ready
   const shouldShowReplace = showReplace;
+  const stateToRestore = restoreState;
 
   currentPanel.webview.onDidReceiveMessage(
     async (message: WebviewMessage) => {
@@ -200,6 +282,11 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
           
           if (shouldShowReplace) {
             currentPanel?.webview.postMessage({ type: 'showReplace' });
+          }
+          
+          // Restore state if available
+          if (stateToRestore) {
+            currentPanel?.webview.postMessage({ type: 'restoreState', state: stateToRestore });
           }
           break;
         case 'runSearch':
@@ -228,6 +315,9 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
           break;
         case 'saveFile':
           await saveFile(currentPanel!, message.uri, message.content);
+          break;
+        case 'minimize':
+          minimizeToStatusBar(context, message.state);
           break;
         case 'replaceOne':
           await replaceOne(message.uri, message.line, message.character, message.length, message.replaceText);
@@ -304,6 +394,7 @@ async function findWorkspaceModules(): Promise<ModuleInfo[]> {
     '**/go.mod',
     '**/pom.xml'
   ];
+
 
   for (const pattern of moduleIndicators) {
     const files = await vscode.workspace.findFiles(pattern, '**/node_modules/**', 100);
@@ -2065,6 +2156,60 @@ function getWebviewHtml(webview: vscode.Webview): string {
               state.replaceKeybinding = message.replaceKeybinding;
             }
             break;
+          case 'restoreState':
+            // Restore saved state from minimize
+            if (message.state) {
+              const s = message.state;
+              queryInput.value = s.query || '';
+              replaceInput.value = s.replaceText || '';
+              state.currentScope = s.scope || 'project';
+              directoryInput.value = s.directoryPath || '';
+              moduleSelect.value = s.modulePath || '';
+              fileInput.value = s.filePath || '';
+              state.options = s.options || { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' };
+              
+              // Update UI checkboxes
+              matchCaseCheckbox.checked = state.options.matchCase;
+              wholeWordCheckbox.checked = state.options.wholeWord;
+              useRegexCheckbox.checked = state.options.useRegex;
+              fileMaskInput.value = state.options.fileMask || '';
+              
+              // Update scope tabs
+              scopeTabs.forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.scope === state.currentScope);
+              });
+              if (state.currentScope === 'file') {
+                scopeFileBtn.style.display = 'block';
+              }
+              updateScopeInputs();
+              
+              // Show replace row if it was visible
+              if (s.showReplace && !replaceRow.classList.contains('visible')) {
+                toggleReplace();
+              }
+              
+              // Re-run search if there was a query
+              if (s.query && s.query.length >= 2) {
+                runSearch();
+              }
+            }
+            break;
+          case 'requestStateForMinimize':
+            // Extension is requesting state before minimizing (from editor title button)
+            vscode.postMessage({ 
+              type: 'minimize',
+              state: {
+                query: queryInput.value,
+                replaceText: replaceInput.value,
+                scope: state.currentScope,
+                directoryPath: directoryInput.value,
+                modulePath: moduleSelect.value,
+                filePath: fileInput.value,
+                options: state.options,
+                showReplace: replaceRow.classList.contains('visible')
+              }
+            });
+            break;
           case '__test_searchCompleted': // Test confirmation: search results received by webview
             // Re-send to extension host for test to receive
             vscode.postMessage({ type: '__test_searchResultsReceived', results: message.results });
@@ -2209,7 +2354,7 @@ function getWebviewHtml(webview: vscode.Webview): string {
 
             html += '<div class="result-item' + (isActive ? ' active' : '') + '" data-index="' + result.globalIndex + '">' +
               '<div class="result-file">' +
-                '<span class="result-filename">' + escapeHtml(result.fileName) + '</span>' +
+                '<span class="result-filename">' + escapeHtml(result.relativePath || result.fileName) + '</span>' +
                 '<span class="result-location">:' + (result.line + 1) + '</span>' +
               '</div>' +
               '<div class="result-preview">' + previewHtml + '</div>' +

@@ -39,8 +39,22 @@
       {
         "command": "rifler.openReplace",
         "title": "Rifler: Open Replace"
+      },
+      {
+        "command": "rifler.minimize",
+        "title": "Minimize to Status Bar",
+        "icon": "$(chevron-right)"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "rifler.minimize",
+          "when": "activeWebviewPanelId == 'rifler'",
+          "group": "navigation"
+        }
+      ]
+    },
     "keybindings": [
       {
         "command": "rifler.open",

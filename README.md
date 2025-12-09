@@ -24,6 +24,7 @@
   - **Words** - Match whole words only
   - **Regex** - Use regular expressions
   - **File Mask** - Filter by file patterns (e.g., `*.ts`, `*.js, *.py`)
+    - Supports PyCharm-style include/exclude masks: comma/semicolon separated; `!` to exclude. Examples: `*.py`; `main.py, util.py`; `!*.txt`; `*.tsx,!*.test.tsx,!*.stories.tsx`; `*test*`.
 - **Search & Replace**
   - **Replace One** - Replace current match and move to next
   - **Replace All** - Replace all occurrences in search results

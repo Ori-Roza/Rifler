@@ -561,6 +561,9 @@ const c = "word_to_replace";`;
 suite('Rifler Webview UI Automation Tests', () => {
   let testWorkspaceFolder: vscode.WorkspaceFolder;
   let testFilePath: string;
+  let includeTsxFilePath: string;
+  let excludeTsxFilePath: string;
+  const maskedSearchTerm = 'mask_target_tsx';
 
   suiteSetup(async () => {
     // Get workspace folder
@@ -587,6 +590,12 @@ class AutomationTestClass {
     log(`Creating test file at: ${testFilePath}`);
     fs.writeFileSync(testFilePath, testContent);
     log(`Test file created successfully`);
+
+    // Files for file mask tests
+    includeTsxFilePath = path.join(testWorkspaceFolder.uri.fsPath, 'component.tsx');
+    excludeTsxFilePath = path.join(testWorkspaceFolder.uri.fsPath, 'component.test.tsx');
+    fs.writeFileSync(includeTsxFilePath, `export const Component = () => '${maskedSearchTerm}';`);
+    fs.writeFileSync(excludeTsxFilePath, `export const ComponentTest = () => '${maskedSearchTerm}';`);
   });
 
   suiteTeardown(async () => {
@@ -675,5 +684,107 @@ class AutomationTestClass {
     assert.ok(result.preview.includes(searchTerm), `Result should contain search term "${searchTerm}"`);
 
     log('   ✅ Find feature automation successful: textbox ID retrieved, term written, results verified');
+  });
+
+  test('Find feature automation: apply file mask and get results', async function() {
+    this.timeout(15000);
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up message listener for masked search results');
+    let messageCount = 0;
+    const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.log(`   ⏰ Timeout reached. Total messages received: ${messageCount}`);
+        reject(new Error('Timeout waiting for masked search results'));
+      }, 8000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        messageCount++;
+        console.log(`   📨 Received message #${messageCount}: ${message.type}`);
+        if (message.type === '__test_searchCompleted') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.results);
+        }
+      });
+    });
+
+    await step('Setting file mask to *.ts');
+    currentPanel.webview.postMessage({
+      type: '__test_setFileMask',
+      value: '*.ts'
+    });
+
+    await step('Setting search term that exists in a .ts file');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: 'find_this_text'
+    });
+
+    const results = await searchResultsPromise;
+    log(`   📊 Received ${results.length} masked search results`);
+
+    assert.ok(Array.isArray(results), 'Results should be an array');
+    assert.ok(results.length > 0, 'Should find results when mask matches');
+    assert.ok(results.every(r => r.fileName.toLowerCase().endsWith('.ts')), 'All results should respect *.ts mask');
+  });
+
+  test('Find feature automation: apply include and exclude masks', async function() {
+    this.timeout(15000);
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up message listener for masked search results with excludes');
+    let messageCount = 0;
+    const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.log(`   ⏰ Timeout reached. Total messages received: ${messageCount}`);
+        reject(new Error('Timeout waiting for masked search results with excludes'));
+      }, 8000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        messageCount++;
+        console.log(`   📨 Received message #${messageCount}: ${message.type}`);
+        if (message.type === '__test_searchCompleted') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.results);
+        }
+      });
+    });
+
+    await step('Setting file mask to include *.tsx and exclude *.test.tsx');
+    currentPanel.webview.postMessage({
+      type: '__test_setFileMask',
+      value: '*.tsx,!*.test.tsx'
+    });
+
+    await step('Setting search term present in both files');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: maskedSearchTerm
+    });
+
+    const results = await searchResultsPromise;
+    log(`   📊 Received ${results.length} masked search results with excludes`);
+
+    assert.ok(Array.isArray(results), 'Results should be an array');
+    assert.strictEqual(results.length, 1, 'Should return only non-test tsx file');
+    assert.ok(results[0].fileName === 'component.tsx', 'Result should be component.tsx only');
   });
 });

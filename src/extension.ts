@@ -2254,6 +2254,10 @@ function getWebviewHtml(webview: vscode.Webview): string {
             queryInput.value = message.value;
             runSearch();
             break;
+          case '__test_setFileMask': // Test utility: set file mask input
+            fileMaskInput.value = message.value || '';
+            state.options.fileMask = fileMaskInput.value;
+            break;
         }
       });
 

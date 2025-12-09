@@ -112,6 +112,41 @@ describe('matchesFileMask', () => {
     expect(matchesFileMask('TEST.TS', '*.ts')).toBe(true);
     expect(matchesFileMask('test.TS', '*.ts')).toBe(true);
   });
+
+  test('should support exclude-only masks', () => {
+    expect(matchesFileMask('notes.txt', '!*.txt')).toBe(false);
+    expect(matchesFileMask('code.ts', '!*.txt')).toBe(true);
+  });
+
+  test('should handle include masks requiring a match when includes are present', () => {
+    expect(matchesFileMask('file.ts', '*.ts,*.js')).toBe(true);
+    expect(matchesFileMask('file.css', '*.ts,*.js')).toBe(false);
+  });
+
+  test('should support include and exclude masks with exclude winning', () => {
+    expect(matchesFileMask('component.test.tsx', '*.tsx,!*.test.tsx')).toBe(false);
+    expect(matchesFileMask('component.stories.tsx', '*.tsx,!*.stories.tsx')).toBe(false);
+    expect(matchesFileMask('component.tsx', '*.tsx,!*.test.tsx,!*.stories.tsx')).toBe(true);
+  });
+
+  test('should support semicolon separated include/exclude masks', () => {
+    expect(matchesFileMask('component.test.tsx', '*.tsx;!*.test.tsx')).toBe(false);
+    expect(matchesFileMask('component.tsx', '*.tsx;!*.test.tsx')).toBe(true);
+  });
+
+  test('should match any file when includes are empty and only excludes provided', () => {
+    expect(matchesFileMask('readme.md', '!*.txt')).toBe(true);
+  });
+
+  test('should handle substring wildcards', () => {
+    expect(matchesFileMask('my_test_file.ts', '*test*')).toBe(true);
+    expect(matchesFileMask('my_prod_file.ts', '*test*')).toBe(false);
+  });
+
+  test('should trim whitespace around exclude tokens', () => {
+    expect(matchesFileMask('types.d.ts', '*.ts, !*.d.ts')).toBe(false);
+    expect(matchesFileMask('index.ts', '*.ts, !*.d.ts')).toBe(true);
+  });
 });
 
 describe('shouldExcludeDirectory', () => {

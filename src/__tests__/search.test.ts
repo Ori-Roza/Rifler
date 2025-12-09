@@ -340,6 +340,31 @@ describe('Search', () => {
         expect(mockFs.promises.readFile).toHaveBeenCalledTimes(1);
         expect(mockFs.promises.readFile).toHaveBeenCalledWith(expect.stringContaining('app.ts'), 'utf-8');
       });
+
+      test('should apply exclude masks with priority', async () => {
+        const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+        (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+        
+        mockFs.existsSync.mockReturnValue(true);
+        mockFs.statSync.mockImplementation(() => ({ 
+          isDirectory: () => false, 
+          isFile: () => true,
+          size: 100 
+        } as fs.Stats));
+        mockFs.promises.readdir.mockResolvedValue([
+          { name: 'component.tsx', isDirectory: () => false, isFile: () => true },
+          { name: 'component.test.tsx', isDirectory: () => false, isFile: () => true }
+        ] as any);
+        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
+        mockFs.promises.readFile.mockResolvedValue('const test = 1;');
+
+        await performSearch('test', 'project', { ...defaultOptions, fileMask: '*.tsx,!*.test.tsx' });
+
+        // Only non-test tsx file should be read
+        expect(mockFs.promises.readFile).toHaveBeenCalledTimes(1);
+        const calledPath = mockFs.promises.readFile.mock.calls[0][0];
+        expect(calledPath).toContain('component.tsx');
+      });
     });
 
     describe('open documents', () => {
@@ -396,7 +421,7 @@ describe('Search', () => {
         expect(results.length).toBe(1);
         expect(results[0]).toMatchObject({
           fileName: 'file.ts',
-          relativePath: testFilePath,
+          relativePath: 'file.ts',
           line: 0,
           character: 8, // position of 'test' in original line
           length: 4,

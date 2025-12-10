@@ -910,6 +910,158 @@ class AutomationTestClass {
   });
 
   // ============================================================================
+  // TEXTBOX EDITABILITY TEST - CRITICAL USER EXPERIENCE TEST
+  // ============================================================================
+
+  test('should allow editing search term with invalid regex pattern', async function() {
+    this.timeout(15000);
+
+    await step('Opening Rifler panel for editability test');
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel is not open');
+    }
+
+    await step('Enabling regex mode and setting initial invalid pattern');
+    // First enable regex mode
+    currentPanel.webview.postMessage({
+      type: '__test_setUseRegex',
+      value: true
+    });
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Set initial invalid regex
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: '[invalid'
+    });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    await step('Simulating typing character by character with validation running');
+    // Simulate typing character by character - this is what really tests editability
+    const characters = ['[', 'i', 'n', 'v', 'a', 'l', 'i', 'd', '-', 't', 'y', 'p', 'i', 'n', 'g'];
+    let currentValue = '';
+    
+    for (const char of characters) {
+      currentValue += char;
+      
+      // Set the value (simulating a keystroke)
+      currentPanel.webview.postMessage({
+        type: '__test_appendToSearchInput',
+        char: char
+      });
+      
+      // Wait a bit - this allows validation to potentially interfere
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    // Wait for all validation to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    await step('Verifying final value contains all typed characters');
+    // Get the current value
+    let receivedQuery = '';
+    const queryPromise = new Promise<void>((resolve) => {
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_queryValue') {
+          receivedQuery = message.value;
+          disposable.dispose();
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 2000);
+    });
+
+    // Request the current query value
+    currentPanel.webview.postMessage({
+      type: '__test_getQueryValue'
+    });
+    
+    await queryPromise;
+    
+    log(`   📝 Final query value: "${receivedQuery}"`);
+    log(`   📝 Expected to contain: "${currentValue}"`);
+    
+    // The test passes if all characters were preserved
+    assert.ok(receivedQuery.length >= characters.length, `Query should have at least ${characters.length} chars, got ${receivedQuery.length}`);
+    assert.ok(receivedQuery.includes('typing'), 'Should contain "typing" - all characters should be preserved');
+    log(`   ✅ Textbox remained editable - all ${characters.length} characters were preserved`);
+  });
+
+  test('should detect all invalid regex patterns', async function() {
+    this.timeout(20000);
+
+    await step('Testing comprehensive invalid regex patterns');
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel is not open');
+    }
+
+    // Test cases: [pattern, expectedToContainError]
+    const invalidPatterns = [
+      { pattern: '[unclosed', desc: 'Unclosed bracket' },
+      { pattern: '[a-z', desc: 'Unclosed character class' },
+      { pattern: '(unclosed', desc: 'Unclosed group' },
+      { pattern: '(?:test', desc: 'Unclosed non-capturing group' },
+      { pattern: '*', desc: 'Nothing to repeat (*)' },
+      { pattern: '+', desc: 'Nothing to repeat (+)' },
+      { pattern: '?', desc: 'Nothing to repeat (?)' },
+      { pattern: '{5}', desc: 'Nothing to repeat ({5})' },
+      { pattern: '{5,3}', desc: 'Numbers out of order in quantifier' },
+      { pattern: '**', desc: 'Invalid nested quantifier' }
+    ];
+
+    // First enable regex mode
+    currentPanel.webview.postMessage({
+      type: '__test_setUseRegex',
+      value: true
+    });
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    for (const { pattern, desc } of invalidPatterns) {
+      await step(`Testing invalid regex: ${desc}`);
+      
+      let validationMessage: any = null;
+      const validationPromise = new Promise<void>((resolve) => {
+        const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+          if (message.type === 'validationResult' && message.field === 'regex') {
+            validationMessage = message;
+            disposable.dispose();
+            resolve();
+          }
+        });
+        setTimeout(() => {
+          disposable.dispose();
+          resolve();
+        }, 2000);
+      });
+
+      // Send the invalid pattern for validation
+      currentPanel.webview.postMessage({
+        type: 'validateRegex',
+        pattern: pattern,
+        useRegex: true
+      });
+
+      await validationPromise;
+
+      // Verify it was detected as invalid
+      assert.ok(validationMessage, `Should receive validation message for pattern: ${pattern}`);
+      assert.strictEqual(validationMessage.isValid, false, `Pattern "${pattern}" should be invalid - ${desc}`);
+      assert.ok(validationMessage.error, `Should have error message for: ${desc}`);
+      log(`   ✅ "${pattern}" correctly detected as invalid: ${validationMessage.error}`);
+    }
+
+    log(`   ✅ All ${invalidPatterns.length} invalid regex patterns correctly detected`);
+  });
+
+  // ============================================================================
   // VALIDATION TESTS - FILE MASK
   // ============================================================================
 

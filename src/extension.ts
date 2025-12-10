@@ -728,6 +728,20 @@ function getWebviewHtml(webview: vscode.Webview): string {
       border-color: var(--vscode-focusBorder);
     }
 
+    /* Input validation states - ensure inputs remain clickable */
+    #query.invalid, #replace-input.invalid, #file-mask.invalid {
+      border-color: var(--vscode-inputValidation-errorBorder, #f48771) !important;
+      background-color: var(--vscode-inputValidation-errorBackground, rgba(244, 135, 113, 0.1)) !important;
+      pointer-events: auto !important;
+      cursor: text !important;
+    }
+
+    #query.invalid:focus, #replace-input.invalid:focus, #file-mask.invalid:focus {
+      border-color: var(--vscode-focusBorder) !important;
+      outline: 1px solid var(--vscode-focusBorder) !important;
+      outline-offset: -1px;
+    }
+
     /* ===== Scope Selection ===== */
     .scope-row {
       display: flex;
@@ -2192,11 +2206,11 @@ function getWebviewHtml(webview: vscode.Webview): string {
         console.log('Input event triggered, value:', queryInput.value);
         clearTimeout(state.searchTimeout);
         
-        // Validate regex in real-time with debounce
+        // Validate regex in real-time with debounce (longer delay to not interrupt typing)
         clearTimeout(validationDebounceTimeout);
         validationDebounceTimeout = setTimeout(() => {
           validateRegexPattern();
-        }, 150);
+        }, 300);
 
         state.searchTimeout = setTimeout(() => {
           console.log('Timeout fired, calling runSearch()');
@@ -2218,7 +2232,19 @@ function getWebviewHtml(webview: vscode.Webview): string {
 
       useRegexCheckbox.addEventListener('change', () => {
         state.options.useRegex = useRegexCheckbox.checked;
-        validateRegexPattern(); // Validate when switching regex mode
+        
+        if (state.options.useRegex) {
+          // Turning regex ON - validate the current pattern
+          validateRegexPattern();
+        } else {
+          // Turning regex OFF - clear any validation errors
+          const msgElement = document.getElementById('query-validation-message');
+          if (msgElement) {
+            msgElement.textContent = '';
+            msgElement.className = 'validation-message';
+          }
+        }
+        
         runSearch();
       });
 
@@ -2341,28 +2367,46 @@ function getWebviewHtml(webview: vscode.Webview): string {
             }
             break;
           case 'validationResult':
+            // SIMPLE validation display - never touch the input element focus
             if (message.field === 'regex') {
-              const queryElement = document.getElementById('query');
-              const queryValidationMsg = document.getElementById('query-validation-message');
-              
-              if (!message.isValid) {
-                queryElement.classList.add('invalid');
-                updateValidationMessage('query', 'query-validation-message', message.error, 'error');
-              } else {
-                queryElement.classList.remove('invalid');
-                updateValidationMessage('query', 'query-validation-message', '', '');
+              const msgElement = document.getElementById('query-validation-message');
+              if (msgElement) {
+                if (!message.isValid && message.error) {
+                  msgElement.textContent = message.error;
+                  msgElement.className = 'validation-message visible error';
+                } else {
+                  msgElement.textContent = '';
+                  msgElement.className = 'validation-message';
+                }
               }
-              updateSearchButtonState();
+              
+              // Forward validation result back for E2E tests
+              vscode.postMessage({
+                type: 'validationResult',
+                field: 'regex',
+                isValid: message.isValid,
+                error: message.error
+              });
             } else if (message.field === 'fileMask') {
-              const fileMaskElement = document.getElementById('file-mask');
-              
-              if (!message.isValid && message.message) {
-                fileMaskElement.classList.add('invalid');
-                updateValidationMessage('file-mask', 'file-mask-validation-message', message.message, 'warning');
-              } else {
-                fileMaskElement.classList.remove('invalid');
-                updateValidationMessage('file-mask', 'file-mask-validation-message', '', '');
+              const msgElement = document.getElementById('file-mask-validation-message');
+              if (msgElement) {
+                if (!message.isValid && message.message) {
+                  msgElement.textContent = message.message;
+                  msgElement.className = 'validation-message visible warning';
+                } else {
+                  msgElement.textContent = '';
+                  msgElement.className = 'validation-message';
+                }
               }
+              
+              // Forward validation result back for E2E tests
+              vscode.postMessage({
+                type: 'validationResult',
+                field: 'fileMask',
+                isValid: message.isValid,
+                message: message.message,
+                fallbackToAll: message.fallbackToAll
+              });
             }
             break;
           case 'restoreState':
@@ -2431,6 +2475,40 @@ function getWebviewHtml(webview: vscode.Webview): string {
             fileMaskInput.value = message.value || '';
             state.options.fileMask = fileMaskInput.value;
             break;
+          case 'validateRegex': // Test utility: validate regex pattern from test  
+            // For testing: trigger validation and it will respond via normal flow
+            queryInput.value = message.pattern || '';
+            state.options.useRegex = message.useRegex || false;
+            validateRegexPattern();
+            break;
+          case 'validateFileMask': // Test utility: validate file mask from test
+            // For testing: trigger validation and it will respond via normal flow
+            fileMaskInput.value = message.fileMask || '';
+            validateFileMaskPattern();
+            break;
+          case '__test_setUseRegex': // Test utility: set regex mode
+            state.options.useRegex = message.value || false;
+            useRegexCheckbox.checked = state.options.useRegex;
+            break;
+          case '__test_triggerSearch': // Test utility: trigger search and report query
+            vscode.postMessage({
+              type: 'runSearch',
+              query: queryInput.value,
+              scope: state.currentScope,
+              options: state.options
+            });
+            break;
+          case '__test_appendToSearchInput': // Test utility: append a character to search input
+            queryInput.value += message.char;
+            // Trigger input event to simulate real typing
+            queryInput.dispatchEvent(new Event('input', { bubbles: true }));
+            break;
+          case '__test_getQueryValue': // Test utility: get current query value
+            vscode.postMessage({
+              type: '__test_queryValue',
+              value: queryInput.value
+            });
+            break;
         }
       });
 
@@ -2459,6 +2537,19 @@ function getWebviewHtml(webview: vscode.Webview): string {
             resultsList.innerHTML = '<div class="empty-state">Type at least 2 characters...</div>';
             resultsCount.textContent = '';
             return;
+          }
+
+          // Don't search if regex mode is on and pattern is invalid
+          // This prevents blocking the UI with failed searches
+          if (state.options.useRegex) {
+            try {
+              new RegExp(query);
+            } catch (e) {
+              // Invalid regex - just show message, don't search
+              resultsList.innerHTML = '<div class="empty-state">Invalid regex pattern</div>';
+              resultsCount.textContent = '';
+              return;
+            }
           }
 
           resultsList.innerHTML = '<div class="empty-state">Searching...</div>';

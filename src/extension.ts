@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { SearchResult, SearchScope, SearchOptions, buildSearchRegex, matchesFileMask } from './utils';
+import { SearchResult, SearchScope, SearchOptions, buildSearchRegex, matchesFileMask, validateRegex, validateFileMask } from './utils';
 import { performSearch } from './search';
 import { replaceOne, replaceAll } from './replacer';
 
@@ -92,6 +92,17 @@ interface MinimizeMessage {
   };
 }
 
+interface ValidateRegexMessage {
+  type: 'validateRegex';
+  pattern: string;
+  useRegex: boolean;
+}
+
+interface ValidateFileMaskMessage {
+  type: 'validateFileMask';
+  fileMask: string;
+}
+
 // Test-only message types
 interface TestSearchCompletedMessage {
   type: '__test_searchCompleted';
@@ -112,7 +123,7 @@ interface TestErrorMessage {
   error?: unknown;
 }
 
-type WebviewMessage = RunSearchMessage | OpenLocationMessage | GetModulesMessage | GetCurrentDirectoryMessage | GetFileContentMessage | ReplaceOneMessage | ReplaceAllMessage | WebviewReadyMessage | SaveFileMessage | MinimizeMessage | TestSearchCompletedMessage | TestSearchResultsReceivedMessage | TestErrorMessage;
+type WebviewMessage = RunSearchMessage | OpenLocationMessage | GetModulesMessage | GetCurrentDirectoryMessage | GetFileContentMessage | ReplaceOneMessage | ReplaceAllMessage | WebviewReadyMessage | SaveFileMessage | MinimizeMessage | ValidateRegexMessage | ValidateFileMaskMessage | TestSearchCompletedMessage | TestSearchResultsReceivedMessage | TestErrorMessage;
 
 /** Messages from Extension to Webview */
 interface SearchResultsMessage {
@@ -374,6 +385,25 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
               }
             }
           );
+          break;
+        case 'validateRegex':
+          const regexValidation = validateRegex(message.pattern, message.useRegex);
+          currentPanel?.webview.postMessage({ 
+            type: 'validationResult', 
+            field: 'regex',
+            isValid: regexValidation.isValid,
+            error: regexValidation.error 
+          });
+          break;
+        case 'validateFileMask':
+          const maskValidation = validateFileMask(message.fileMask);
+          currentPanel?.webview.postMessage({ 
+            type: 'validationResult', 
+            field: 'fileMask',
+            isValid: maskValidation.isValid,
+            message: maskValidation.message,
+            fallbackToAll: maskValidation.fallbackToAll
+          });
           break;
         // Test message handling - just ignore, the test listens to raw messages
         case '__test_searchCompleted':
@@ -1235,6 +1265,57 @@ function getWebviewHtml(webview: vscode.Webview): string {
     .file-mask-group input::placeholder {
       color: var(--vscode-input-placeholderForeground);
     }
+
+    /* ===== Validation Messages ===== */
+    .validation-message {
+      font-size: 11px;
+      margin-top: 2px;
+      padding: 4px 6px;
+      border-radius: 2px;
+      display: none;
+      animation: slideIn 0.2s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .validation-message.visible {
+      display: block;
+    }
+
+    .validation-message.error {
+      background-color: var(--vscode-errorForeground, #f48771);
+      color: var(--vscode-editor-background);
+    }
+
+    .validation-message.warning {
+      background-color: var(--vscode-editorWarning-foreground, #dca927);
+      color: var(--vscode-editor-background);
+    }
+
+    #query.invalid {
+      border-color: var(--vscode-errorForeground, #f48771);
+      border-width: 2px;
+      background-color: var(--vscode-editor-background);
+    }
+
+    #file-mask-input.invalid {
+      border-color: var(--vscode-editorWarning-foreground, #dca927);
+      border-width: 2px;
+    }
+
+    .search-row button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -1244,6 +1325,7 @@ function getWebviewHtml(webview: vscode.Webview): string {
       <input type="text" id="query" placeholder="Type to search..." autofocus />
       <button id="toggle-replace" title="Toggle Replace (Option+Shift+F)">&#x2195;</button>
     </div>
+    <div id="query-validation-message" class="validation-message"></div>
     <div class="search-row" id="replace-row">
       <span class="search-label">Replace:</span>
       <input type="text" id="replace-input" placeholder="Replace with..." />
@@ -1267,6 +1349,7 @@ function getWebviewHtml(webview: vscode.Webview): string {
         <label for="file-mask">File Mask:</label>
         <input type="text" id="file-mask" placeholder="*.ts, *.js, *.py" />
       </div>
+      <div id="file-mask-validation-message" class="validation-message" style="margin-left: auto;"></div>
     </div>
     <div class="scope-row">
       <span class="search-label">In:</span>
@@ -2054,10 +2137,63 @@ function getWebviewHtml(webview: vscode.Webview): string {
         });
       }
 
+      // Validation handlers
+      let validationDebounceTimeout;
+
+      function updateValidationMessage(fieldId, messageElementId, message, type) {
+        const messageElement = document.getElementById(messageElementId);
+        if (!messageElement) return;
+
+        if (message) {
+          messageElement.textContent = message;
+          messageElement.className = 'validation-message visible ' + type;
+        } else {
+          messageElement.className = 'validation-message';
+          messageElement.textContent = '';
+        }
+      }
+
+      function updateSearchButtonState() {
+        const queryValidation = document.getElementById('query-validation-message');
+        const hasRegexError = queryValidation && queryValidation.classList.contains('error');
+        const searchBtn = document.getElementById('search-btn') || toggleReplaceBtn.previousElementSibling;
+        
+        if (searchBtn) {
+          searchBtn.disabled = hasRegexError;
+        }
+      }
+
+      function validateRegexPattern() {
+        const useRegex = state.options.useRegex;
+        const pattern = queryInput.value;
+
+        vscode.postMessage({
+          type: 'validateRegex',
+          pattern: pattern,
+          useRegex: useRegex
+        });
+      }
+
+      function validateFileMaskPattern() {
+        const fileMask = fileMaskInput.value;
+
+        vscode.postMessage({
+          type: 'validateFileMask',
+          fileMask: fileMask
+        });
+      }
+
       // Dynamic search on input
       queryInput.addEventListener('input', () => {
         console.log('Input event triggered, value:', queryInput.value);
         clearTimeout(state.searchTimeout);
+        
+        // Validate regex in real-time with debounce
+        clearTimeout(validationDebounceTimeout);
+        validationDebounceTimeout = setTimeout(() => {
+          validateRegexPattern();
+        }, 150);
+
         state.searchTimeout = setTimeout(() => {
           console.log('Timeout fired, calling runSearch()');
           runSearch();
@@ -2078,11 +2214,19 @@ function getWebviewHtml(webview: vscode.Webview): string {
 
       useRegexCheckbox.addEventListener('change', () => {
         state.options.useRegex = useRegexCheckbox.checked;
+        validateRegexPattern(); // Validate when switching regex mode
         runSearch();
       });
 
       fileMaskInput.addEventListener('input', () => {
         clearTimeout(state.searchTimeout);
+        
+        // Validate file mask with debounce
+        clearTimeout(validationDebounceTimeout);
+        validationDebounceTimeout = setTimeout(() => {
+          validateFileMaskPattern();
+        }, 150);
+
         state.searchTimeout = setTimeout(() => {
           state.options.fileMask = fileMaskInput.value;
           runSearch();
@@ -2190,6 +2334,31 @@ function getWebviewHtml(webview: vscode.Webview): string {
           case 'config':
             if (message.replaceKeybinding) {
               state.replaceKeybinding = message.replaceKeybinding;
+            }
+            break;
+          case 'validationResult':
+            if (message.field === 'regex') {
+              const queryElement = document.getElementById('query');
+              const queryValidationMsg = document.getElementById('query-validation-message');
+              
+              if (!message.isValid) {
+                queryElement.classList.add('invalid');
+                updateValidationMessage('query', 'query-validation-message', message.error, 'error');
+              } else {
+                queryElement.classList.remove('invalid');
+                updateValidationMessage('query', 'query-validation-message', '', '');
+              }
+              updateSearchButtonState();
+            } else if (message.field === 'fileMask') {
+              const fileMaskElement = document.getElementById('file-mask');
+              
+              if (!message.isValid && message.message) {
+                fileMaskElement.classList.add('invalid');
+                updateValidationMessage('file-mask', 'file-mask-validation-message', message.message, 'warning');
+              } else {
+                fileMaskElement.classList.remove('invalid');
+                updateValidationMessage('file-mask', 'file-mask-validation-message', '', '');
+              }
             }
             break;
           case 'restoreState':

@@ -313,6 +313,7 @@ describe('BINARY_EXTENSIONS constant', () => {
 });
 
 describe('collectFiles', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const mockFs = require('fs');
   
   beforeEach(() => {

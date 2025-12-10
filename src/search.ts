@@ -57,7 +57,7 @@ export async function performSearch(
   if (scope === 'file' && filePath) {
     await searchInFileAsync(filePath, regex, results, maxResults);
   } else if (scope === 'directory') {
-    let searchPath = (directoryPath || '').trim();
+    const searchPath = ((directoryPath || '').trim());
     
     try {
       if (searchPath) {

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { SearchResult, SearchScope, SearchOptions, buildSearchRegex, matchesFileMask, validateRegex, validateFileMask } from './utils';
+import { SearchResult, SearchScope, SearchOptions, buildSearchRegex, validateRegex, validateFileMask } from './utils';
 import { performSearch } from './search';
 import { replaceOne, replaceAll } from './replacer';
 
@@ -309,7 +309,7 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
   currentPanel.webview.onDidReceiveMessage(
     async (message: WebviewMessage) => {
       switch (message.type) {
-        case 'webviewReady':
+        case 'webviewReady': {
           // Send configuration to webview
           const config = vscode.workspace.getConfiguration('rifler');
           const replaceKeybinding = config.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
@@ -329,6 +329,7 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
             currentPanel?.webview.postMessage({ type: 'setSearchQuery', query: queryToSet });
           }
           break;
+        }
         case 'runSearch':
           console.log('Received runSearch message:', message);
           await runSearch(
@@ -362,7 +363,7 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
         case 'replaceOne':
           await replaceOne(message.uri, message.line, message.character, message.length, message.replaceText);
           break;
-        case 'replaceAll':
+        case 'replaceAll': {
           await replaceAll(
             message.query,
             message.replaceText,
@@ -386,7 +387,8 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
             }
           );
           break;
-        case 'validateRegex':
+        }
+        case 'validateRegex': {
           const regexValidation = validateRegex(message.pattern, message.useRegex);
           currentPanel?.webview.postMessage({ 
             type: 'validationResult', 
@@ -395,7 +397,8 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
             error: regexValidation.error 
           });
           break;
-        case 'validateFileMask':
+        }
+        case 'validateFileMask': {
           const maskValidation = validateFileMask(message.fileMask);
           currentPanel?.webview.postMessage({ 
             type: 'validationResult', 
@@ -405,6 +408,7 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
             fallbackToAll: maskValidation.fallbackToAll
           });
           break;
+        }
         // Test message handling - just ignore, the test listens to raw messages
         case '__test_searchCompleted':
         case '__test_searchResultsReceived':

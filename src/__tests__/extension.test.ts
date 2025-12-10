@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { activate } from '../extension';
+import { activate, deactivate } from '../extension';
 
 // Mock vscode
 jest.mock('vscode', () => require('../../__mocks__/vscode'), { virtual: true });
@@ -142,8 +142,6 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
     });
 
     test('should clean up on deactivation', () => {
-      const { deactivate } = require('../extension');
-
       // Deactivate should clean up resources
       // Should not throw
       expect(() => deactivate()).not.toThrow();

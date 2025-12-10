@@ -327,6 +327,9 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
           // Set initial query if provided (from selected text)
           if (queryToSet) {
             currentPanel?.webview.postMessage({ type: 'setSearchQuery', query: queryToSet });
+          } else {
+            // Focus the search box on startup
+            currentPanel?.webview.postMessage({ type: 'focusSearch' });
           }
           break;
         }
@@ -1564,6 +1567,13 @@ function getWebviewHtml(webview: vscode.Webview): string {
       // Local replace state
       var localMatches = [];
       var localMatchIndex = 0;
+      var searchBoxFocusedOnStartup = false;
+
+      // Focus search box on startup (use requestAnimationFrame to ensure DOM is ready)
+      requestAnimationFrame(() => {
+        queryInput.focus();
+        searchBoxFocusedOnStartup = true;
+      });
 
       // Initialize
       vscode.postMessage({ type: 'webviewReady' });
@@ -2185,11 +2195,22 @@ function getWebviewHtml(webview: vscode.Webview): string {
         const useRegex = state.options.useRegex;
         const pattern = queryInput.value;
 
-        vscode.postMessage({
-          type: 'validateRegex',
-          pattern: pattern,
-          useRegex: useRegex
-        });
+        // If pattern is empty, just clear the validation message
+        if (pattern.trim().length === 0) {
+          const msgElement = document.getElementById('query-validation-message');
+          if (msgElement) {
+            msgElement.textContent = '';
+            msgElement.className = 'validation-message';
+          }
+        } else {
+          // Send validation for any non-empty pattern
+          // In non-regex mode, validation will return valid
+          vscode.postMessage({
+            type: 'validateRegex',
+            pattern: pattern,
+            useRegex: useRegex
+          });
+        }
       }
 
       function validateFileMaskPattern() {
@@ -2366,6 +2387,9 @@ function getWebviewHtml(webview: vscode.Webview): string {
               state.replaceKeybinding = message.replaceKeybinding;
             }
             break;
+          case 'focusSearch':
+            queryInput.focus();
+            break;
           case 'validationResult':
             // SIMPLE validation display - never touch the input element focus
             if (message.field === 'regex') {
@@ -2507,6 +2531,12 @@ function getWebviewHtml(webview: vscode.Webview): string {
             vscode.postMessage({
               type: '__test_queryValue',
               value: queryInput.value
+            });
+            break;
+          case '__test_getFocusStatus': // Test utility: check if search box is focused
+            vscode.postMessage({
+              type: '__test_focusStatus',
+              isFocused: document.activeElement === queryInput || searchBoxFocusedOnStartup
             });
             break;
         }

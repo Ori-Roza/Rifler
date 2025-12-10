@@ -1245,4 +1245,50 @@ class AutomationTestClass {
     await validationPromise;
     log(`   ✅ File mask validation completed`);
   });
+
+  test('Search box should be focused on startup', async function() {
+    this.timeout(15000);
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for panel to open and webview to initialize
+
+    const currentPanel = __test_currentPanel;
+
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Checking if search box is focused');
+    
+    // Wait an additional moment to ensure focus has been applied
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Set up a promise to wait for focus status
+    const focusPromise = new Promise<boolean>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for focus status'));
+      }, 3000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_focusStatus') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.isFocused);
+        }
+      });
+
+      // Request focus status from webview
+      currentPanel.webview.postMessage({
+        type: '__test_getFocusStatus'
+      });
+    });
+
+    const isFocused = await focusPromise;
+    
+    log(`   Search box focused: ${isFocused}`);
+    assert.ok(isFocused, 'Search box should be focused when the extension is invoked');
+    
+    log('   ✅ Search box focus test passed');
+  });
 });

@@ -7,6 +7,9 @@ import {
   escapeHtml,
   escapeAttr,
   collectFiles,
+  validateRegex,
+  validateFileMask,
+  isValidRegexPattern,
   EXCLUDE_DIRS,
   BINARY_EXTENSIONS,
   SearchOptions
@@ -430,5 +433,250 @@ describe('collectFiles', () => {
     const files = collectFiles('/test/dir');
 
     expect(files).toEqual([]);
+  });
+});
+
+// ============================================================================
+// VALIDATION TESTS
+// ============================================================================
+
+describe('validateRegex', () => {
+  test('should return invalid for empty pattern', () => {
+    const result = validateRegex('', false);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.error).toContain('empty');
+  });
+
+  test('should return valid for simple pattern in non-regex mode', () => {
+    const result = validateRegex('test', false);
+    expect(result.isValid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  test('should return valid for special characters in non-regex mode', () => {
+    const result = validateRegex('test.file[123](*)', false);
+    expect(result.isValid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  test('should return valid for simple regex in regex mode', () => {
+    const result = validateRegex('test', true);
+    expect(result.isValid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  test('should return valid for wildcard regex in regex mode', () => {
+    const result = validateRegex('test.*', true);
+    expect(result.isValid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  test('should return invalid for unclosed bracket in regex mode', () => {
+    const result = validateRegex('[unclosed', true);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.error).toContain('Invalid regex');
+  });
+
+  test('should return invalid for unclosed parenthesis in regex mode', () => {
+    const result = validateRegex('(unclosed', true);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.error).toContain('Invalid regex');
+  });
+
+  test('should return valid for unclosed brace in regex mode (valid in JS)', () => {
+    const result = validateRegex('test{5,', true);
+    // In JavaScript, test{5, is valid (matches "test" followed by 5 or more characters)
+    expect(result.isValid).toBe(true);
+  });
+
+  test('should return valid for escape sequence in regex mode', () => {
+    // In JavaScript, \k is valid in certain contexts (backreferences)
+    const result = validateRegex('\\k', true);
+    expect(result.isValid).toBe(true);
+  });
+
+  test('should return valid for complex valid email regex', () => {
+    const emailRegex = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$';
+    const result = validateRegex(emailRegex, true);
+    expect(result.isValid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  test('should return valid for word boundary patterns', () => {
+    const result = validateRegex('\\bword\\b', true);
+    expect(result.isValid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  test('should return valid for lookahead/lookbehind patterns', () => {
+    const result = validateRegex('(?=pattern)', true);
+    expect(result.isValid).toBe(true);
+  });
+
+  test('should return valid for character class with ranges', () => {
+    const result = validateRegex('[a-zA-Z0-9]', true);
+    expect(result.isValid).toBe(true);
+  });
+
+  test('should return valid for negated character class', () => {
+    const result = validateRegex('[^abc]', true);
+    expect(result.isValid).toBe(true);
+  });
+
+  test('should handle very long regex pattern', () => {
+    const longPattern = 'a' + '|b'.repeat(1000);
+    const result = validateRegex(longPattern, true);
+    expect(result.isValid).toBe(true);
+  });
+
+  test('should preserve error message from regex engine', () => {
+    const result = validateRegex('[a-', true);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+});
+
+describe('validateFileMask', () => {
+  test('should return valid for empty mask', () => {
+    const result = validateFileMask('');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+    expect(result.message).toBeUndefined();
+  });
+
+  test('should return valid for whitespace-only mask', () => {
+    const result = validateFileMask('   ');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for simple extension pattern', () => {
+    const result = validateFileMask('*.ts');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for multiple comma-separated patterns', () => {
+    const result = validateFileMask('*.ts, *.js, *.py');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for semicolon-separated patterns', () => {
+    const result = validateFileMask('*.ts; *.js; *.py');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for mixed separators', () => {
+    const result = validateFileMask('*.ts, *.js; *.py');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for exclude-only patterns', () => {
+    const result = validateFileMask('!*.test.ts');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for mixed include/exclude patterns', () => {
+    const result = validateFileMask('*.tsx, !*.test.tsx');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for complex glob patterns', () => {
+    const result = validateFileMask('**/src/**/*.ts');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for question mark patterns', () => {
+    const result = validateFileMask('test?.ts');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for patterns with dots', () => {
+    const result = validateFileMask('*.min.js');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should handle very long mask', () => {
+    const longMask = '*.ts, ' + '*.js, '.repeat(100);
+    const result = validateFileMask(longMask);
+    expect(result.isValid).toBe(true);
+  });
+
+  test('should return valid for patterns with underscores', () => {
+    const result = validateFileMask('*.test_*.ts');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should return valid for patterns with numbers', () => {
+    const result = validateFileMask('*.config.v[0-9].ts');
+    expect(result.isValid).toBe(true);
+  });
+
+  test('should handle comma-only input', () => {
+    const result = validateFileMask(',,,');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+
+  test('should handle exclude-only with multiple patterns', () => {
+    const result = validateFileMask('!*.test.ts, !*.spec.ts');
+    expect(result.isValid).toBe(true);
+    expect(result.fallbackToAll).toBe(false);
+  });
+});
+
+describe('isValidRegexPattern', () => {
+  test('should return true for simple valid pattern', () => {
+    expect(isValidRegexPattern('test')).toBe(true);
+  });
+
+  test('should return true for wildcard pattern', () => {
+    expect(isValidRegexPattern('test.*')).toBe(true);
+  });
+
+  test('should return true for anchored pattern', () => {
+    expect(isValidRegexPattern('^start')).toBe(true);
+    expect(isValidRegexPattern('end$')).toBe(true);
+  });
+
+  test('should return true for character class', () => {
+    expect(isValidRegexPattern('[a-z]')).toBe(true);
+  });
+
+  test('should return false for unclosed bracket', () => {
+    expect(isValidRegexPattern('[unclosed')).toBe(false);
+  });
+
+  test('should return false for unclosed parenthesis', () => {
+    expect(isValidRegexPattern('(unclosed')).toBe(false);
+  });
+
+  test('should return false for empty pattern', () => {
+    expect(isValidRegexPattern('')).toBe(false);
+  });
+
+  test('should return true for valid escape sequence', () => {
+    // \k is valid in JavaScript for backreferences
+    expect(isValidRegexPattern('\\k')).toBe(true);
+  });
+
+  test('should return true for complex regex', () => {
+    expect(isValidRegexPattern('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$')).toBe(true);
+  });
+
+  test('should return true for word boundary', () => {
+    expect(isValidRegexPattern('\\bword\\b')).toBe(true);
   });
 });

@@ -787,4 +787,310 @@ class AutomationTestClass {
     assert.strictEqual(results.length, 1, 'Should return only non-test tsx file');
     assert.ok(results[0].fileName === 'component.tsx', 'Result should be component.tsx only');
   });
+
+  // ============================================================================
+  // VALIDATION TESTS - REGEX
+  // ============================================================================
+
+  test('should validate invalid regex pattern', async function() {
+    this.timeout(10000);
+
+    await step('Testing validation of invalid regex pattern');
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel is not open');
+    }
+
+    let validationMessage: any = null;
+    const validationPromise = new Promise<void>((resolve) => {
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === 'validationResult' && message.field === 'regex') {
+          validationMessage = message;
+          disposable.dispose();
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 3000);
+    });
+
+    await step('Sending invalid regex pattern: [unclosed');
+    currentPanel.webview.postMessage({
+      type: 'validateRegex',
+      pattern: '[unclosed',
+      useRegex: true
+    });
+
+    await validationPromise;
+    
+    assert.ok(validationMessage, 'Should receive validation message');
+    assert.strictEqual(validationMessage.field, 'regex', 'Should be regex field');
+    assert.strictEqual(validationMessage.isValid, false, 'Should be invalid');
+    assert.ok(validationMessage.error, 'Should have error message');
+    log(`   ✅ Validation error received: ${validationMessage.error}`);
+  });
+
+  test('should validate valid regex pattern', async function() {
+    this.timeout(10000);
+
+    await step('Testing validation of valid regex pattern');
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel is not open');
+    }
+
+    let validationMessage: any = null;
+    const validationPromise = new Promise<void>((resolve) => {
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === 'validationResult' && message.field === 'regex') {
+          validationMessage = message;
+          disposable.dispose();
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 3000);
+    });
+
+    await step('Sending valid regex pattern: test.*');
+    currentPanel.webview.postMessage({
+      type: 'validateRegex',
+      pattern: 'test.*',
+      useRegex: true
+    });
+
+    await validationPromise;
+    
+    assert.ok(validationMessage, 'Should receive validation message');
+    assert.strictEqual(validationMessage.field, 'regex', 'Should be regex field');
+    assert.strictEqual(validationMessage.isValid, true, 'Should be valid');
+    log(`   ✅ Validation passed for valid regex`);
+  });
+
+  test('should validate pattern in non-regex mode as valid', async function() {
+    this.timeout(10000);
+
+    await step('Testing validation of special characters in non-regex mode');
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel is not open');
+    }
+
+    let validationMessage: any = null;
+    const validationPromise = new Promise<void>((resolve) => {
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === 'validationResult' && message.field === 'regex') {
+          validationMessage = message;
+          disposable.dispose();
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 3000);
+    });
+
+    await step('Sending pattern [test] in non-regex mode');
+    currentPanel.webview.postMessage({
+      type: 'validateRegex',
+      pattern: '[test]',
+      useRegex: false
+    });
+
+    await validationPromise;
+    
+    assert.ok(validationMessage, 'Should receive validation message');
+    assert.strictEqual(validationMessage.isValid, true, 'Should be valid in non-regex mode');
+    log(`   ✅ Special characters valid in non-regex mode`);
+  });
+
+  // ============================================================================
+  // VALIDATION TESTS - FILE MASK
+  // ============================================================================
+
+  test('should validate valid file mask pattern', async function() {
+    this.timeout(10000);
+
+    await step('Testing validation of valid file mask');
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel is not open');
+    }
+
+    let validationMessage: any = null;
+    const validationPromise = new Promise<void>((resolve) => {
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === 'validationResult' && message.field === 'fileMask') {
+          validationMessage = message;
+          disposable.dispose();
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 3000);
+    });
+
+    await step('Sending valid file mask: *.ts, *.js');
+    currentPanel.webview.postMessage({
+      type: 'validateFileMask',
+      fileMask: '*.ts, *.js'
+    });
+
+    await validationPromise;
+    
+    assert.ok(validationMessage, 'Should receive validation message');
+    assert.strictEqual(validationMessage.field, 'fileMask', 'Should be fileMask field');
+    assert.strictEqual(validationMessage.isValid, true, 'Should be valid');
+    assert.strictEqual(validationMessage.fallbackToAll, false, 'Should not fallback');
+    log(`   ✅ File mask validation passed`);
+  });
+
+  test('should validate complex file mask with exclude patterns', async function() {
+    this.timeout(10000);
+
+    await step('Testing validation of complex file mask with excludes');
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel is not open');
+    }
+
+    let validationMessage: any = null;
+    const validationPromise = new Promise<void>((resolve) => {
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === 'validationResult' && message.field === 'fileMask') {
+          validationMessage = message;
+          disposable.dispose();
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 3000);
+    });
+
+    await step('Sending file mask with excludes: *.tsx,!*.test.tsx');
+    currentPanel.webview.postMessage({
+      type: 'validateFileMask',
+      fileMask: '*.tsx,!*.test.tsx'
+    });
+
+    await validationPromise;
+    
+    assert.ok(validationMessage, 'Should receive validation message');
+    assert.strictEqual(validationMessage.isValid, true, 'Should be valid');
+    log(`   ✅ Complex file mask validation passed`);
+  });
+
+  // ============================================================================
+  // INTEGRATION TESTS - VALIDATION WITH SEARCH
+  // ============================================================================
+
+  test('should prevent search execution with invalid regex', async function() {
+    this.timeout(15000);
+
+    await step('Testing that search is blocked with invalid regex');
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel is not open');
+    }
+
+    let validationMessage: any = null;
+    let searchResults: any[] | null = null;
+
+    const validationPromise = new Promise<void>((resolve) => {
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === 'validationResult' && message.field === 'regex') {
+          validationMessage = message;
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 3000);
+    });
+
+    const searchPromise = new Promise<void>((resolve) => {
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          searchResults = message.results;
+          disposable.dispose();
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 5000);
+    });
+
+    await step('Setting invalid regex pattern: (unclosed');
+    currentPanel.webview.postMessage({
+      type: 'validateRegex',
+      pattern: '(unclosed',
+      useRegex: true
+    });
+
+    await validationPromise;
+    assert.ok(validationMessage?.error, 'Should have validation error');
+
+    await step('Attempting search with invalid regex');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: '(unclosed'
+    });
+
+    await searchPromise;
+    
+    log(`   ✅ Search correctly blocked with invalid regex`);
+  });
+
+  test('should allow search to continue with warning for invalid file mask', async function() {
+    this.timeout(20000);
+
+    await step('Testing that search continues with file mask warning');
+    const currentPanel = __test_currentPanel;
+    if (!currentPanel) {
+      throw new Error('Rifler panel is not open');
+    }
+
+    let validationMessage: any = null;
+    let searchResults: any[] | null = null;
+
+    const validationPromise = new Promise<void>((resolve) => {
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === 'validationResult' && message.field === 'fileMask') {
+          validationMessage = message;
+          resolve();
+        }
+      });
+      setTimeout(() => {
+        disposable.dispose();
+        resolve();
+      }, 3000);
+    });
+
+    await step('Setting file mask and starting search');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: 'test'
+    });
+
+    await step('Setting valid file mask for search');
+    currentPanel.webview.postMessage({
+      type: '__test_setFileMask',
+      value: '*.ts, *.js'
+    });
+
+    await validationPromise;
+    log(`   ✅ File mask validation completed`);
+  });
 });

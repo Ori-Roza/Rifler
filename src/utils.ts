@@ -267,3 +267,112 @@ export function escapeAttr(text: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+// ============================================================================
+// Validation Utilities
+// ============================================================================
+
+/**
+ * Result of validation operations
+ */
+export interface ValidationResult {
+  isValid: boolean;
+  error?: string;  // Error message for invalid input
+}
+
+export interface MaskValidationResult {
+  isValid: boolean;
+  message?: string;  // Warning or info message
+  fallbackToAll: boolean;  // If true, mask will match all files
+}
+
+/**
+ * Validate a regex pattern string
+ * @param pattern The pattern to validate
+ * @param useRegex Whether regex mode is enabled
+ * @returns ValidationResult with error details if invalid
+ */
+export function validateRegex(pattern: string, useRegex: boolean): ValidationResult {
+  if (!pattern || pattern.length === 0) {
+    return { isValid: false, error: 'Search pattern cannot be empty' };
+  }
+
+  if (!useRegex) {
+    // In non-regex mode, any pattern is valid (we escape special chars)
+    return { isValid: true };
+  }
+
+  // In regex mode, try to compile the pattern
+  try {
+    new RegExp(pattern, 'g');
+    return { isValid: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid regex pattern';
+    return {
+      isValid: false,
+      error: `Invalid regex: ${message}`
+    };
+  }
+}
+
+/**
+ * Validate a file mask pattern
+ * @param fileMask The file mask to validate
+ * @returns MaskValidationResult with warning if fallback behavior triggered
+ */
+export function validateFileMask(fileMask: string): MaskValidationResult {
+  const trimmed = fileMask.trim();
+  
+  // Empty mask is valid - matches all files
+  if (!trimmed) {
+    return { isValid: true, fallbackToAll: false };
+  }
+
+  try {
+    // Try to parse and compile the mask patterns
+    const tokens = trimmed.split(/[,;]/).map(m => m.trim()).filter(Boolean);
+    
+    if (tokens.length === 0) {
+      return { isValid: true, fallbackToAll: false };
+    }
+
+    for (const token of tokens) {
+      const isExclude = token.startsWith('!');
+      const pattern = isExclude ? token.slice(1).trim() : token;
+      
+      if (!pattern) continue;
+
+      // Build the regex pattern (same logic as matchesFileMask)
+      const regexPattern = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+
+      // Test regex compilation
+      new RegExp(`^${regexPattern}$`, 'i');
+    }
+
+    return { isValid: true, fallbackToAll: false };
+  } catch (error) {
+    // If there's an error, we can still fall back to match-all
+    const message = error instanceof Error ? error.message : 'Invalid file mask pattern';
+    return {
+      isValid: false,
+      message: `Invalid file mask (falling back to match all): ${message}`,
+      fallbackToAll: true
+    };
+  }
+}
+
+/**
+ * Quick check if regex pattern is valid
+ */
+export function isValidRegexPattern(pattern: string): boolean {
+  if (!pattern) return false;
+  try {
+    new RegExp(pattern, 'g');
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -9,7 +9,9 @@ import {
   matchesFileMask,
   EXCLUDE_DIRS,
   BINARY_EXTENSIONS,
-  Limiter
+  Limiter,
+  validateRegex,
+  validateFileMask
 } from './utils';
 
 export async function performSearch(
@@ -26,9 +28,25 @@ export async function performSearch(
     return [];
   }
 
+  // Validate regex before attempting to build it
+  const regexValidation = validateRegex(query, options.useRegex);
+  if (!regexValidation.isValid) {
+    console.error('Invalid regex:', regexValidation.error);
+    // Return empty array - client should have caught this
+    return [];
+  }
+
   const regex = buildSearchRegex(query, options);
   if (!regex) {
     return [];
+  }
+
+  // Validate file mask before using it
+  const maskValidation = validateFileMask(options.fileMask);
+  if (!maskValidation.isValid) {
+    console.warn('File mask validation failed:', maskValidation.message);
+    // Use empty mask as fallback (matches all files)
+    options.fileMask = '';
   }
 
   const results: SearchResult[] = [];

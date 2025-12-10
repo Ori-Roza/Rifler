@@ -156,18 +156,37 @@ interface FileContentMessage {
 let currentPanel: vscode.WebviewPanel | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
 let savedState: MinimizeMessage['state'] | undefined;
+let isMinimized: boolean = false;
 
 // Export for testing
 export { currentPanel as __test_currentPanel };
 
+const STORAGE_KEY_SEARCH_STATE = 'rifler.persistedSearchState';
+
 export function activate(context: vscode.ExtensionContext) {
   console.log('Rifler extension is now active');
+
+  // Load persisted state from storage
+  const persistedState = context.globalState.get<MinimizeMessage['state']>(STORAGE_KEY_SEARCH_STATE);
+  if (persistedState) {
+    savedState = persistedState;
+  }
 
   const openCommand = vscode.commands.registerCommand(
     'rifler.open',
     () => {
-      const selectedText = getSelectedText();
-      openSearchPanel(context, false, undefined, selectedText);
+      // Toggle: if panel is open, minimize it; if minimized, restore it
+      if (currentPanel) {
+        // Panel is open, minimize it
+        currentPanel.webview.postMessage({ type: 'requestStateForMinimize' });
+      } else if (isMinimized) {
+        // Panel is minimized, restore it
+        restorePanel(context);
+      } else {
+        // Panel is not open and not minimized, open it fresh
+        const selectedText = getSelectedText();
+        openSearchPanel(context, false, undefined, selectedText);
+      }
     }
   );
 
@@ -225,9 +244,11 @@ function getSelectedText(): string | undefined {
 // ============================================================================
 
 function minimizeToStatusBar(context: vscode.ExtensionContext, state?: MinimizeMessage['state']): void {
-  // Save the state before closing
+  // Save the state before closing - both to memory and to persistent storage
   if (state) {
     savedState = state;
+    // Persist to storage
+    context.globalState.update(STORAGE_KEY_SEARCH_STATE, state);
   }
 
   // Hide the panel
@@ -235,6 +256,9 @@ function minimizeToStatusBar(context: vscode.ExtensionContext, state?: MinimizeM
     currentPanel.dispose();
     currentPanel = undefined;
   }
+
+  // Mark as minimized
+  isMinimized = true;
 
   // Create status bar item if it doesn't exist
   if (!statusBarItem) {
@@ -255,11 +279,15 @@ function restorePanel(context: vscode.ExtensionContext): void {
     statusBarItem.hide();
   }
 
+  // Mark as no longer minimized
+  isMinimized = false;
+
   // Open the panel and restore state
   openSearchPanel(context, false, savedState);
   
-  // Clear saved state after restoring
+  // Clear saved state after restoring (both from memory and storage)
   savedState = undefined;
+  context.globalState.update(STORAGE_KEY_SEARCH_STATE, undefined);
   
   // Ensure the panel is focused so the editor title button appears
   if (currentPanel) {

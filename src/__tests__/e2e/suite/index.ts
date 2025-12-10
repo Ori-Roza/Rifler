@@ -7,6 +7,9 @@ import * as vscode from 'vscode';
 
 // import * as myExtension from '../../extension';
 
+// Import persistence tests
+import './persistence.test';
+
 suite('Extension Test Suite', () => {
   after(() => {
     vscode.window.showInformationMessage('All tests done!');

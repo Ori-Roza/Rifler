@@ -34,6 +34,9 @@
   - **Syntax Highlighting** - Code highlighting for 50+ languages (powered by highlight.js)
   - **Click to Edit** - Click anywhere in preview to start editing inline
   - **Auto-save** - Changes auto-save as you type
+- **Responsive Sidebar**
+  - Layout flexes to the default VS Code sidebar width with wrapping controls (no overflow on first open)
+  - Restores your last search, results, and preview when reopening
 - **Inline File Editing**
   - Edit files directly in the preview panel
   - Real-time syntax highlighting while editing

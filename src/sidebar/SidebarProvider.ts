@@ -141,7 +141,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     await replaceAll(
       message.query,
       message.replaceText,
-      message.scope,
+      message.scope as SearchScope,
       message.options,
       message.directoryPath,
       message.modulePath,
@@ -486,6 +486,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           if (message.type === 'searchResults') {
             currentResults = message.results;
             displayResults(message.results);
+            // Send test confirmation message
+            vscode.postMessage({ type: '__test_searchCompleted', results: message.results });
           } else if (message.type === 'restoreState') {
             // Restore previous search state
             if (message.state) {
@@ -499,6 +501,33 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
                 replacePanel.style.display = 'block';
               }
             }
+          } else if (message.type === '__test_setSearchInput') {
+            // Test utility: set search input and trigger search
+            queryInput.value = message.value;
+            performSearch();
+          } else if (message.type === 'validateRegex') {
+            // Validate regex pattern
+            const pattern = message.pattern;
+            const useRegex = message.useRegex;
+            
+            let isValid = true;
+            let error = '';
+            
+            if (useRegex) {
+              try {
+                new RegExp(pattern, 'g');
+              } catch (e) {
+                isValid = false;
+                error = (e instanceof Error) ? e.message : String(e);
+              }
+            }
+            
+            vscode.postMessage({
+              type: 'validationResult',
+              field: 'regex',
+              isValid,
+              error
+            });
           }
         });
 

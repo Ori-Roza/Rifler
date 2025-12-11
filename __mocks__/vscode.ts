@@ -22,19 +22,25 @@ const vscode = {
     }),
     getConfiguration: jest.fn().mockReturnValue({
       get: jest.fn().mockReturnValue('ctrl+shift+r'),
+      update: jest.fn().mockResolvedValue(undefined),
     }),
     textDocuments: [],
     workspaceFolders: [],
+    fs: {
+      readDirectory: jest.fn().mockResolvedValue([]),
+    },
   },
   window: {
     showErrorMessage: jest.fn(),
     showInformationMessage: jest.fn(),
+    showQuickPick: jest.fn().mockResolvedValue(undefined),
     activeTextEditor: undefined,
     createStatusBarItem: jest.fn().mockReturnValue({
       show: jest.fn(),
       hide: jest.fn(),
       dispose: jest.fn(),
     }),
+    registerWebviewViewProvider: jest.fn().mockReturnValue({ dispose: jest.fn() }),
   },
   extensions: {
     getExtension: jest.fn(),
@@ -48,6 +54,17 @@ const vscode = {
     Right: 2,
   },
   ThemeColor: jest.fn((name) => ({ name })),
+  FileType: {
+    Unknown: 0,
+    File: 1,
+    Directory: 2,
+    SymbolicLink: 64,
+  },
+  ConfigurationTarget: {
+    Global: 1,
+    Workspace: 2,
+    WorkspaceFolder: 3,
+  },
 };
 
 module.exports = vscode;

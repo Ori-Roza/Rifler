@@ -31,19 +31,57 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "rifler-sidebar",
+          "title": "Rifler",
+          "icon": "assets/icon-activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "rifler-sidebar": [
+        {
+          "type": "webview",
+          "id": "rifler.sidebarView",
+          "name": "Search",
+          "contextualTitle": "Rifler Search"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "rifler.open",
-        "title": "Rifler: Open"
+        "title": "Rifler: Search in Files (Window Panel)"
       },
       {
         "command": "rifler.openReplace",
-        "title": "Rifler: Open Replace"
+        "title": "Rifler: Search and Replace (Window Panel)"
+      },
+      {
+        "command": "rifler.openSidebar",
+        "title": "Rifler: Search in Files (Sidebar)",
+        "icon": "$(search)"
+      },
+      {
+        "command": "rifler.openSidebarReplace",
+        "title": "Rifler: Search and Replace (Sidebar)",
+        "icon": "$(replace-all)"
+      },
+      {
+        "command": "rifler.toggleView",
+        "title": "Rifler: Switch Between Sidebar and Window View",
+        "icon": "$(split-horizontal)"
       },
       {
         "command": "rifler.minimize",
         "title": "Minimize to Status Bar",
         "icon": "$(chevron-right)"
+      },
+      {
+        "command": "rifler.restore",
+        "title": "Restore from Status Bar"
       }
     ],
     "menus": {
@@ -51,6 +89,13 @@
         {
           "command": "rifler.minimize",
           "when": "activeWebviewPanelId == 'rifler'",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "rifler.toggleView",
+          "when": "view == rifler.sidebarView",
           "group": "navigation"
         }
       ]
@@ -65,15 +110,38 @@
         "command": "rifler.openReplace",
         "key": "alt+shift+f",
         "mac": "alt+shift+f"
+      },
+      {
+        "command": "rifler.openSidebar",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f"
+      },
+      {
+        "command": "rifler.toggleView",
+        "key": "ctrl+k ctrl+r",
+        "mac": "cmd+k cmd+r"
       }
     ],
     "configuration": {
       "title": "Rifler",
       "properties": {
+        "rifler.panelLocation": {
+          "type": "string",
+          "enum": ["sidebar", "window", "ask"],
+          "enumDescriptions": [
+            "Always open in sidebar panel",
+            "Always open in window panel (beside editor)",
+            "Ask each time which view to use"
+          ],
+          "default": "window",
+          "description": "Where to open the Rifler search panel",
+          "order": 1
+        },
         "rifler.replaceInPreviewKeybinding": {
           "type": "string",
           "default": "ctrl+shift+r",
-          "description": "Keybinding to open Replace in Preview while editing a file in Rifler. Format: modifier+key (e.g., ctrl+shift+r, cmd+r)"
+          "description": "Keybinding to open Replace in Preview while editing a file in Rifler. Format: modifier+key (e.g., ctrl+shift+r, cmd+r)",
+          "order": 2
         }
       }
     }

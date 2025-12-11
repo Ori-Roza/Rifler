@@ -34,6 +34,9 @@
   - **Syntax Highlighting** - Code highlighting for 50+ languages (powered by highlight.js)
   - **Click to Edit** - Click anywhere in preview to start editing inline
   - **Auto-save** - Changes auto-save as you type
+- **Responsive Sidebar**
+  - Layout flexes to the default VS Code sidebar width with wrapping controls (no overflow on first open)
+  - Restores your last search, results, and preview when reopening
 - **Inline File Editing**
   - Edit files directly in the preview panel
   - Real-time syntax highlighting while editing
@@ -69,6 +72,14 @@ Click anywhere in the file preview to enter edit mode:
 - Changes auto-save after 1 second of inactivity
 - Press `Escape` to exit edit mode
 - Press `Cmd+S` / `Ctrl+S` to save immediately
+
+### Open the Sidebar
+- Keyboard: `Cmd+Shift+F` (Mac) / `Ctrl+Shift+F` (Windows/Linux) opens the Rifler sidebar.
+- Mouse: Click the Rifler icon in the Activity Bar to open the sidebar.
+
+<div align="center">
+  <img src="assets/rifler-sidebar.png" alt="Rifler Sidebar" width="60%" height="auto"/>
+</div>
 
 ### Replace in Preview Editor
 While editing a file in the preview panel:

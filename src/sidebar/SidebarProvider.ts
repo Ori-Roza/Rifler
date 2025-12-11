@@ -17,6 +17,8 @@ interface SearchMessage {
   character?: number;
   length?: number;
   replaceText?: string;
+  content?: string;
+  state?: any;
 }
 
 export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
@@ -93,6 +95,18 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       case 'getCurrentDirectory':
         this._sendCurrentDirectory();
         break;
+      case 'getFileContent':
+        await this._sendFileContent(message.uri, message.query, message.options);
+        break;
+      case 'saveFile':
+        await this._saveFile(message.uri, message.content);
+        break;
+      case 'minimize':
+        // Save state before minimize
+        if (message.state) {
+          await this._context.globalState.update('rifler.sidebarState', message.state);
+        }
+        break;
     }
   }
 
@@ -113,6 +127,17 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({
       type: 'searchResults',
       results
+    });
+
+    // Save search state for persistence
+    await this._context.globalState.update('rifler.sidebarState', {
+      query: message.query,
+      scope: message.scope,
+      options: message.options,
+      directoryPath: message.directoryPath,
+      modulePath: message.modulePath,
+      filePath: message.filePath,
+      results: results
     });
   }
 
@@ -203,6 +228,75 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       type: 'currentDirectory',
       directory
     });
+  }
+
+  private async _sendFileContent(uriString: string | undefined, query: string | undefined, options: SearchOptions | undefined): Promise<void> {
+    if (!uriString || !query || !options) {
+      return;
+    }
+
+    try {
+      const uri = vscode.Uri.parse(uriString);
+      const content = await vscode.workspace.fs.readFile(uri);
+      const text = new TextDecoder().decode(content);
+      const fileName = uri.path.split('/').pop() || 'File';
+
+      // Find all matches in the file using buildSearchRegex from utils
+      const matches: Array<{ line: number; start: number; end: number }> = [];
+      const lines = text.split('\n');
+      const { buildSearchRegex } = require('../utils');
+      const regex = buildSearchRegex(query, options);
+
+      if (regex) {
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+          const line = lines[lineIndex];
+          let match: RegExpExecArray | null;
+
+          // Reset regex for each line
+          regex.lastIndex = 0;
+
+          while ((match = regex.exec(line)) !== null) {
+            matches.push({
+              line: lineIndex,
+              start: match.index,
+              end: match.index + match[0].length
+            });
+            // Prevent infinite loop for zero-length matches
+            if (match[0].length === 0) regex.lastIndex++;
+          }
+        }
+      }
+
+      this._view?.webview.postMessage({
+        type: 'fileContent',
+        uri: uriString,
+        content: text,
+        fileName,
+        matches
+      });
+    } catch (error) {
+      console.error('Error reading file for preview:', error);
+    }
+  }
+
+  private async _saveFile(uriString: string | undefined, content: string | undefined): Promise<void> {
+    if (!uriString || !content) {
+      return;
+    }
+
+    try {
+      const uri = vscode.Uri.parse(uriString);
+      const encoder = new TextEncoder();
+      await vscode.workspace.fs.writeFile(uri, encoder.encode(content));
+      
+      // Show confirmation
+      const fileName = uri.path.split('/').pop() || 'File';
+      vscode.window.showInformationMessage(`Saved ${fileName}`);
+    } catch (error) {
+      const fileName = uriString.split('/').pop() || 'file';
+      console.error('Error saving file:', error);
+      vscode.window.showErrorMessage(`Could not save ${fileName}: ${error}`);
+    }
   }
 
   private _restoreState(): void {

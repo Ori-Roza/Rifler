@@ -1,7 +1,22 @@
 import * as vscode from 'vscode';
-import { SearchResult, SearchScope, SearchOptions } from '../utils';
+import { SearchScope, SearchOptions } from '../utils';
 import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
+
+interface SearchMessage {
+  type: string;
+  query?: string;
+  scope?: string;
+  options?: SearchOptions;
+  directoryPath?: string;
+  modulePath?: string;
+  filePath?: string;
+  uri?: string;
+  line?: number;
+  character?: number;
+  length?: number;
+  replaceText?: string;
+}
 
 export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'rifler.sidebarView';
@@ -15,8 +30,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
-    context: vscode.WebviewViewResolveContext,
-    token: vscode.CancellationToken
+    _context: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken
   ): void | Thenable<void> {
     this._view = webviewView;
 
@@ -45,7 +60,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _handleMessage(message: any): Promise<void> {
+  private async _handleMessage(message: SearchMessage): Promise<void> {
     // Implement message handling (same as window panel)
     switch (message.type) {
       case 'runSearch':
@@ -55,7 +70,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         await this._openLocation(message);
         break;
       case 'replaceOne':
-        await replaceOne(message.uri, message.line, message.character, message.length, message.replaceText);
+        if (message.uri && message.line !== undefined && message.character !== undefined && message.length !== undefined && message.replaceText) {
+          await replaceOne(message.uri, message.line, message.character, message.length, message.replaceText);
+        }
         break;
       case 'replaceAll':
         await this._replaceAll(message);
@@ -78,10 +95,14 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async _runSearch(message: any): Promise<void> {
+  private async _runSearch(message: SearchMessage): Promise<void> {
+    if (!message.query || !message.scope || !message.options) {
+      return;
+    }
+
     const results = await performSearch(
       message.query,
-      message.scope,
+      message.scope as SearchScope,
       message.options,
       message.directoryPath,
       message.modulePath,
@@ -94,7 +115,11 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _openLocation(message: any): Promise<void> {
+  private async _openLocation(message: SearchMessage): Promise<void> {
+    if (!message.uri || message.line === undefined || message.character === undefined) {
+      return;
+    }
+
     const uri = vscode.Uri.parse(message.uri);
     const document = await vscode.workspace.openTextDocument(uri);
     
@@ -108,7 +133,11 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
   }
 
-  private async _replaceAll(message: any): Promise<void> {
+  private async _replaceAll(message: SearchMessage): Promise<void> {
+    if (!message.query || message.replaceText === undefined || !message.scope || !message.options) {
+      return;
+    }
+
     await replaceAll(
       message.query,
       message.replaceText,
@@ -125,7 +154,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _sendModules(): Promise<void> {
-    const modules: any[] = [];
+    const modules: Array<{ name: string; path: string }> = [];
     const workspaceFolders = vscode.workspace.workspaceFolders;
     
     if (workspaceFolders && workspaceFolders.length > 0) {
@@ -557,7 +586,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  public postMessage(message: any): void {
+  public postMessage(message: SearchMessage): void {
     this._view?.webview.postMessage(message);
   }
 }

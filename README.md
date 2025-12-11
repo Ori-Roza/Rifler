@@ -46,14 +46,24 @@
   - `↑/↓` - Navigate results
   - `Enter` - Open selected result in editor
   - `Double-click` - Open file at clicked line
-  - `Option+Shift+F` (Mac) / `Alt+Shift+F` - Toggle Replace mode
+  - `Cmd+Alt+R` (Mac) / `Ctrl+Alt+R` (Windows/Linux) - Open Replace mode
   - `Alt+R` - Open Replace in File widget
   - `Cmd+S` / `Ctrl+S` - Save current file (in edit mode)
   - `Escape` - Exit edit mode or focus search box
 
 ## Usage
 
-1. Press `Cmd+Shift+F` (Mac) or `Ctrl+Shift+F` (Windows/Linux)
+### Opening Rifler
+
+Press `Cmd+Alt+F` (Mac) or `Ctrl+Alt+F` (Windows/Linux) to **toggle** Rifler open/close.
+
+- By default, Rifler opens in the **sidebar** (Activity Bar)
+- To use **tab mode** instead, change the setting: `rifler.viewMode` to `"tab"`
+- The same shortcut toggles open/close in both modes
+
+### Searching
+
+1. Open Rifler with `Cmd+Alt+F` (Mac) or `Ctrl+Alt+F` (Windows/Linux)
 2. Type your search query (results appear dynamically after 2+ characters)
 3. Toggle search options as needed (Match Case, Words, Regex)
 4. Use File Mask to filter results (e.g., `*.ts, *.js`)
@@ -62,7 +72,7 @@
 7. Click on preview to edit inline, or double-click to open in main editor
 
 ### Replace in Search Results
-1. Press `Option+Shift+F` (Mac) or `Alt+Shift+F` (Windows/Linux) to toggle replace mode
+1. Press `Cmd+Alt+R` (Mac) or `Ctrl+Alt+R` (Windows/Linux) to open replace mode
 2. Enter replacement text
 3. Press `Enter` to replace current match, or `Cmd+Enter` / `Ctrl+Enter` to replace all
 
@@ -73,13 +83,27 @@ Click anywhere in the file preview to enter edit mode:
 - Press `Escape` to exit edit mode
 - Press `Cmd+S` / `Ctrl+S` to save immediately
 
-### Open the Sidebar
-- Keyboard: `Cmd+Shift+F` (Mac) / `Ctrl+Shift+F` (Windows/Linux) opens the Rifler sidebar.
-- Mouse: Click the Rifler icon in the Activity Bar to open the sidebar.
+### Choosing Your View Mode
+
+Rifler can open in two modes:
+
+1. **Sidebar Mode (Default)** - Opens in the Activity Bar sidebar
+   - Use `Cmd+Alt+F` (Mac) / `Ctrl+Alt+F` to toggle open/close
+   - Or click the Rifler icon in the Activity Bar
+
+2. **Tab Mode** - Opens as a separate editor tab
+   - Change setting: `rifler.viewMode` to `"tab"`
+   - Use `Cmd+Alt+F` (Mac) / `Ctrl+Alt+F` to toggle open/close
 
 <div align="center">
   <img src="assets/rifler-sidebar.png" alt="Rifler Sidebar" width="40%" height="auto"/>
 </div>
+
+### Switching Between Modes
+
+You can switch between sidebar and tab mode:
+- Use `Cmd+Alt+T` (Mac) / `Ctrl+Alt+T` (Windows/Linux)
+- Or use the toggle button in the sidebar view title
 
 ### Replace in Preview Editor
 While editing a file in the preview panel:
@@ -111,8 +135,24 @@ To customize the main Rifler keybindings, open Keyboard Shortcuts (`Cmd+K Cmd+S`
 
 | Command | Default (Mac) | Default (Windows/Linux) |
 |---------|---------------|------------------------|
-| Rifler: Open | `Cmd+Shift+F` | `Ctrl+Shift+F` |
-| Rifler: Open Replace | `Option+Shift+F` | `Alt+Shift+F` |
+| Rifler: Toggle Open/Close | `Cmd+Alt+F` | `Ctrl+Alt+F` |
+| Rifler: Open Replace Mode | `Cmd+Alt+R` | `Ctrl+Alt+R` |
+| Rifler: Switch View Mode | `Cmd+Alt+T` | `Ctrl+Alt+T` |
+
+### View Mode Configuration
+
+To change the default view mode, add to your `settings.json`:
+
+```json
+{
+  "rifler.viewMode": "sidebar"  // or "tab"
+}
+```
+
+Or change it in Settings UI:
+1. Open Settings (`Cmd+,` on Mac / `Ctrl+,` on Windows/Linux)
+2. Search for "rifler viewMode"
+3. Choose either "sidebar" or "tab"
 
 ## Installation
 

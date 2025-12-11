@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {

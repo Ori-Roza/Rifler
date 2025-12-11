@@ -159,8 +159,10 @@ let statusBarItem: vscode.StatusBarItem | undefined;
 let savedState: MinimizeMessage['state'] | undefined;
 let isMinimized: boolean = false;
 
-// Export for testing
-export { currentPanel as __test_currentPanel };
+// Export for testing - return current panel value
+export function __test_getCurrentPanel() {
+  return currentPanel;
+}
 
 const STORAGE_KEY_SEARCH_STATE = 'rifler.persistedSearchState';
 

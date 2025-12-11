@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import { performSearch } from '../../../search';
 import { replaceOne, replaceAll } from '../../../replacer';
 // Import test utilities from extension
-import { __test_currentPanel } from '../../../extension';
+import { __test_getCurrentPanel } from '../../../extension';
 
 // Slow mode helper - set E2E_SLOW_MODE=true to see each step
 const SLOW_MODE = process.env.E2E_SLOW_MODE === 'true';
@@ -565,6 +565,16 @@ suite('Rifler Webview UI Automation Tests', () => {
   let excludeTsxFilePath: string;
   const maskedSearchTerm = 'mask_target_tsx';
 
+  // Helper to reset panel state before tests
+  async function resetPanel() {
+    const currentPanel = __test_getCurrentPanel();
+    if (currentPanel) {
+      currentPanel.dispose();
+      // Wait for disposal to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
   suiteSetup(async () => {
     // Get workspace folder
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -608,11 +618,14 @@ class AutomationTestClass {
   test('Find feature automation: get textbox ID, write term, check results.length > 0', async function() {
     this.timeout(15000); // Increase timeout for webview operations
 
+    // Reset panel state
+    await resetPanel();
+
     await step('Opening Rifler search panel');
     await vscode.commands.executeCommand('rifler.open');
     await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for panel to open and webview to initialize
 
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
 
     if (!currentPanel) {
       throw new Error('Rifler panel was not created');
@@ -689,11 +702,13 @@ class AutomationTestClass {
   test('Find feature automation: apply file mask and get results', async function() {
     this.timeout(15000);
 
+    // Reset panel state
+    await resetPanel();
     await step('Opening Rifler search panel');
     await vscode.commands.executeCommand('rifler.open');
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel was not created');
     }
@@ -740,11 +755,14 @@ class AutomationTestClass {
   test('Find feature automation: apply include and exclude masks', async function() {
     this.timeout(15000);
 
+    // Reset panel state
+    await resetPanel();
+
     await step('Opening Rifler search panel');
     await vscode.commands.executeCommand('rifler.open');
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel was not created');
     }
@@ -795,8 +813,13 @@ class AutomationTestClass {
   test('should validate invalid regex pattern', async function() {
     this.timeout(10000);
 
+    // Reset panel state and open it
+    await resetPanel();
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     await step('Testing validation of invalid regex pattern');
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel is not open');
     }
@@ -835,8 +858,13 @@ class AutomationTestClass {
   test('should validate valid regex pattern', async function() {
     this.timeout(10000);
 
+    // Reset panel state and open it
+    await resetPanel();
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     await step('Testing validation of valid regex pattern');
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel is not open');
     }
@@ -874,8 +902,13 @@ class AutomationTestClass {
   test('should validate pattern in non-regex mode as valid', async function() {
     this.timeout(10000);
 
+    // Reset panel state and open it
+    await resetPanel();
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     await step('Testing validation of special characters in non-regex mode');
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel is not open');
     }
@@ -916,11 +949,13 @@ class AutomationTestClass {
   test('should allow editing search term with invalid regex pattern', async function() {
     this.timeout(15000);
 
+    // Reset panel state
+    await resetPanel();
     await step('Opening Rifler panel for editability test');
     await vscode.commands.executeCommand('rifler.open');
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel is not open');
     }
@@ -997,8 +1032,14 @@ class AutomationTestClass {
   test('should detect all invalid regex patterns', async function() {
     this.timeout(20000);
 
+    // Reset panel state
+    await resetPanel();
+    // Open panel after reset
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     await step('Testing comprehensive invalid regex patterns');
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel is not open');
     }
@@ -1068,8 +1109,13 @@ class AutomationTestClass {
   test('should validate valid file mask pattern', async function() {
     this.timeout(10000);
 
+    // Reset panel state and open it
+    await resetPanel();
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     await step('Testing validation of valid file mask');
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel is not open');
     }
@@ -1107,8 +1153,13 @@ class AutomationTestClass {
   test('should validate complex file mask with exclude patterns', async function() {
     this.timeout(10000);
 
+    // Reset panel state and open it
+    await resetPanel();
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     await step('Testing validation of complex file mask with excludes');
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel is not open');
     }
@@ -1148,8 +1199,13 @@ class AutomationTestClass {
   test('should prevent search execution with invalid regex', async function() {
     this.timeout(15000);
 
+    // Reset panel state and open it
+    await resetPanel();
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     await step('Testing that search is blocked with invalid regex');
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel is not open');
     }
@@ -1208,8 +1264,13 @@ class AutomationTestClass {
   test('should allow search to continue with warning for invalid file mask', async function() {
     this.timeout(20000);
 
+    // Reset panel state and open it
+    await resetPanel();
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     await step('Testing that search continues with file mask warning');
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
     if (!currentPanel) {
       throw new Error('Rifler panel is not open');
     }
@@ -1249,11 +1310,13 @@ class AutomationTestClass {
   test('Search box should be focused on startup', async function() {
     this.timeout(15000);
 
+    // Reset panel state and open it
+    await resetPanel();
     await step('Opening Rifler search panel');
     await vscode.commands.executeCommand('rifler.open');
     await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for panel to open and webview to initialize
 
-    const currentPanel = __test_currentPanel;
+    const currentPanel = __test_getCurrentPanel();
 
     if (!currentPanel) {
       throw new Error('Rifler panel was not created');

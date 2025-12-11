@@ -1,8 +1,27 @@
 import * as vscode from 'vscode';
-import { SearchScope, SearchOptions } from '../utils';
+import { SearchScope, SearchOptions, SearchResult, validateRegex, validateFileMask, buildSearchRegex } from '../utils';
 import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
 import { getWebviewHtml } from '../extension';
+
+interface SidebarState {
+  query?: string;
+  replaceText?: string;
+  scope?: SearchScope | string;
+  directoryPath?: string;
+  modulePath?: string;
+  filePath?: string;
+  options?: SearchOptions;
+  showReplace?: boolean;
+  results?: SearchResult[];
+  activeIndex?: number;
+  lastPreview?: {
+    uri: string;
+    content: string;
+    fileName: string;
+    matches: Array<{ line: number; start: number; end: number }>;
+  };
+}
 
 interface SearchMessage {
   type: string;
@@ -18,7 +37,17 @@ interface SearchMessage {
   length?: number;
   replaceText?: string;
   content?: string;
-  state?: any;
+  state?: SidebarState;
+  pattern?: string;
+  useRegex?: boolean;
+  fileMask?: string;
+  activeIndex?: number;
+  lastPreview?: {
+    uri: string;
+    content: string;
+    fileName: string;
+    matches: Array<{ line: number; start: number; end: number }>;
+  };
 }
 
 export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
@@ -26,6 +55,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   
   private _view?: vscode.WebviewView;
   private _context: vscode.ExtensionContext;
+  activeIndex?: number;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this._context = context;
@@ -96,7 +126,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         this._sendCurrentDirectory();
         break;
       case 'getFileContent':
-        await this._sendFileContent(message.uri, message.query, message.options);
+        await this._sendFileContent(message.uri, message.query, message.options, message.activeIndex);
         break;
       case 'saveFile':
         await this._saveFile(message.uri, message.content);
@@ -107,6 +137,31 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           await this._context.globalState.update('rifler.sidebarState', message.state);
         }
         break;
+      case 'clearState':
+        // Clear saved state when search is cleared
+        await this._context.globalState.update('rifler.sidebarState', undefined);
+        break;
+      case 'validateRegex': {
+        const regexValidation = validateRegex(message.pattern || '', message.useRegex || false);
+        this._view?.webview.postMessage({ 
+          type: 'validationResult', 
+          field: 'regex',
+          isValid: regexValidation.isValid,
+          error: regexValidation.error 
+        });
+        break;
+      }
+      case 'validateFileMask': {
+        const maskValidation = validateFileMask(message.fileMask || '');
+        this._view?.webview.postMessage({ 
+          type: 'validationResult', 
+          field: 'fileMask',
+          isValid: maskValidation.isValid,
+          message: maskValidation.message,
+          fallbackToAll: maskValidation.fallbackToAll
+        });
+        break;
+      }
     }
   }
 
@@ -124,9 +179,12 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       message.filePath
     );
 
+    const activeIndex = message.activeIndex ?? (results.length > 0 ? 0 : -1);
+
     this._view?.webview.postMessage({
       type: 'searchResults',
-      results
+      results,
+      activeIndex
     });
 
     // Save search state for persistence
@@ -137,7 +195,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       directoryPath: message.directoryPath,
       modulePath: message.modulePath,
       filePath: message.filePath,
-      results: results
+      results: results,
+      activeIndex
     });
   }
 
@@ -230,7 +289,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _sendFileContent(uriString: string | undefined, query: string | undefined, options: SearchOptions | undefined): Promise<void> {
+  private async _sendFileContent(uriString: string | undefined, query: string | undefined, options: SearchOptions | undefined, activeIndex?: number): Promise<void> {
     if (!uriString || !query || !options) {
       return;
     }
@@ -244,7 +303,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       // Find all matches in the file using buildSearchRegex from utils
       const matches: Array<{ line: number; start: number; end: number }> = [];
       const lines = text.split('\n');
-      const { buildSearchRegex } = require('../utils');
       const regex = buildSearchRegex(query, options);
 
       if (regex) {
@@ -267,12 +325,22 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         }
       }
 
-      this._view?.webview.postMessage({
+      const payload = {
         type: 'fileContent',
         uri: uriString,
         content: text,
         fileName,
         matches
+      };
+
+      this._view?.webview.postMessage(payload);
+
+      // Persist last preview and active index for instant restore
+      const existing = this._context.globalState.get<SidebarState>('rifler.sidebarState') || {};
+      await this._context.globalState.update('rifler.sidebarState', {
+        ...existing,
+        lastPreview: payload,
+        activeIndex: activeIndex ?? existing.activeIndex ?? 0
       });
     } catch (error) {
       console.error('Error reading file for preview:', error);

@@ -131,6 +131,7 @@ type WebviewMessage = RunSearchMessage | OpenLocationMessage | GetModulesMessage
 interface SearchResultsMessage {
   type: 'searchResults';
   results: SearchResult[];
+  activeIndex?: number;
 }
 
 interface ModulesListMessage {
@@ -764,6 +765,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-width: 0;
     }
 
     /* ===== Search Header ===== */
@@ -771,12 +773,16 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       padding: 12px;
       border-bottom: 1px solid var(--vscode-widget-border, #444);
       background-color: var(--vscode-sideBar-background);
+      width: 100%;
     }
 
     .search-row {
       display: flex;
       gap: 8px;
       margin-bottom: 8px;
+      flex-wrap: wrap;
+      min-width: 0;
+      width: 100%;
       align-items: center;
     }
 
@@ -785,9 +791,11 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       color: var(--vscode-button-secondaryForeground);
       border: 1px solid var(--vscode-widget-border);
       cursor: pointer;
-      padding: 4px 8px;
+      padding: 3px 6px;
       border-radius: 2px;
       font-size: 11px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     
     .search-row button:hover {
@@ -818,6 +826,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       color: var(--vscode-input-foreground);
       border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, #444));
       border-radius: 3px;
+      min-width: 0;
       outline: none;
     }
 
@@ -1354,11 +1363,19 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       white-space: nowrap;
     }
 
+    .file-mask-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 6px;
+      padding: 4px 0;
+    }
+
     .file-mask-group {
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-left: auto;
+      flex: 1;
     }
 
     .file-mask-group label {
@@ -1460,11 +1477,13 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         <input type="checkbox" id="use-regex" />
         <label for="use-regex">Regex</label>
       </div>
+    </div>
+    <div class="file-mask-row">
       <div class="file-mask-group">
         <label for="file-mask">File Mask:</label>
         <input type="text" id="file-mask" placeholder="*.ts, *.js, *.py" />
       </div>
-      <div id="file-mask-validation-message" class="validation-message" style="margin-left: auto;"></div>
+      <div id="file-mask-validation-message" class="validation-message"></div>
     </div>
     <div class="scope-row">
       <span class="search-label">In:</span>
@@ -1555,6 +1574,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         currentDirectory: '',
         currentQuery: '',
         fileContent: null,
+        lastPreview: null,
         searchTimeout: null,
         replaceKeybinding: 'ctrl+shift+r',
         options: {
@@ -2321,6 +2341,30 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         console.log('Input event triggered, value:', queryInput.value);
         clearTimeout(state.searchTimeout);
         
+        // If query is empty, clear preview and state immediately
+        if (queryInput.value.trim().length === 0) {
+          previewContent.innerHTML = '<div class="empty-state">No results</div>';
+          previewFilename.textContent = '';
+          resultsList.innerHTML = '<div class="empty-state">Type to search...</div>';
+          resultsCount.textContent = '';
+          state.results = [];
+          state.activeIndex = -1;
+          state.currentQuery = '';
+          state.fileContent = null;
+          state.lastPreview = null;
+          
+          // Clear validation message
+          const msgElement = document.getElementById('query-validation-message');
+          if (msgElement) {
+            msgElement.textContent = '';
+            msgElement.className = 'validation-message';
+          }
+          
+          // Clear state from sidebar persistence immediately
+          vscode.postMessage({ type: 'clearState' });
+          return; // Don't continue to search
+        }
+        
         // Validate regex in real-time with debounce (longer delay to not interrupt typing)
         clearTimeout(validationDebounceTimeout);
         validationDebounceTimeout = setTimeout(() => {
@@ -2441,7 +2485,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         console.log('Webview received message:', message.type, message);
         switch (message.type) {
           case 'searchResults':
-            handleSearchResults(message.results);
+            handleSearchResults(message.results, { skipAutoLoad: false, activeIndex: message.activeIndex });
             break;
           case 'modulesList':
             handleModulesList(message.modules);
@@ -2559,9 +2603,18 @@ export function getWebviewHtml(webview: vscode.Webview): string {
                 toggleReplace();
               }
               
-              // Re-run search if there was a query
-              if (s.query && s.query.length >= 2) {
+              // Restore previous results if available (don't re-run search)
+              if (s.results && s.results.length > 0) {
+                handleSearchResults(s.results, { skipAutoLoad: true, activeIndex: s.activeIndex });
+              } else if (s.query && s.query.length >= 2) {
+                // Only run search if no previous results to restore
                 runSearch();
+              }
+
+              // Restore last preview if saved
+              if (s.lastPreview) {
+                state.lastPreview = s.lastPreview;
+                handleFileContent(s.lastPreview);
               }
             }
             break;
@@ -2703,9 +2756,10 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         }
       }
 
-      function handleSearchResults(results) {
+      function handleSearchResults(results, options = { skipAutoLoad: false, activeIndex: undefined }) {
+        const resolvedActiveIndex = options.activeIndex !== undefined ? options.activeIndex : (results.length > 0 ? 0 : -1);
         state.results = results;
-        state.activeIndex = results.length > 0 ? 0 : -1;
+        state.activeIndex = resolvedActiveIndex;
 
         resultsCount.textContent = results.length + (results.length >= 5000 ? '+' : '') + ' results';
 
@@ -2721,8 +2775,8 @@ export function getWebviewHtml(webview: vscode.Webview): string {
 
         renderResults();
         
-        // Auto-load first result's file content
-        if (state.activeIndex >= 0) {
+        // Auto-load result's file content unless explicitly skipped
+        if (!options.skipAutoLoad && state.activeIndex >= 0) {
           loadFileContent(state.results[state.activeIndex]);
         }
       }
@@ -2742,6 +2796,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
 
       function handleFileContent(message) {
         state.fileContent = message;
+        state.lastPreview = message;
         previewFilename.textContent = message.fileName;
         
         // Show actions
@@ -2886,7 +2941,8 @@ export function getWebviewHtml(webview: vscode.Webview): string {
           type: 'getFileContent',
           uri: result.uri,
           query: state.currentQuery,
-          options: state.options
+          options: state.options,
+          activeIndex: state.activeIndex
         });
       }
 

@@ -8,7 +8,15 @@
 </div>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_v2.gif" alt="Rifler Demo" width="100%"/>
+  <strong>Tab Mode</strong>
+  <br/>
+  <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_tab.gif" alt="Rifler Tab Mode Demo" width="100%"/>
+</div>
+
+<div align="center">
+  <strong>Sidebar Mode</strong>
+  <br/>
+  <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_sidebar.gif" alt="Rifler Sidebar Mode Demo" width="100%"/>
 </div>
 
 ## Features

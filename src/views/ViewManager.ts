@@ -47,6 +47,10 @@ export class ViewManager {
 
   private _openSidebar(options: { showReplace?: boolean; initialQuery?: string }): void {
     if (this._sidebarProvider) {
+      // Reveal the sidebar view container first
+      vscode.commands.executeCommand('workbench.view.extension.rifler-sidebar');
+      
+      // Then show the sidebar provider view
       this._sidebarProvider.show();
       
       if (options.initialQuery) {

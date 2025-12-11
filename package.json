@@ -112,6 +112,11 @@
         "mac": "alt+shift+f"
       },
       {
+        "command": "rifler.openSidebar",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f"
+      },
+      {
         "command": "rifler.toggleView",
         "key": "ctrl+k ctrl+r",
         "mac": "cmd+k cmd+r"

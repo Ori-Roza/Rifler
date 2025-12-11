@@ -4,6 +4,8 @@ import * as fs from 'fs';
 import { SearchResult, SearchScope, SearchOptions, buildSearchRegex, validateRegex, validateFileMask } from './utils';
 import { performSearch } from './search';
 import { replaceOne, replaceAll } from './replacer';
+import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
+import { ViewManager } from './views/ViewManager';
 
 // ============================================================================
 // Types
@@ -172,6 +174,19 @@ export function activate(context: vscode.ExtensionContext) {
     savedState = persistedState;
   }
 
+  // Initialize ViewManager
+  const viewManager = new ViewManager(context);
+
+  // Register sidebar provider
+  const sidebarProvider = new RiflerSidebarProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      RiflerSidebarProvider.viewType,
+      sidebarProvider
+    )
+  );
+  viewManager.registerSidebarProvider(sidebarProvider);
+
   const openCommand = vscode.commands.registerCommand(
     'rifler.open',
     () => {
@@ -198,6 +213,34 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  const openSidebarCommand = vscode.commands.registerCommand(
+    'rifler.openSidebar',
+    () => {
+      const selectedText = getSelectedText();
+      viewManager.openView({
+        forcedLocation: 'sidebar',
+        initialQuery: selectedText
+      });
+    }
+  );
+
+  const openSidebarReplaceCommand = vscode.commands.registerCommand(
+    'rifler.openSidebarReplace',
+    () => {
+      const selectedText = getSelectedText();
+      viewManager.openView({
+        forcedLocation: 'sidebar',
+        showReplace: true,
+        initialQuery: selectedText
+      });
+    }
+  );
+
+  const toggleViewCommand = vscode.commands.registerCommand(
+    'rifler.toggleView',
+    () => viewManager.switchView()
+  );
+
   const restoreCommand = vscode.commands.registerCommand(
     'rifler.restore',
     () => restorePanel(context)
@@ -213,7 +256,15 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  context.subscriptions.push(openCommand, openReplaceCommand, restoreCommand, minimizeCommand);
+  context.subscriptions.push(
+    openCommand,
+    openReplaceCommand,
+    openSidebarCommand,
+    openSidebarReplaceCommand,
+    toggleViewCommand,
+    restoreCommand,
+    minimizeCommand
+  );
 }
 
 export function deactivate() {

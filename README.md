@@ -73,6 +73,10 @@ Click anywhere in the file preview to enter edit mode:
 - Press `Escape` to exit edit mode
 - Press `Cmd+S` / `Ctrl+S` to save immediately
 
+### Open the Sidebar
+- Keyboard: `Cmd+Shift+F` (Mac) / `Ctrl+Shift+F` (Windows/Linux) opens the Rifler sidebar.
+- Mouse: Click the Rifler icon in the Activity Bar to open the sidebar.
+
 ### Replace in Preview Editor
 While editing a file in the preview panel:
 1. Press `Alt+R` or the configured keybinding (default: `Ctrl+Shift+R`) to open the replace widget

@@ -195,17 +195,41 @@ export function activate(context: vscode.ExtensionContext) {
   const openCommand = vscode.commands.registerCommand(
     'rifler.open',
     () => {
-      // Toggle: if panel is open, minimize it; if minimized, restore it
-      if (currentPanel) {
-        // Panel is open, minimize it
-        currentPanel.webview.postMessage({ type: 'requestStateForMinimize' });
-      } else if (isMinimized) {
-        // Panel is minimized, restore it
-        restorePanel(context);
+      // Check viewMode configuration to decide where to open
+      const config = vscode.workspace.getConfiguration('rifler');
+      const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+
+      if (viewMode === 'sidebar') {
+        // Toggle sidebar: if visible, close it; if closed, open it
+        const sidebarVisible = vscode.window.activeTextEditor === undefined || 
+          !vscode.window.tabGroups.all.some(group => 
+            group.tabs.some(tab => tab.label === 'Rifler')
+          );
+        
+        if (sidebarVisible) {
+          // Open sidebar
+          const selectedText = getSelectedText();
+          viewManager.openView({
+            forcedLocation: 'sidebar',
+            initialQuery: selectedText
+          });
+        } else {
+          // Close sidebar by focusing editor
+          vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+        }
       } else {
-        // Panel is not open and not minimized, open it fresh
-        const selectedText = getSelectedText();
-        openSearchPanel(context, false, undefined, selectedText);
+        // Toggle tab: if panel is open, minimize it; if minimized, restore it
+        if (currentPanel) {
+          // Panel is open, close it
+          currentPanel.dispose();
+        } else if (isMinimized) {
+          // Panel is minimized, restore it
+          restorePanel(context);
+        } else {
+          // Panel is not open and not minimized, open it fresh
+          const selectedText = getSelectedText();
+          openSearchPanel(context, false, undefined, selectedText);
+        }
       }
     }
   );
@@ -213,8 +237,22 @@ export function activate(context: vscode.ExtensionContext) {
   const openReplaceCommand = vscode.commands.registerCommand(
     'rifler.openReplace',
     () => {
+      // Check viewMode configuration to decide where to open
+      const config = vscode.workspace.getConfiguration('rifler');
+      const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+
       const selectedText = getSelectedText();
-      openSearchPanel(context, true, undefined, selectedText);
+      if (viewMode === 'sidebar') {
+        // Open in sidebar with replace mode
+        viewManager.openView({
+          forcedLocation: 'sidebar',
+          showReplace: true,
+          initialQuery: selectedText
+        });
+      } else {
+        // Open in tab with replace mode (existing behavior)
+        openSearchPanel(context, true, undefined, selectedText);
+      }
     }
   );
 
@@ -1698,7 +1736,12 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       function toggleReplace() {
         const isVisible = replaceRow.classList.toggle('visible');
         if (isVisible) {
-          replaceInput.focus();
+          // If search box has a value, focus on replace; otherwise focus on search
+          if (queryInput.value.trim()) {
+            replaceInput.focus();
+          } else {
+            queryInput.focus();
+          }
         } else {
           queryInput.focus();
         }
@@ -2500,8 +2543,14 @@ export function getWebviewHtml(webview: vscode.Webview): string {
             if (!replaceRow.classList.contains('visible')) {
               toggleReplace();
             } else {
-              replaceInput.focus();
-              replaceInput.select();
+              // If search box has a value, focus on replace; otherwise focus on search
+              if (queryInput.value.trim()) {
+                replaceInput.focus();
+                replaceInput.select();
+              } else {
+                queryInput.focus();
+                queryInput.select();
+              }
             }
             break;
           case 'setSearchQuery':

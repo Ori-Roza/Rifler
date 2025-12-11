@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
@@ -26,7 +26,8 @@
     "productivity",
     "speed",
     "fuzzy search",
-    "fast search"
+    "fast search",
+    "code search"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
@@ -103,28 +104,34 @@
     "keybindings": [
       {
         "command": "rifler.open",
-        "key": "ctrl+shift+f",
-        "mac": "cmd+shift+f"
-      },
-      {
-        "command": "rifler.openReplace",
-        "key": "alt+shift+f",
-        "mac": "alt+shift+f"
-      },
-      {
-        "command": "rifler.openSidebar",
         "key": "ctrl+alt+f",
         "mac": "cmd+alt+f"
       },
       {
+        "command": "rifler.openReplace",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r"
+      },
+      {
         "command": "rifler.toggleView",
-        "key": "ctrl+k ctrl+r",
-        "mac": "cmd+k cmd+r"
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t"
       }
     ],
     "configuration": {
       "title": "Rifler",
       "properties": {
+        "rifler.viewMode": {
+          "type": "string",
+          "enum": ["sidebar", "tab"],
+          "enumDescriptions": [
+            "Open as a sidebar panel",
+            "Open as a full editor tab"
+          ],
+          "default": "sidebar",
+          "description": "Choose how Rifler opens by default: as a sidebar panel or a full editor tab. Use Cmd+Alt+F (Mac) or Ctrl+Alt+F (Windows/Linux) to toggle open/close.",
+          "order": 1
+        },
         "rifler.panelLocation": {
           "type": "string",
           "enum": ["sidebar", "window", "ask"],
@@ -134,14 +141,14 @@
             "Ask each time which view to use"
           ],
           "default": "window",
-          "description": "Where to open the Rifler search panel",
-          "order": 1
+          "description": "[Deprecated] Use rifler.viewMode instead. Where to open the Rifler search panel",
+          "order": 2
         },
         "rifler.replaceInPreviewKeybinding": {
           "type": "string",
           "default": "ctrl+shift+r",
           "description": "Keybinding to open Replace in Preview while editing a file in Rifler. Format: modifier+key (e.g., ctrl+shift+r, cmd+r)",
-          "order": 2
+          "order": 3
         }
       }
     }

@@ -160,6 +160,7 @@ let currentPanel: vscode.WebviewPanel | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
 let savedState: MinimizeMessage['state'] | undefined;
 let isMinimized: boolean = false;
+let sidebarVisible: boolean = false;
 
 // Export test helpers - create an object that can be mutated so tests can access the current panel
 export const testHelpers = {
@@ -192,6 +193,11 @@ export function activate(context: vscode.ExtensionContext) {
   );
   viewManager.registerSidebarProvider(sidebarProvider);
 
+  // Set up sidebar visibility tracking
+  sidebarProvider.setVisibilityCallback((visible: boolean) => {
+    sidebarVisible = visible;
+  });
+
   const openCommand = vscode.commands.registerCommand(
     'rifler.open',
     () => {
@@ -201,24 +207,21 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (viewMode === 'sidebar') {
         // Toggle sidebar: if visible, close it; if closed, open it
-        const sidebarVisible = vscode.window.activeTextEditor === undefined || 
-          !vscode.window.tabGroups.all.some(group => 
-            group.tabs.some(tab => tab.label === 'Rifler')
-          );
-        
         if (sidebarVisible) {
+          // Close the sidebar
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+          // Note: sidebarVisible will be set to false by the visibility callback
+        } else {
           // Open sidebar
           const selectedText = getSelectedText();
           viewManager.openView({
             forcedLocation: 'sidebar',
             initialQuery: selectedText
           });
-        } else {
-          // Close sidebar by focusing editor
-          vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+          // Note: sidebarVisible will be set to true by the visibility callback
         }
       } else {
-        // Toggle tab: if panel is open, minimize it; if minimized, restore it
+        // Toggle tab: if panel is open, close it; if closed, open it
         if (currentPanel) {
           // Panel is open, close it
           currentPanel.dispose();

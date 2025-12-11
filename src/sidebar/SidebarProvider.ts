@@ -57,9 +57,14 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _context: vscode.ExtensionContext;
   activeIndex?: number;
+  private _onVisibilityChanged?: (visible: boolean) => void;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this._context = context;
+  }
+
+  public setVisibilityCallback(callback: (visible: boolean) => void): void {
+    this._onVisibilityChanged = callback;
   }
 
   public resolveWebviewView(
@@ -85,6 +90,15 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this._restoreState();
+        // Notify that sidebar is now visible
+        if (this._onVisibilityChanged) {
+          this._onVisibilityChanged(true);
+        }
+      } else {
+        // Notify that sidebar is now hidden
+        if (this._onVisibilityChanged) {
+          this._onVisibilityChanged(false);
+        }
       }
     });
 

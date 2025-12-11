@@ -78,7 +78,7 @@ Click anywhere in the file preview to enter edit mode:
 - Mouse: Click the Rifler icon in the Activity Bar to open the sidebar.
 
 <div align="center">
-  <img src="assets/rifler-sidebar.png" alt="Rifler Sidebar" width="100%"/>
+  <img src="assets/rifler-sidebar.png" alt="Rifler Sidebar" width="60%" height="auto"/>
 </div>
 
 ### Replace in Preview Editor

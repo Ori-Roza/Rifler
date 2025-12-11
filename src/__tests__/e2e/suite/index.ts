@@ -9,6 +9,7 @@ import * as vscode from 'vscode';
 
 // Import persistence tests
 import './persistence.test';
+import './popup-search.test';
 
 suite('Extension Test Suite', () => {
   after(() => {
@@ -23,6 +24,7 @@ suite('Extension Test Suite', () => {
     const commands = await vscode.commands.getCommands(true);
     assert.ok(commands.includes('rifler.open'));
     assert.ok(commands.includes('rifler.openReplace'));
+    assert.ok(commands.includes('rifler.popupSearch'));
   });
 
   test('Should open search panel', async () => {

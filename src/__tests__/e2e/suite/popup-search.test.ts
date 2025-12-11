@@ -100,7 +100,10 @@ suite('Popup Search Feature', () => {
       // Update to popup
       await config.update('searchMode', 'popup', vscode.ConfigurationTarget.Global);
 
-      const updatedValue = config.get('searchMode');
+      // Refresh configuration after update
+      const updatedConfig = vscode.workspace.getConfiguration('rifler');
+      const updatedValue = updatedConfig.get('searchMode');
+      
       assert.strictEqual(
         updatedValue,
         'popup',
@@ -108,10 +111,11 @@ suite('Popup Search Feature', () => {
       );
     } finally {
       // Restore original value
+      const finalConfig = vscode.workspace.getConfiguration('rifler');
       if (originalValue) {
-        await config.update('searchMode', originalValue, vscode.ConfigurationTarget.Global);
+        await finalConfig.update('searchMode', originalValue, vscode.ConfigurationTarget.Global);
       } else {
-        await config.update('searchMode', undefined, vscode.ConfigurationTarget.Global);
+        await finalConfig.update('searchMode', undefined, vscode.ConfigurationTarget.Global);
       }
     }
   });
@@ -124,7 +128,10 @@ suite('Popup Search Feature', () => {
       // Update to editor
       await config.update('searchMode', 'editor', vscode.ConfigurationTarget.Global);
 
-      const updatedValue = config.get('searchMode');
+      // Refresh configuration after update
+      const updatedConfig = vscode.workspace.getConfiguration('rifler');
+      const updatedValue = updatedConfig.get('searchMode');
+      
       assert.strictEqual(
         updatedValue,
         'editor',
@@ -132,10 +139,11 @@ suite('Popup Search Feature', () => {
       );
     } finally {
       // Restore original value
+      const finalConfig = vscode.workspace.getConfiguration('rifler');
       if (originalValue) {
-        await config.update('searchMode', originalValue, vscode.ConfigurationTarget.Global);
+        await finalConfig.update('searchMode', originalValue, vscode.ConfigurationTarget.Global);
       } else {
-        await config.update('searchMode', undefined, vscode.ConfigurationTarget.Global);
+        await finalConfig.update('searchMode', undefined, vscode.ConfigurationTarget.Global);
       }
     }
   });

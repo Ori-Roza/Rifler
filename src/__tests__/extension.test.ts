@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { activate, deactivate } from '../extension';
 
 // Mock vscode
-jest.mock('vscode', () => require('../../__mocks__/vscode'), { virtual: true });
+jest.mock('vscode');
 
 describe('Extension - Persistent Storage and Toggle Features', () => {
   let context: vscode.ExtensionContext;

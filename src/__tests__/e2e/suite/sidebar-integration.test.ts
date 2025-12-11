@@ -7,6 +7,7 @@ import * as fs from 'fs';
 // Import actual search/replace functions to test them directly
 import { performSearch } from '../../../search';
 import { replaceOne, replaceAll } from '../../../replacer';
+import { RiflerSidebarProvider } from '../../../sidebar/SidebarProvider';
 
 suite('Sidebar Functional E2E Tests', () => {
   let testWorkspaceFolder: vscode.WorkspaceFolder;
@@ -308,5 +309,38 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     assert.ok(true, 'Sidebar should use selected text as initial query');
+  });
+
+  test('Sidebar directory default should fall back to workspace folder when no active editor', async function() {
+    this.timeout(10000);
+
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(workspaceFolder, 'Workspace folder should exist');
+
+    // Ensure no active editor so fallback is used
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const provider = new RiflerSidebarProvider({
+      extensionUri: vscode.Uri.file(path.join(__dirname, '..', '..', '..', '..')),
+      globalState: { update: async () => {}, get: () => undefined }
+    } as any);
+
+    const messages: Array<any> = [];
+    (provider as any)._view = {
+      webview: {
+        postMessage: (msg: any) => { messages.push(msg); return Promise.resolve(true); }
+      }
+    } as any;
+
+    (provider as any)._sendCurrentDirectory();
+
+    const currentDirMessage = messages.find(m => m.type === 'currentDirectory');
+    assert.ok(currentDirMessage, 'Should send currentDirectory message');
+    assert.strictEqual(
+      currentDirMessage.directory,
+      workspaceFolder.uri.fsPath,
+      'Directory should fall back to workspace folder when no active editor is open'
+    );
   });
 });

@@ -4,7 +4,7 @@ import * as search from '../search';
 import { SearchScope, SearchOptions } from '../utils';
 
 // Mock vscode
-jest.mock('vscode', () => require('../../__mocks__/vscode'), { virtual: true });
+jest.mock('vscode');
 
 // Mock search module
 jest.mock('../search');

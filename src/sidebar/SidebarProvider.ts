@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { SearchScope, SearchOptions, SearchResult, validateRegex, validateFileMask, buildSearchRegex } from '../utils';
 import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
@@ -270,17 +271,15 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
 
   private _sendCurrentDirectory(): void {
     const editor = vscode.window.activeTextEditor;
+    const workspaceFolders = vscode.workspace.workspaceFolders;
     let directory = '';
 
     if (editor) {
-      const filePath = editor.document.uri.fsPath;
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      
-      if (workspaceFolders && workspaceFolders.length > 0) {
-        directory = workspaceFolders[0].uri.fsPath;
-      } else {
-        directory = filePath.substring(0, filePath.lastIndexOf('/'));
-      }
+      // Prefer the directory of the active file when an editor is present
+      directory = path.dirname(editor.document.uri.fsPath);
+    } else if (workspaceFolders && workspaceFolders.length > 0) {
+      // Fallback to the first workspace folder when no editor is active
+      directory = workspaceFolders[0].uri.fsPath;
     }
 
     this._view?.webview.postMessage({

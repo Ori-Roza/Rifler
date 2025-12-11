@@ -59,8 +59,7 @@
       {
         "command": "rifler.open",
         "key": "ctrl+shift+f",
-        "mac": "cmd+shift+f",
-        "when": "editorTextFocus"
+        "mac": "cmd+shift+f"
       },
       {
         "command": "rifler.openReplace",

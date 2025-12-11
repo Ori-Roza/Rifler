@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { SearchResult, SearchScope, SearchOptions, buildSearchRegex, validateRegex, validateFileMask } from './utils';
 import { performSearch } from './search';
 import { replaceOne, replaceAll } from './replacer';
+import { showPopupSearch } from './quickpick';
 
 // ============================================================================
 // Types
@@ -213,7 +214,15 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  context.subscriptions.push(openCommand, openReplaceCommand, restoreCommand, minimizeCommand);
+  const popupSearchCommand = vscode.commands.registerCommand(
+    'rifler.popupSearch',
+    () => {
+      const selectedText = getSelectedText();
+      showPopupSearch(context, selectedText);
+    }
+  );
+
+  context.subscriptions.push(openCommand, openReplaceCommand, restoreCommand, minimizeCommand, popupSearchCommand);
 }
 
 export function deactivate() {

@@ -41,6 +41,10 @@
         "title": "Rifler: Open Replace"
       },
       {
+        "command": "rifler.popupSearch",
+        "title": "Rifler: Popup Search"
+      },
+      {
         "command": "rifler.minimize",
         "title": "Minimize to Status Bar",
         "icon": "$(chevron-right)"
@@ -65,11 +69,22 @@
         "command": "rifler.openReplace",
         "key": "alt+shift+f",
         "mac": "alt+shift+f"
+      },
+      {
+        "command": "rifler.popupSearch",
+        "key": "ctrl+shift+alt+f",
+        "mac": "cmd+shift+alt+f"
       }
     ],
     "configuration": {
       "title": "Rifler",
       "properties": {
+        "rifler.searchMode": {
+          "type": "string",
+          "enum": ["popup", "editor"],
+          "default": "editor",
+          "description": "Choose how Rifler displays search results. 'editor' opens a full preview panel, 'popup' uses a lightweight QuickPick window."
+        },
         "rifler.replaceInPreviewKeybinding": {
           "type": "string",
           "default": "ctrl+shift+r",

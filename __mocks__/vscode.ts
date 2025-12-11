@@ -7,6 +7,14 @@ const vscode = {
     start: { line: startLine, character: startChar },
     end: { line: endLine, character: endChar },
   })),
+  Position: jest.fn((line, character) => ({
+    line,
+    character,
+  })),
+  Selection: jest.fn((startLine, startChar, endLine, endChar) => ({
+    start: { line: startLine, character: startChar },
+    end: { line: endLine, character: endChar },
+  })),
   WorkspaceEdit: jest.fn(() => ({
     replace: jest.fn(),
   })),
@@ -23,6 +31,7 @@ const vscode = {
     getConfiguration: jest.fn().mockReturnValue({
       get: jest.fn().mockReturnValue('ctrl+shift+r'),
     }),
+    findFiles: jest.fn().mockResolvedValue([]),
     textDocuments: [],
     workspaceFolders: [],
   },
@@ -35,6 +44,12 @@ const vscode = {
       hide: jest.fn(),
       dispose: jest.fn(),
     }),
+    createQuickPick: jest.fn(),
+    showTextDocument: jest.fn(),
+    createTextEditorDecorationType: jest.fn().mockReturnValue({
+      dispose: jest.fn(),
+    }),
+    onDidChangeActiveTextEditor: jest.fn(),
   },
   extensions: {
     getExtension: jest.fn(),
@@ -47,7 +62,17 @@ const vscode = {
     Left: 1,
     Right: 2,
   },
+  TextEditorRevealType: {
+    Default: 0,
+    InCenter: 1,
+    InTop: 2,
+  },
   ThemeColor: jest.fn((name) => ({ name })),
+  ConfigurationTarget: {
+    Global: 1,
+    Workspace: 2,
+    WorkspaceFolder: 3,
+  },
 };
 
 module.exports = vscode;

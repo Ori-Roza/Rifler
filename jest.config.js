@@ -4,6 +4,9 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts', '!**/__tests__/e2e/**'],
+  moduleNameMapper: {
+    '^vscode$': '<rootDir>/__mocks__/vscode.ts'
+  },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverageFrom: [
     'src/**/*.ts',

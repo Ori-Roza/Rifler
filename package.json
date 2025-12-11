@@ -129,19 +129,13 @@
             "Open as a full editor tab"
           ],
           "default": "sidebar",
-          "description": "Choose how Rifler opens by default: as a sidebar panel or a full editor tab. Use Cmd+Alt+F (Mac) or Ctrl+Alt+F (Windows/Linux) to toggle open/close.",
+          "description": "Choose how Rifler opens by default: as a sidebar panel or a full editor tab. Default shortcut: Cmd+Alt+F (Mac) / Ctrl+Alt+F (Windows/Linux). To customize the shortcut, open Keyboard Shortcuts (Cmd+K Cmd+S) and search for 'rifler.open'.",
           "order": 1
         },
-        "rifler.panelLocation": {
+        "rifler.openKeybindingHint": {
           "type": "string",
-          "enum": ["sidebar", "window", "ask"],
-          "enumDescriptions": [
-            "Always open in sidebar panel",
-            "Always open in window panel (beside editor)",
-            "Ask each time which view to use"
-          ],
-          "default": "window",
-          "description": "[Deprecated] Use rifler.viewMode instead. Where to open the Rifler search panel",
+          "default": "ctrl+alt+f",
+          "markdownDescription": "**Note:** This is a hint only. To change the actual keybinding for opening Rifler, go to **Keyboard Shortcuts** (`Cmd+K Cmd+S` on Mac, `Ctrl+K Ctrl+S` on Windows/Linux) and search for `rifler.open`. The default is `Cmd+Alt+F` (Mac) / `Ctrl+Alt+F` (Windows/Linux).",
           "order": 2
         },
         "rifler.replaceInPreviewKeybinding": {

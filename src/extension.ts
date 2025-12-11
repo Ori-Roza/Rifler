@@ -736,7 +736,7 @@ async function openLocation(uriString: string, line: number, character: number):
 // Webview HTML Generation
 // ============================================================================
 
-function getWebviewHtml(webview: vscode.Webview): string {
+export function getWebviewHtml(webview: vscode.Webview): string {
   const nonce = getNonce();
 
   return /*html*/ `<!DOCTYPE html>

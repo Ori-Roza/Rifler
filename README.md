@@ -77,6 +77,10 @@ Click anywhere in the file preview to enter edit mode:
 - Keyboard: `Cmd+Shift+F` (Mac) / `Ctrl+Shift+F` (Windows/Linux) opens the Rifler sidebar.
 - Mouse: Click the Rifler icon in the Activity Bar to open the sidebar.
 
+<div align="center">
+  <img src="assets/rifler-sidebar.png" alt="Rifler Sidebar" width="100%"/>
+</div>
+
 ### Replace in Preview Editor
 While editing a file in the preview panel:
 1. Press `Alt+R` or the configured keybinding (default: `Ctrl+Shift+R`) to open the replace widget

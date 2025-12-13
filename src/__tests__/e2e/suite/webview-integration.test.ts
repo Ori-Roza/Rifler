@@ -1301,4 +1301,174 @@ class AutomationTestClass {
     
     log('   ✅ Search box focus test passed');
   });
+
+  // ============================================================================
+  // Open in Editor Feature Tests (Issue #51)
+  // ============================================================================
+
+  test('Open in Editor: clicking button should open file in editor', async function() {
+    this.timeout(20000);
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('__test_ensurePanelOpen');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const currentPanel = testHelpers.getCurrentPanel();
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up message listener for search and open');
+    let searchCompleted = false;
+    const openLocationPromise = new Promise<{uri: string, line: number, character: number}>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for openLocation message'));
+      }, 10000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          searchCompleted = true;
+          log(`   ✅ Search completed with ${message.results.length} results`);
+          
+          // Now simulate clicking the open in editor button
+          setTimeout(() => {
+            currentPanel.webview.postMessage({
+              type: '__test_clickOpenInEditor',
+              index: 0
+            });
+          }, 500);
+        } else if (message.type === 'openLocation') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message);
+        }
+      });
+    });
+
+    await step('Triggering search');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: 'find_this_text'
+    });
+
+    await step('Waiting for openLocation message');
+    const openLocationMsg = await openLocationPromise;
+    
+    log(`   📂 File opened: ${openLocationMsg.uri}`);
+    log(`   📍 Line: ${openLocationMsg.line}, Character: ${openLocationMsg.character}`);
+    
+    assert.ok(openLocationMsg.uri, 'openLocation should have a uri');
+    assert.ok(typeof openLocationMsg.line === 'number', 'openLocation should have a line number');
+    assert.ok(typeof openLocationMsg.character === 'number', 'openLocation should have a character position');
+    
+    log('   ✅ Open in Editor button works correctly');
+  });
+
+  test('Open in Editor: Ctrl+Enter keyboard shortcut should open file', async function() {
+    this.timeout(20000);
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('__test_ensurePanelOpen');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const currentPanel = testHelpers.getCurrentPanel();
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up message listener');
+    const openLocationPromise = new Promise<{uri: string, line: number, character: number}>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for openLocation from Ctrl+Enter'));
+      }, 10000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          log(`   ✅ Search completed with ${message.results.length} results`);
+          
+          // Simulate Ctrl+Enter keypress
+          setTimeout(() => {
+            currentPanel.webview.postMessage({
+              type: '__test_simulateKeyboard',
+              key: 'Enter',
+              ctrlKey: true
+            });
+          }, 500);
+        } else if (message.type === 'openLocation') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message);
+        }
+      });
+    });
+
+    await step('Triggering search');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: 'find_this_text'
+    });
+
+    await step('Waiting for openLocation from Ctrl+Enter');
+    const openLocationMsg = await openLocationPromise;
+    
+    log(`   📂 File opened via Ctrl+Enter: ${openLocationMsg.uri}`);
+    assert.ok(openLocationMsg.uri, 'Ctrl+Enter should trigger openLocation');
+    
+    log('   ✅ Ctrl+Enter keyboard shortcut works correctly');
+  });
+
+  test('Open in Editor: context menu should have open option', async function() {
+    this.timeout(20000);
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('__test_ensurePanelOpen');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const currentPanel = testHelpers.getCurrentPanel();
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up message listener');
+    const contextMenuPromise = new Promise<{hasOpenOption: boolean, hasCopyPathOption: boolean}>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for context menu info'));
+      }, 10000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          log(`   ✅ Search completed with ${message.results.length} results`);
+          
+          // Request context menu info
+          setTimeout(() => {
+            currentPanel.webview.postMessage({
+              type: '__test_getContextMenuInfo',
+              index: 0
+            });
+          }, 500);
+        } else if (message.type === '__test_contextMenuInfo') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message);
+        }
+      });
+    });
+
+    await step('Triggering search');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: 'find_this_text'
+    });
+
+    await step('Checking context menu options');
+    const menuInfo = await contextMenuPromise;
+    
+    log(`   📋 Context menu has "Open in Editor": ${menuInfo.hasOpenOption}`);
+    log(`   📋 Context menu has "Copy File Path": ${menuInfo.hasCopyPathOption}`);
+    
+    assert.ok(menuInfo.hasOpenOption, 'Context menu should have "Open in Editor" option');
+    assert.ok(menuInfo.hasCopyPathOption, 'Context menu should have "Copy File Path" option');
+    
+    log('   ✅ Context menu has correct options');
+  });
 });

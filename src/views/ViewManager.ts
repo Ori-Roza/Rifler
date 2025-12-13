@@ -21,7 +21,17 @@ export class ViewManager {
     forcedLocation?: PanelLocation;
   } = {}): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
-    const panelLocation = options.forcedLocation || config.get<PanelLocation>('panelLocation', 'sidebar');
+    
+    let panelLocation = options.forcedLocation;
+    if (!panelLocation) {
+      // Try new setting first
+      panelLocation = config.get<PanelLocation>('panelLocation');
+      if (!panelLocation) {
+        // Fall back to deprecated viewMode setting
+        const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+        panelLocation = viewMode === 'tab' ? 'window' : 'sidebar';
+      }
+    }
 
     if (panelLocation === 'sidebar') {
       this._openSidebar(options);
@@ -61,7 +71,15 @@ export class ViewManager {
 
   public async switchView(): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
-    const currentLocation = config.get<PanelLocation>('panelLocation', 'sidebar');
+    
+    // Read current location (with backward compatibility for viewMode)
+    let currentLocation = config.get<PanelLocation>('panelLocation');
+    if (!currentLocation) {
+      // Fall back to deprecated viewMode setting
+      const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+      currentLocation = viewMode === 'tab' ? 'window' : 'sidebar';
+    }
+    
     const newLocation: PanelLocation = currentLocation === 'sidebar' ? 'window' : 'sidebar';
     
     // Close current view first
@@ -71,8 +89,10 @@ export class ViewManager {
       await vscode.commands.executeCommand('rifler._closeWindowInternal');
     }
     
-    // Update the setting
+    // Update both settings for backward compatibility
     await config.update('panelLocation', newLocation, vscode.ConfigurationTarget.Global);
+    // Also update deprecated viewMode setting
+    await config.update('viewMode', newLocation === 'window' ? 'tab' : 'sidebar', vscode.ConfigurationTarget.Global);
     
     // Open in new location
     await this.openView({ forcedLocation: newLocation });

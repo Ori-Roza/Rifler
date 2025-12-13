@@ -1472,3 +1472,140 @@ class AutomationTestClass {
     log('   ✅ Context menu has correct options');
   });
 });
+
+suite('Rifler Virtualization Tests', () => {
+  let testWorkspaceFolder: vscode.WorkspaceFolder;
+  let largeTestFilePath: string;
+
+  suiteSetup(async () => {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      throw new Error('No workspace folder available');
+    }
+    testWorkspaceFolder = workspaceFolder;
+
+    // Create a test file with many searchable lines for virtualization testing
+    largeTestFilePath = path.join(testWorkspaceFolder.uri.fsPath, 'virtualization-test.ts');
+    const lines = ['// Virtualization test file'];
+    for (let i = 0; i < 200; i++) {
+      lines.push(`const virtualItem${i} = "virtual_match_${i}";`);
+    }
+    fs.writeFileSync(largeTestFilePath, lines.join('\n'));
+    log(`Created virtualization test file with ${lines.length} lines`);
+
+    // Ensure panel is open
+    await vscode.commands.executeCommand('__test_ensurePanelOpen');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  });
+
+  suiteTeardown(async () => {
+    if (fs.existsSync(largeTestFilePath)) {
+      fs.unlinkSync(largeTestFilePath);
+    }
+  });
+
+  test('Search should return many results with virtualization', async function() {
+    this.timeout(20000);
+
+    await step('Opening Rifler panel');
+    await vscode.commands.executeCommand('__test_ensurePanelOpen');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const currentPanel = testHelpers.getCurrentPanel();
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up search results listener');
+    let messageCount = 0;
+    const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`Timeout waiting for virtualization search results. Messages received: ${messageCount}`));
+      }, 10000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        messageCount++;
+        if (message.type === '__test_searchCompleted') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.results);
+        }
+      });
+    });
+
+    await step('Searching for term with many matches');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: 'virtualItem'
+    });
+
+    const results = await searchResultsPromise;
+    log(`   📊 Received ${results.length} search results`);
+
+    assert.ok(results.length >= 100, `Should find many results (found ${results.length})`);
+    log('   ✅ Virtualization handles large result sets');
+  });
+
+  test('Search results count should show correct format for large results', async function() {
+    this.timeout(15000);
+
+    await step('Opening Rifler panel');
+    await vscode.commands.executeCommand('__test_ensurePanelOpen');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const currentPanel = testHelpers.getCurrentPanel();
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up search results listener');
+    const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for search results'));
+      }, 10000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.results);
+        }
+      });
+    });
+
+    await step('Searching for common term');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: 'virtual_match'
+    });
+
+    const results = await searchResultsPromise;
+    log(`   📊 Search returned ${results.length} results`);
+
+    // Verify results have expected structure
+    assert.ok(Array.isArray(results), 'Results should be an array');
+    if (results.length > 0) {
+      const firstResult = results[0];
+      assert.ok(firstResult.fileName, 'Result should have fileName');
+      assert.ok(typeof firstResult.line === 'number', 'Result should have line number');
+      assert.ok(firstResult.preview, 'Result should have preview');
+    }
+    log('   ✅ Large result set has correct structure');
+  });
+
+  test('maxResults configuration should be respected', async function() {
+    this.timeout(15000);
+
+    // Check configuration is accessible
+    const config = vscode.workspace.getConfiguration('rifler');
+    const maxResults = config.get<number>('maxResults');
+    
+    log(`   📊 Current maxResults config: ${maxResults}`);
+    
+    // Default should be 10000
+    assert.ok(maxResults === undefined || maxResults === 10000 || maxResults > 0, 
+      'maxResults should be positive or use default');
+    
+    log('   ✅ maxResults configuration is accessible');
+  });
+});

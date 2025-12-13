@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
@@ -159,6 +159,13 @@
           "default": "ctrl+shift+r",
           "description": "Keybinding to open Replace in Preview while editing a file in Rifler. Format: modifier+key (e.g., ctrl+shift+r, cmd+r)",
           "order": 4
+        },
+        "rifler.maxResults": {
+          "type": "number",
+          "default": 10000,
+          "minimum": 100,
+          "markdownDescription": "Maximum number of search results to collect. With virtualized rendering, higher values are handled efficiently.",
+          "order": 5
         }
       }
     }

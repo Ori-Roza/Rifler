@@ -465,7 +465,7 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
 
   currentPanel.webview.onDidReceiveMessage(
     async (message: WebviewMessage) => {
-      console.log('Extension received message from webview:', (message as any).type);
+      console.log('Extension received message from webview:', message.type);
       switch (message.type) {
         case 'webviewReady': {
           // Send configuration to webview

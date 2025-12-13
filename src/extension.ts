@@ -1002,11 +1002,76 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       display: flex;
       align-items: baseline;
       gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
     }
 
     .result-filename {
       font-weight: 600;
       color: var(--vscode-textLink-foreground);
+    }
+
+    .open-in-editor-btn {
+      opacity: 0;
+      transition: opacity 0.15s;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 2px 6px;
+      color: var(--vscode-textLink-foreground);
+      font-size: 14px;
+      flex-shrink: 0;
+      border-radius: 3px;
+    }
+
+    .result-item:hover .open-in-editor-btn,
+    .result-item.active .open-in-editor-btn {
+      opacity: 1;
+    }
+
+    .open-in-editor-btn:hover {
+      background-color: var(--vscode-toolbar-hoverBackground);
+      color: var(--vscode-textLink-activeForeground);
+    }
+
+    /* Context Menu */
+    .context-menu {
+      position: fixed;
+      background-color: var(--vscode-menu-background);
+      border: 1px solid var(--vscode-menu-border);
+      border-radius: 4px;
+      padding: 4px 0;
+      min-width: 160px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+    }
+
+    .context-menu-item {
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--vscode-menu-foreground);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .context-menu-item:hover {
+      background-color: var(--vscode-menu-selectionBackground);
+      color: var(--vscode-menu-selectionForeground);
+    }
+
+    .context-menu-item .shortcut {
+      margin-left: auto;
+      opacity: 0.7;
+      font-size: 11px;
     }
 
     .result-location {
@@ -2512,7 +2577,8 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         } else if (e.key === 'ArrowUp' && !isInEditor) {
           e.preventDefault();
           navigateResults(-1);
-        } else if (e.key === 'Enter' && document.activeElement !== directoryInput && document.activeElement !== replaceInput && !isInEditor) {
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isInEditor) {
+          // Ctrl+Enter / Cmd+Enter: Open in Editor
           e.preventDefault();
           openActiveResult();
         } else if (e.key === 'Escape') {
@@ -2738,6 +2804,25 @@ export function getWebviewHtml(webview: vscode.Webview): string {
               isFocused: document.activeElement === queryInput || searchBoxFocusedOnStartup
             });
             break;
+          case '__test_clickOpenInEditor': // Test utility: click open in editor button
+            if (typeof message.index === 'number') {
+              openResultInEditor(message.index);
+            }
+            break;
+          case '__test_simulateKeyboard': // Test utility: simulate keyboard event
+            if (message.key === 'Enter' && message.ctrlKey) {
+              openActiveResult();
+            }
+            break;
+          case '__test_getContextMenuInfo': // Test utility: get context menu info
+            // Report what context menu options would be available
+            vscode.postMessage({
+              type: '__test_contextMenuInfo',
+              hasOpenOption: true,
+              hasCopyPathOption: true,
+              hasCopyRelativeOption: true
+            });
+            break;
         }
       });
 
@@ -2888,9 +2973,14 @@ export function getWebviewHtml(webview: vscode.Webview): string {
             );
 
             html += '<div class="result-item' + (isActive ? ' active' : '') + '" data-index="' + result.globalIndex + '">' +
-              '<div class="result-file">' +
-                '<span class="result-filename">' + escapeHtml(result.relativePath || result.fileName) + '</span>' +
-                '<span class="result-location">:' + (result.line + 1) + '</span>' +
+              '<div class="result-header">' +
+                '<div class="result-file">' +
+                  '<span class="result-filename">' + escapeHtml(result.relativePath || result.fileName) + '</span>' +
+                  '<span class="result-location">:' + (result.line + 1) + '</span>' +
+                '</div>' +
+                '<button class="open-in-editor-btn" data-index="' + result.globalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
+                  '↗' +
+                '</button>' +
               '</div>' +
               '<div class="result-preview">' + previewHtml + '</div>' +
             '</div>';
@@ -2901,13 +2991,110 @@ export function getWebviewHtml(webview: vscode.Webview): string {
 
         // Click handlers
         resultsList.querySelectorAll('.result-item').forEach(item => {
-          item.addEventListener('click', () => {
+          item.addEventListener('click', (e) => {
+            // Don't trigger if clicking the open-in-editor button
+            if (e.target.classList.contains('open-in-editor-btn')) return;
             const index = parseInt(item.dataset.index, 10);
             setActiveIndex(index);
           });
-          item.addEventListener('dblclick', () => {
+          item.addEventListener('dblclick', (e) => {
+            if (e.target.classList.contains('open-in-editor-btn')) return;
             openActiveResult();
           });
+          // Context menu
+          item.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const index = parseInt(item.dataset.index, 10);
+            showContextMenu(e, index);
+          });
+        });
+
+        // Open in Editor button click handlers
+        resultsList.querySelectorAll('.open-in-editor-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = parseInt(btn.dataset.index, 10);
+            openResultInEditor(index);
+          });
+        });
+      }
+
+      // Context menu for result items
+      function showContextMenu(e, index) {
+        // Remove any existing context menu
+        hideContextMenu();
+
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.id = 'result-context-menu';
+        menu.innerHTML = 
+          '<div class="context-menu-item" data-action="open">Open in Editor<span class="shortcut">Ctrl+Enter</span></div>' +
+          '<div class="context-menu-item" data-action="copy-path">Copy File Path</div>' +
+          '<div class="context-menu-item" data-action="copy-relative">Copy Relative Path</div>';
+
+        // Position the menu
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        document.body.appendChild(menu);
+
+        // Adjust if menu goes off screen
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+          menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+          menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
+        }
+
+        // Handle menu item clicks
+        menu.querySelectorAll('.context-menu-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const action = item.dataset.action;
+            const result = state.results[index];
+            if (action === 'open') {
+              openResultInEditor(index);
+            } else if (action === 'copy-path') {
+              copyToClipboard(result.uri.replace('file://', ''));
+            } else if (action === 'copy-relative') {
+              copyToClipboard(result.relativePath || result.fileName);
+            }
+            hideContextMenu();
+          });
+        });
+
+        // Close menu on click outside or escape
+        setTimeout(() => {
+          document.addEventListener('click', hideContextMenu, { once: true });
+          document.addEventListener('keydown', function escHandler(e) {
+            if (e.key === 'Escape') {
+              hideContextMenu();
+              document.removeEventListener('keydown', escHandler);
+            }
+          });
+        }, 0);
+      }
+
+      function hideContextMenu() {
+        const menu = document.getElementById('result-context-menu');
+        if (menu) menu.remove();
+      }
+
+      function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+          // Optional: show feedback
+        }).catch(err => {
+          console.error('Failed to copy:', err);
+        });
+      }
+
+      function openResultInEditor(index) {
+        if (index < 0 || index >= state.results.length) return;
+        const result = state.results[index];
+        vscode.postMessage({
+          type: 'openLocation',
+          uri: result.uri,
+          line: result.line,
+          character: result.character
         });
       }
 

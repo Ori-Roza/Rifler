@@ -22,6 +22,10 @@
 ## Features
 
 - **Dynamic Search** - Results appear as you type (no Find button needed)
+- **High Performance**
+  - **Virtualized Results** - Smooth scrolling with 10,000+ results
+  - **Configurable Limit** - Adjust max results via `rifler.maxResults` setting
+  - **Path Tooltips** - Hover truncated paths to see full file path
 - **Multiple Scopes**
   - **Project** - Search entire workspace
   - **Module** - Search in detected modules (package.json, tsconfig.json, etc.)
@@ -162,6 +166,18 @@ Or change it in Settings UI:
 2. Search for "rifler viewMode"
 3. Choose either "sidebar" or "tab"
 
+### Max Results Configuration
+
+To change the maximum number of search results, add to your `settings.json`:
+
+```json
+{
+  "rifler.maxResults": 10000  // default, minimum: 100
+}
+```
+
+With virtualized rendering, Rifler efficiently handles large result sets without UI lag.
+
 ## Installation
 
 ### From VSIX
@@ -184,15 +200,16 @@ Benchmark results on a large production codebase (~100k+ files):
 | Search for "if" keyword | 5000+ | ~0.4s |
 | Search for variable declarations (regex) | 5000+ | ~1.3s |
 
-**Average search time: ~1.2s** on large codebases | Max results: **5000**
+**Average search time: ~1.2s** on large codebases | Max results: **10,000** (configurable)
 
 On smaller codebases (< 10k files), search times are typically **under 100ms**.
 
 **Optimizations:**
 - 🎯 Smart exclusions (node_modules, .git, binaries, hidden folders)
-- 🚀 Early termination at 5000 results
+- 🚀 Early termination at configurable max results (default: 10,000)
 - 💾 Memory efficient (skips files > 1MB)
 - ⚡ Parallel async I/O with concurrency limiter
+- 🖥️ Virtualized results list for smooth scrolling with large result sets
 
 *Run `node benchmark.js [path]` to test performance on your own codebase*
 

@@ -20,7 +20,8 @@ export async function performSearch(
   options: SearchOptions,
   directoryPath?: string,
   modulePath?: string,
-  filePath?: string
+  filePath?: string,
+  maxResults: number = 10000
 ): Promise<SearchResult[]> {
   console.log('performSearch called:', { query, scope, directoryPath, modulePath, filePath, options });
   
@@ -49,13 +50,13 @@ export async function performSearch(
     options.fileMask = '';
   }
 
+  const effectiveMaxResults = Math.max(1, Math.floor(maxResults || 10000));
   const results: SearchResult[] = [];
-  const maxResults = 5000;
   const limiter = new Limiter(100);
 
   // For directory or module scope, search directly in filesystem
   if (scope === 'file' && filePath) {
-    await searchInFileAsync(filePath, regex, results, maxResults);
+    await searchInFileAsync(filePath, regex, results, effectiveMaxResults);
   } else if (scope === 'directory') {
     const searchPath = ((directoryPath || '').trim());
     
@@ -66,10 +67,10 @@ export async function performSearch(
         
         if (stat.isDirectory()) {
           // Search in the directory
-          await searchInDirectory(searchPath, regex, options.fileMask, results, maxResults, limiter);
+          await searchInDirectory(searchPath, regex, options.fileMask, results, effectiveMaxResults, limiter);
         } else {
           console.log('Path is a file, searching only in:', searchPath);
-          await searchInFileAsync(searchPath, regex, results, maxResults);
+          await searchInFileAsync(searchPath, regex, results, effectiveMaxResults);
         }
       } else {
         console.log('Directory path is empty');
@@ -80,7 +81,7 @@ export async function performSearch(
   } else if (scope === 'module' && modulePath) {
     try {
       await fs.promises.access(modulePath);
-      await searchInDirectory(modulePath, regex, options.fileMask, results, maxResults, limiter);
+      await searchInDirectory(modulePath, regex, options.fileMask, results, effectiveMaxResults, limiter);
     } catch {
       // Module path doesn't exist
     }
@@ -90,9 +91,9 @@ export async function performSearch(
     console.log('Workspace folders:', workspaceFolders ? workspaceFolders.map(f => f.uri.fsPath) : 'None');
     if (workspaceFolders) {
       const tasks = workspaceFolders.map(folder => {
-        if (results.length >= maxResults) return Promise.resolve();
+        if (results.length >= effectiveMaxResults) return Promise.resolve();
         console.log('Searching in folder:', folder.uri.fsPath);
-        return searchInDirectory(folder.uri.fsPath, regex, options.fileMask, results, maxResults, limiter);
+        return searchInDirectory(folder.uri.fsPath, regex, options.fileMask, results, effectiveMaxResults, limiter);
       });
       await Promise.all(tasks);
     }

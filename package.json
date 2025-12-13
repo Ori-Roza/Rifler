@@ -159,6 +159,13 @@
           "default": "ctrl+shift+r",
           "description": "Keybinding to open Replace in Preview while editing a file in Rifler. Format: modifier+key (e.g., ctrl+shift+r, cmd+r)",
           "order": 4
+        },
+        "rifler.maxResults": {
+          "type": "number",
+          "default": 10000,
+          "minimum": 100,
+          "markdownDescription": "Maximum number of search results to collect. With virtualized rendering, higher values are handled efficiently.",
+          "order": 5
         }
       }
     }

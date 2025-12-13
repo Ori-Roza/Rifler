@@ -479,4 +479,63 @@ describe('Search', () => {
       });
     });
   });
+
+  describe('maxResults parameter', () => {
+    test('should limit results to maxResults value', async () => {
+      const testFilePath = '/test/file.ts';
+      // Create content with many matches
+      const lines = Array.from({ length: 100 }, (_, i) => `const test${i} = "test value";`);
+      const content = lines.join('\n');
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.promises.stat.mockResolvedValue({ size: content.length, isFile: () => true, isDirectory: () => false } as fs.Stats);
+      mockFs.promises.readFile.mockResolvedValue(content);
+
+      const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath, 10);
+
+      expect(results.length).toBe(10);
+    });
+
+    test('should return all results when under maxResults limit', async () => {
+      const testFilePath = '/test/file.ts';
+      const content = 'const test1 = "value";\nconst test2 = "value";';
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.promises.stat.mockResolvedValue({ size: content.length, isFile: () => true, isDirectory: () => false } as fs.Stats);
+      mockFs.promises.readFile.mockResolvedValue(content);
+
+      const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath, 1000);
+
+      expect(results.length).toBe(2);
+    });
+
+    test('should use default maxResults of 10000 when not specified', async () => {
+      const testFilePath = '/test/file.ts';
+      const content = 'const test = "value";';
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.promises.stat.mockResolvedValue({ size: content.length, isFile: () => true, isDirectory: () => false } as fs.Stats);
+      mockFs.promises.readFile.mockResolvedValue(content);
+
+      // Just verify it doesn't throw and returns results
+      const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
+
+      expect(results.length).toBe(1);
+    });
+
+    test('should handle maxResults of 0 or negative by using default', async () => {
+      const testFilePath = '/test/file.ts';
+      const lines = Array.from({ length: 10 }, (_, i) => `const test${i} = "value";`);
+      const content = lines.join('\n');
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.promises.stat.mockResolvedValue({ size: content.length, isFile: () => true, isDirectory: () => false } as fs.Stats);
+      mockFs.promises.readFile.mockResolvedValue(content);
+
+      // With maxResults = 0, should still return results (uses default)
+      const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath, 0);
+
+      expect(results.length).toBe(10);
+    });
+  });
 });

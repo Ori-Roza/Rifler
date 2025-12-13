@@ -7,79 +7,6 @@ import { replaceOne, replaceAll } from './replacer';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
 
-// ============================================================================
-// Types
-// ============================================================================
-
-/** Represents a module in the workspace */
-interface ModuleInfo {
-  name: string;
-  path: string;
-}
-
-/** Messages from Webview to Extension */
-interface RunSearchMessage {
-  type: 'runSearch';
-  query: string;
-  scope: SearchScope;
-  directoryPath?: string;
-  modulePath?: string;
-  filePath?: string;
-  options: SearchOptions;
-}
-
-interface ReplaceOneMessage {
-  type: 'replaceOne';
-  uri: string;
-  line: number;
-  character: number;
-  length: number;
-  replaceText: string;
-}
-
-interface ReplaceAllMessage {
-  type: 'replaceAll';
-  query: string;
-  replaceText: string;
-  scope: SearchScope;
-  directoryPath?: string;
-  modulePath?: string;
-  filePath?: string;
-  options: SearchOptions;
-}
-
-interface OpenLocationMessage {
-  type: 'openLocation';
-  uri: string;
-  line: number;
-  character: number;
-}
-
-interface GetModulesMessage {
-  type: 'getModules';
-}
-
-interface GetCurrentDirectoryMessage {
-  type: 'getCurrentDirectory';
-}
-
-interface GetFileContentMessage {
-  type: 'getFileContent';
-  uri: string;
-  query: string;
-  options: SearchOptions;
-}
-
-interface SaveFileMessage {
-  type: 'saveFile';
-  uri: string;
-  content: string;
-}
-
-interface WebviewReadyMessage {
-  type: 'webviewReady';
-}
-
 interface MinimizeMessage {
   type: 'minimize';
   state: {
@@ -125,13 +52,87 @@ interface TestErrorMessage {
   error?: unknown;
 }
 
-type WebviewMessage = RunSearchMessage | OpenLocationMessage | GetModulesMessage | GetCurrentDirectoryMessage | GetFileContentMessage | ReplaceOneMessage | ReplaceAllMessage | WebviewReadyMessage | SaveFileMessage | MinimizeMessage | ValidateRegexMessage | ValidateFileMaskMessage | TestSearchCompletedMessage | TestSearchResultsReceivedMessage | TestErrorMessage;
+interface DiagPingMessage {
+  type: '__diag_ping';
+  ts: number;
+}
+
+interface RunSearchMessage {
+  type: 'runSearch';
+  query: string;
+  scope: SearchScope;
+  options: SearchOptions;
+  directoryPath?: string;
+  modulePath?: string;
+  filePath?: string;
+}
+
+interface OpenLocationMessage {
+  type: 'openLocation';
+  uri: string;
+  line: number;
+  character: number;
+}
+
+interface GetModulesMessage {
+  type: 'getModules';
+}
+
+interface GetCurrentDirectoryMessage {
+  type: 'getCurrentDirectory';
+}
+
+interface GetFileContentMessage {
+  type: 'getFileContent';
+  uri: string;
+  query: string;
+  options: SearchOptions;
+  activeIndex?: number;
+}
+
+interface ReplaceOneMessage {
+  type: 'replaceOne';
+  uri: string;
+  line: number;
+  character: number;
+  length: number;
+  replaceText: string;
+}
+
+interface ReplaceAllMessage {
+  type: 'replaceAll';
+  query: string;
+  replaceText: string;
+  scope: SearchScope;
+  options: SearchOptions;
+  directoryPath?: string;
+  modulePath?: string;
+  filePath?: string;
+}
+
+interface WebviewReadyMessage {
+  type: 'webviewReady';
+}
+
+interface SaveFileMessage {
+  type: 'saveFile';
+  uri: string;
+  content: string;
+}
+
+interface ModuleInfo {
+  name: string;
+  path: string;
+}
+
+type WebviewMessage = RunSearchMessage | OpenLocationMessage | GetModulesMessage | GetCurrentDirectoryMessage | GetFileContentMessage | ReplaceOneMessage | ReplaceAllMessage | WebviewReadyMessage | SaveFileMessage | MinimizeMessage | ValidateRegexMessage | ValidateFileMaskMessage | TestSearchCompletedMessage | TestSearchResultsReceivedMessage | TestErrorMessage | DiagPingMessage;
 
 /** Messages from Extension to Webview */
 interface SearchResultsMessage {
   type: 'searchResults';
   results: SearchResult[];
   activeIndex?: number;
+  maxResults?: number;
 }
 
 interface ModulesListMessage {
@@ -464,12 +465,14 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
 
   currentPanel.webview.onDidReceiveMessage(
     async (message: WebviewMessage) => {
+      console.log('Extension received message from webview:', (message as any).type);
       switch (message.type) {
         case 'webviewReady': {
           // Send configuration to webview
           const config = vscode.workspace.getConfiguration('rifler');
           const replaceKeybinding = config.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
-          currentPanel?.webview.postMessage({ type: 'config', replaceKeybinding });
+          const maxResults = config.get<number>('maxResults', 10000);
+          currentPanel?.webview.postMessage({ type: 'config', replaceKeybinding, maxResults });
           
           if (shouldShowReplace) {
             currentPanel?.webview.postMessage({ type: 'showReplace' });
@@ -572,7 +575,11 @@ function openSearchPanel(context: vscode.ExtensionContext, showReplace: boolean 
         case '__test_searchCompleted':
         case '__test_searchResultsReceived':
         case 'error':
+          console.error('Webview runtime error:', message);
           // These messages are handled by the test listener directly
+          break;
+        case '__diag_ping':
+          console.log('Received webview diag ping');
           break;
       }
     },
@@ -750,6 +757,9 @@ async function runSearch(
   modulePath?: string,
   filePath?: string
 ): Promise<void> {
+  const config = vscode.workspace.getConfiguration('rifler');
+  const maxResults = config.get<number>('maxResults', 10000);
+
   if (scope === 'project' && (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)) {
     vscode.window.showWarningMessage('No workspace folder open. Please open a folder to search in project scope.');
     panel.webview.postMessage({
@@ -759,12 +769,13 @@ async function runSearch(
     return;
   }
 
-  const results = await performSearch(query, scope, options, directoryPath, modulePath, filePath);
+  const results = await performSearch(query, scope, options, directoryPath, modulePath, filePath, maxResults);
   
   console.log('Sending searchResults to webview:', results.length, 'results');
   panel.webview.postMessage({
     type: 'searchResults',
-    results
+    results,
+    maxResults
   } as SearchResultsMessage);
 }
 
@@ -1000,6 +1011,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
+      position: relative;
     }
 
     .result-item {
@@ -1024,6 +1036,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       gap: 6px;
       flex: 1;
       min-width: 0;
+      overflow: hidden;
     }
 
     .result-header {
@@ -1036,6 +1049,9 @@ export function getWebviewHtml(webview: vscode.Webview): string {
     .result-filename {
       font-weight: 600;
       color: var(--vscode-textLink-foreground);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .open-in-editor-btn {
@@ -1703,6 +1719,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         lastPreview: null,
         searchTimeout: null,
         replaceKeybinding: 'ctrl+shift+r',
+        maxResultsCap: 10000,
         options: {
           matchCase: false,
           wholeWord: false,
@@ -1712,6 +1729,41 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       };
 
       const vscode = acquireVsCodeApi();
+
+      // Diagnostic ping to verify webview->extension messaging is live
+      try {
+        vscode.postMessage({ type: '__diag_ping', ts: Date.now() });
+      } catch (err) {
+        console.error('Failed to send diag ping from webview', err);
+      }
+
+      // Surface unexpected runtime errors to the extension host (helps E2E diagnose webview failures)
+      window.addEventListener('error', (event) => {
+        try {
+          vscode.postMessage({
+            type: 'error',
+            message: event.message,
+            source: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            error: event.error?.stack || String(event.error)
+          });
+        } catch (err) {
+          console.error('Failed to forward webview error', err);
+        }
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        try {
+          vscode.postMessage({
+            type: 'error',
+            message: 'Unhandled promise rejection',
+            error: event.reason?.stack || String(event.reason)
+          });
+        } catch (err) {
+          console.error('Failed to forward webview rejection', err);
+        }
+      });
 
       // DOM Elements
       const queryInput = document.getElementById('query');
@@ -1743,6 +1795,23 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       const editorContainer = document.getElementById('editor-container');
       const editorBackdrop = document.getElementById('editor-backdrop');
       const editorLineNumbers = document.getElementById('editor-line-numbers');
+
+      // Virtualized results rendering setup
+      const VIRTUAL_ROW_HEIGHT = 68;
+      const VIRTUAL_OVERSCAN = 8;
+      const virtualContent = document.createElement('div');
+      virtualContent.id = 'results-virtual-content';
+      virtualContent.style.position = 'relative';
+      virtualContent.style.width = '100%';
+
+      const resultsPlaceholder = document.createElement('div');
+      resultsPlaceholder.className = 'empty-state';
+      resultsPlaceholder.style.display = 'none';
+
+      // Prepare results container
+      resultsList.innerHTML = '';
+      resultsList.appendChild(virtualContent);
+      resultsList.appendChild(resultsPlaceholder);
       
       const replaceWidget = document.getElementById('replace-widget');
       const localSearchInput = document.getElementById('local-search-input');
@@ -2370,7 +2439,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         resultsCount.textContent = state.results.length + ' results';
         
         if (state.results.length === 0) {
-          resultsList.innerHTML = '<div class="empty-state">No results found</div>';
+          showPlaceholder('No results found');
           previewContent.innerHTML = '<div class="empty-state">No results</div>';
           previewFilename.textContent = '';
           state.activeIndex = -1;
@@ -2387,7 +2456,9 @@ export function getWebviewHtml(webview: vscode.Webview): string {
           if (state.activeIndex >= state.results.length) {
             state.activeIndex = state.results.length - 1;
           }
-          renderResults();
+          hidePlaceholder();
+          renderResultsVirtualized();
+          ensureActiveVisible();
           if (state.activeIndex >= 0) {
             loadFileContent(state.results[state.activeIndex]);
           }
@@ -2476,7 +2547,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         if (queryInput.value.trim().length === 0) {
           previewContent.innerHTML = '<div class="empty-state">No results</div>';
           previewFilename.textContent = '';
-          resultsList.innerHTML = '<div class="empty-state">Type to search...</div>';
+          showPlaceholder('Type to search...');
           resultsCount.textContent = '';
           state.results = [];
           state.activeIndex = -1;
@@ -2617,6 +2688,9 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         console.log('Webview received message:', message.type, message);
         switch (message.type) {
           case 'searchResults':
+            if (message.maxResults) {
+              state.maxResultsCap = message.maxResults;
+            }
             handleSearchResults(message.results, { skipAutoLoad: false, activeIndex: message.activeIndex });
             break;
           case 'modulesList':
@@ -2661,6 +2735,9 @@ export function getWebviewHtml(webview: vscode.Webview): string {
           case 'config':
             if (message.replaceKeybinding) {
               state.replaceKeybinding = message.replaceKeybinding;
+            }
+            if (message.maxResults) {
+              state.maxResultsCap = message.maxResults;
             }
             break;
           case 'focusSearch':
@@ -2860,6 +2937,31 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         }
       }
 
+      function showPlaceholder(text) {
+        resultsPlaceholder.textContent = text;
+        resultsPlaceholder.style.display = 'flex';
+        virtualContent.innerHTML = '';
+        virtualContent.style.height = '0px';
+      }
+
+      function hidePlaceholder() {
+        resultsPlaceholder.style.display = 'none';
+      }
+
+      let virtualRenderPending = false;
+
+      function scheduleVirtualRender() {
+        if (virtualRenderPending) return;
+        virtualRenderPending = true;
+        requestAnimationFrame(() => {
+          virtualRenderPending = false;
+          renderResultsVirtualized();
+        });
+      }
+
+      resultsList.addEventListener('scroll', scheduleVirtualRender);
+      window.addEventListener('resize', scheduleVirtualRender);
+
       function runSearch() {
         try {
           const query = queryInput.value.trim();
@@ -2868,7 +2970,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
           console.log('runSearch called, query:', query, 'length:', query.length);
           
           if (query.length < 2) {
-            resultsList.innerHTML = '<div class="empty-state">Type at least 2 characters...</div>';
+            showPlaceholder('Type at least 2 characters...');
             resultsCount.textContent = '';
             return;
           }
@@ -2880,13 +2982,13 @@ export function getWebviewHtml(webview: vscode.Webview): string {
               new RegExp(query);
             } catch (e) {
               // Invalid regex - just show message, don't search
-              resultsList.innerHTML = '<div class="empty-state">Invalid regex pattern</div>';
+              showPlaceholder('Invalid regex pattern');
               resultsCount.textContent = '';
               return;
             }
           }
 
-          resultsList.innerHTML = '<div class="empty-state">Searching...</div>';
+          showPlaceholder('Searching...');
           resultsCount.textContent = '';
 
           const message = {
@@ -2917,24 +3019,118 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         const resolvedActiveIndex = options.activeIndex !== undefined ? options.activeIndex : (results.length > 0 ? 0 : -1);
         state.results = results;
         state.activeIndex = resolvedActiveIndex;
+        resultsList.scrollTop = 0;
 
-        resultsCount.textContent = results.length + (results.length >= 5000 ? '+' : '') + ' results';
+        resultsCount.textContent = results.length + (state.maxResultsCap && results.length >= state.maxResultsCap ? '+' : '') + ' results';
 
         // Send test confirmation message back to extension host
         vscode.postMessage({ type: '__test_searchCompleted', results: results });
 
         if (results.length === 0) {
-          resultsList.innerHTML = '<div class="empty-state">No results found</div>';
+          showPlaceholder('No results found');
           previewContent.innerHTML = '<div class="empty-state">No results</div>';
           previewFilename.textContent = '';
           return;
         }
 
-        renderResults();
+        hidePlaceholder();
+        renderResultsVirtualized();
         
         // Auto-load result's file content unless explicitly skipped
         if (!options.skipAutoLoad && state.activeIndex >= 0) {
           loadFileContent(state.results[state.activeIndex]);
+        }
+      }
+
+      function renderResultsVirtualized() {
+        if (state.results.length === 0) return;
+
+        const total = state.results.length;
+        const viewportHeight = resultsList.clientHeight || 1;
+        const scrollTop = resultsList.scrollTop;
+        const start = Math.max(0, Math.floor(scrollTop / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN);
+        const end = Math.min(total, Math.ceil((scrollTop + viewportHeight) / VIRTUAL_ROW_HEIGHT) + VIRTUAL_OVERSCAN);
+
+        virtualContent.style.height = (total * VIRTUAL_ROW_HEIGHT) + 'px';
+
+        const fragment = document.createDocumentFragment();
+        for (let i = start; i < end; i++) {
+          fragment.appendChild(renderResultRow(state.results[i], i));
+        }
+
+        virtualContent.innerHTML = '';
+        virtualContent.appendChild(fragment);
+      }
+
+      function renderResultRow(result, index) {
+        const isActive = index === state.activeIndex;
+        const item = document.createElement('div');
+        item.className = 'result-item' + (isActive ? ' active' : '');
+        item.dataset.index = String(index);
+        item.style.position = 'absolute';
+        item.style.top = (index * VIRTUAL_ROW_HEIGHT) + 'px';
+        item.style.left = '0';
+        item.style.right = '0';
+
+        const previewHtml = highlightMatchSafe(
+          result.preview,
+          result.previewMatchRange.start,
+          result.previewMatchRange.end
+        );
+
+        const fullPath = result.relativePath || result.fileName;
+        item.innerHTML = '<div class="result-header">' +
+            '<div class="result-file" title="' + escapeAttr(fullPath) + '">' +
+              '<span class="result-filename">' + escapeHtml(fullPath) + '</span>' +
+              '<span class="result-location">:' + (result.line + 1) + '</span>' +
+            '</div>' +
+            '<button class="open-in-editor-btn" data-index="' + index + '" title="Open in Editor (Ctrl+Enter)">' +
+              '&nearr;' +
+            '</button>' +
+          '</div>' +
+          '<div class="result-preview">' + previewHtml + '</div>';
+
+        item.addEventListener('click', (e) => {
+          const target = e.target;
+          if (target && target.classList && target.classList.contains('open-in-editor-btn')) return;
+          const idx = parseInt(item.dataset.index, 10);
+          setActiveIndex(idx);
+        });
+
+        item.addEventListener('dblclick', (e) => {
+          const target = e.target;
+          if (target && target.classList && target.classList.contains('open-in-editor-btn')) return;
+          openActiveResult();
+        });
+
+        item.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          const idx = parseInt(item.dataset.index, 10);
+          showContextMenu(e, idx);
+        });
+
+        const openBtn = item.querySelector('.open-in-editor-btn');
+        if (openBtn) {
+          openBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(openBtn.dataset.index, 10);
+            openResultInEditor(idx);
+          });
+        }
+
+        return item;
+      }
+
+      function ensureActiveVisible() {
+        if (state.activeIndex < 0) return;
+        const top = state.activeIndex * VIRTUAL_ROW_HEIGHT;
+        const bottom = top + VIRTUAL_ROW_HEIGHT;
+        const viewTop = resultsList.scrollTop;
+        const viewBottom = viewTop + resultsList.clientHeight;
+        if (top < viewTop) {
+          resultsList.scrollTop = top;
+        } else if (bottom > viewBottom) {
+          resultsList.scrollTop = bottom - resultsList.clientHeight;
         }
       }
 
@@ -2967,77 +3163,6 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         } else {
           renderFilePreview(message);
         }
-      }
-
-      function renderResults() {
-        // Group results by file
-        const grouped = {};
-        state.results.forEach((result, index) => {
-          if (!grouped[result.uri]) {
-            grouped[result.uri] = [];
-          }
-          grouped[result.uri].push({ ...result, globalIndex: index });
-        });
-
-        let html = '';
-        for (const uri in grouped) {
-          const matches = grouped[uri];
-          const first = matches[0];
-          
-          matches.forEach(result => {
-            const isActive = result.globalIndex === state.activeIndex;
-            // Highlight before escaping to preserve correct character positions
-            const previewHtml = highlightMatchSafe(
-              result.preview,
-              result.previewMatchRange.start,
-              result.previewMatchRange.end
-            );
-
-            html += '<div class="result-item' + (isActive ? ' active' : '') + '" data-index="' + result.globalIndex + '">' +
-              '<div class="result-header">' +
-                '<div class="result-file">' +
-                  '<span class="result-filename">' + escapeHtml(result.relativePath || result.fileName) + '</span>' +
-                  '<span class="result-location">:' + (result.line + 1) + '</span>' +
-                '</div>' +
-                '<button class="open-in-editor-btn" data-index="' + result.globalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
-                  '↗' +
-                '</button>' +
-              '</div>' +
-              '<div class="result-preview">' + previewHtml + '</div>' +
-            '</div>';
-          });
-        }
-
-        resultsList.innerHTML = html;
-
-        // Click handlers
-        resultsList.querySelectorAll('.result-item').forEach(item => {
-          item.addEventListener('click', (e) => {
-            // Don't trigger if clicking the open-in-editor button
-            if (e.target.classList.contains('open-in-editor-btn')) return;
-            const index = parseInt(item.dataset.index, 10);
-            setActiveIndex(index);
-          });
-          item.addEventListener('dblclick', (e) => {
-            if (e.target.classList.contains('open-in-editor-btn')) return;
-            openActiveResult();
-          });
-          // Context menu
-          item.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            const index = parseInt(item.dataset.index, 10);
-            showContextMenu(e, index);
-          });
-        });
-
-        // Open in Editor button click handlers
-        resultsList.querySelectorAll('.open-in-editor-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const index = parseInt(btn.dataset.index, 10);
-            openResultInEditor(index);
-          });
-        });
       }
 
       // Context menu for result items
@@ -3211,14 +3336,8 @@ export function getWebviewHtml(webview: vscode.Webview): string {
 
         state.activeIndex = index;
 
-        resultsList.querySelectorAll('.result-item').forEach((item, i) => {
-          item.classList.toggle('active', parseInt(item.dataset.index, 10) === index);
-        });
-
-        const activeItem = resultsList.querySelector('.result-item.active');
-        if (activeItem) {
-          activeItem.scrollIntoView({ block: 'nearest' });
-        }
+        renderResultsVirtualized();
+        ensureActiveVisible();
 
         // Load file content for new selection
         loadFileContent(state.results[index]);

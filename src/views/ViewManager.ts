@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { RiflerSidebarProvider } from '../sidebar/SidebarProvider';
 
-export type PanelLocation = 'sidebar' | 'window' | 'ask';
+export type PanelLocation = 'sidebar' | 'window';
 
 export class ViewManager {
   private _sidebarProvider?: RiflerSidebarProvider;
@@ -21,27 +21,12 @@ export class ViewManager {
     forcedLocation?: PanelLocation;
   } = {}): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
-    const panelLocation = options.forcedLocation || config.get<PanelLocation>('panelLocation', 'window');
+    const panelLocation = options.forcedLocation || config.get<PanelLocation>('panelLocation', 'sidebar');
 
-    if (panelLocation === 'ask') {
-      const choice = await vscode.window.showQuickPick([
-        { label: 'Sidebar', value: 'sidebar', description: 'Open in activity bar sidebar' },
-        { label: 'Window', value: 'window', description: 'Open beside editor (current behavior)' }
-      ], {
-        placeHolder: 'Where would you like to open Rifler?'
-      });
-
-      if (!choice) return;
-      
-      if (choice.value === 'sidebar') {
-        this._openSidebar(options);
-      } else {
-        this._openWindow(options);
-      }
-    } else if (panelLocation === 'sidebar') {
+    if (panelLocation === 'sidebar') {
       this._openSidebar(options);
     } else {
-      this._openWindow(options);
+      await this._openWindow(options);
     }
   }
 
@@ -66,10 +51,9 @@ export class ViewManager {
     }
   }
 
-  private _openWindow(options: { showReplace?: boolean; initialQuery?: string }): void {
-    // Signal to extension.ts to open the window panel
-    // This will be handled by the existing openSearchPanel logic
-    vscode.commands.executeCommand('rifler.open', {
+  private async _openWindow(options: { showReplace?: boolean; initialQuery?: string }): Promise<void> {
+    // Use internal command that always opens without toggle logic
+    await vscode.commands.executeCommand('rifler._openWindowInternal', {
       initialQuery: options.initialQuery,
       showReplace: options.showReplace
     });
@@ -77,10 +61,17 @@ export class ViewManager {
 
   public async switchView(): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
-    const currentLocation = config.get<PanelLocation>('panelLocation', 'window');
+    const currentLocation = config.get<PanelLocation>('panelLocation', 'sidebar');
     const newLocation: PanelLocation = currentLocation === 'sidebar' ? 'window' : 'sidebar';
     
-    // Switch the setting
+    // Close current view first
+    if (currentLocation === 'sidebar') {
+      await vscode.commands.executeCommand('workbench.action.closeSidebar');
+    } else {
+      await vscode.commands.executeCommand('rifler._closeWindowInternal');
+    }
+    
+    // Update the setting
     await config.update('panelLocation', newLocation, vscode.ConfigurationTarget.Global);
     
     // Open in new location

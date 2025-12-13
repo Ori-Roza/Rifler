@@ -312,6 +312,24 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // Internal command to open window panel without toggle logic (used by ViewManager)
+  const openWindowInternalCommand = vscode.commands.registerCommand(
+    'rifler._openWindowInternal',
+    (options?: { initialQuery?: string; showReplace?: boolean }) => {
+      openSearchPanel(context, options?.showReplace ?? false, undefined, options?.initialQuery);
+    }
+  );
+
+  // Internal command to close window panel (used by ViewManager for switching views)
+  const closeWindowInternalCommand = vscode.commands.registerCommand(
+    'rifler._closeWindowInternal',
+    () => {
+      if (currentPanel) {
+        currentPanel.dispose();
+      }
+    }
+  );
+
   context.subscriptions.push(
     openCommand,
     openReplaceCommand,
@@ -320,7 +338,9 @@ export function activate(context: vscode.ExtensionContext) {
     toggleViewCommand,
     restoreCommand,
     minimizeCommand,
-    testEnsureOpenCommand
+    testEnsureOpenCommand,
+    openWindowInternalCommand,
+    closeWindowInternalCommand
   );
 }
 
@@ -2881,8 +2901,9 @@ export function getWebviewHtml(webview: vscode.Webview): string {
           
           matches.forEach(result => {
             const isActive = result.globalIndex === state.activeIndex;
-            const previewHtml = highlightMatch(
-              escapeHtml(result.preview),
+            // Highlight before escaping to preserve correct character positions
+            const previewHtml = highlightMatchSafe(
+              result.preview,
               result.previewMatchRange.start,
               result.previewMatchRange.end
             );
@@ -3049,6 +3070,16 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         if (start < 0 || end <= start || start >= html.length) return html;
         end = Math.min(end, html.length);
         return html.substring(0, start) + '<span class="match">' + html.substring(start, end) + '</span>' + html.substring(end);
+      }
+
+      // Highlight match in raw text, escaping each part separately to preserve positions
+      function highlightMatchSafe(rawText, start, end) {
+        if (start < 0 || end <= start || start >= rawText.length) return escapeHtml(rawText);
+        end = Math.min(end, rawText.length);
+        const before = escapeHtml(rawText.substring(0, start));
+        const match = escapeHtml(rawText.substring(start, end));
+        const after = escapeHtml(rawText.substring(end));
+        return before + '<span class="match">' + match + '</span>' + after;
       }
     })();
   </script>

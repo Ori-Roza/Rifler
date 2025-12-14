@@ -297,7 +297,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       if (sidebarVisible) {
-        sidebarProvider.postMessage({ type: 'toggleReplace' } as any);
+        sidebarProvider.postMessage({ type: 'toggleReplace' });
       }
     }
   );

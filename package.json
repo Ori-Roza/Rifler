@@ -61,6 +61,10 @@
         "title": "Rifler: Search and Replace (Window Panel)"
       },
       {
+        "command": "rifler.toggleReplace",
+        "title": "Rifler: Toggle Replace"
+      },
+      {
         "command": "rifler.openSidebar",
         "title": "Rifler: Search in Files (Sidebar)",
         "icon": "$(search)"
@@ -116,6 +120,12 @@
         "command": "rifler.openReplace",
         "key": "ctrl+alt+r",
         "mac": "cmd+alt+r"
+      },
+      {
+        "command": "rifler.toggleReplace",
+        "key": "alt+shift+f",
+        "mac": "shift+option+f",
+        "when": "activeWebviewPanelId == 'rifler' || view == rifler.sidebarView"
       },
       {
         "command": "rifler.toggleView",

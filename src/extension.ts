@@ -288,6 +288,20 @@ export function activate(context: vscode.ExtensionContext) {
     () => viewManager.switchView()
   );
 
+  // Command to toggle the Replace row in the active Rifler view
+  const toggleReplaceCommand = vscode.commands.registerCommand(
+    'rifler.toggleReplace',
+    () => {
+      if (currentPanel) {
+        currentPanel.webview.postMessage({ type: 'toggleReplace' });
+        return;
+      }
+      if (sidebarVisible) {
+        sidebarProvider.postMessage({ type: 'toggleReplace' } as any);
+      }
+    }
+  );
+
   const restoreCommand = vscode.commands.registerCommand(
     'rifler.restore',
     () => restorePanel(context)
@@ -302,6 +316,14 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }
   );
+
+  // Status bar toggle as a simple, click-first alternative
+  const replaceToggleStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+  replaceToggleStatusBar.text = '$(replace) Toggle Replace';
+  replaceToggleStatusBar.tooltip = 'Toggle Replace row in Rifler';
+  replaceToggleStatusBar.command = 'rifler.toggleReplace';
+  context.subscriptions.push(replaceToggleStatusBar);
+  replaceToggleStatusBar.show();
 
   // Test-only command to ensure panel is open without toggling
   const testEnsureOpenCommand = vscode.commands.registerCommand(
@@ -337,6 +359,7 @@ export function activate(context: vscode.ExtensionContext) {
     openSidebarCommand,
     openSidebarReplaceCommand,
     toggleViewCommand,
+    toggleReplaceCommand,
     restoreCommand,
     minimizeCommand,
     testEnsureOpenCommand,
@@ -847,70 +870,168 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       --rifler-highlight-border: #e0b700;
     }
 
-    /* ===== Search Header ===== */
-    .search-header {
+    /* ===== Search Bar Card Layout ===== */
+    .search-bar-card {
+      background-color: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+      border: 1px solid var(--vscode-widget-border, #444);
+      border-radius: 10px;
       padding: 12px;
-      border-bottom: 1px solid var(--vscode-widget-border, #444);
-      background-color: var(--vscode-sideBar-background);
-      width: 100%;
+      margin: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: calc(100% - 16px);
+      box-sizing: border-box;
     }
 
-    .search-row {
+    /* Row 1: Search Field */
+    .search-field-row {
       display: flex;
-      gap: 8px;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-      min-width: 0;
-      width: 100%;
       align-items: center;
+      gap: 8px;
+      background-color: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border, #444);
+      border-radius: 6px;
+      padding: 4px 8px;
+      transition: border-color 0.15s;
     }
 
-    .search-row button {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: 1px solid var(--vscode-widget-border);
-      cursor: pointer;
-      padding: 3px 6px;
-      border-radius: 2px;
-      font-size: 11px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    
-    .search-row button:hover {
-      background: var(--vscode-button-secondaryHoverBackground);
+    .search-field-row:focus-within {
+      border-color: var(--vscode-focusBorder);
     }
 
-    #replace-row {
-      display: none;
-    }
-
-    #replace-row.visible {
-      display: flex;
-    }
-
-    .search-label {
-      font-size: 11px;
-      font-weight: 500;
+    .search-icon {
+      font-size: 14px;
       color: var(--vscode-descriptionForeground);
-      min-width: 50px;
+      flex-shrink: 0;
+      opacity: 0.7;
     }
 
-    #query, #replace-input {
+    #query {
       flex: 1;
-      padding: 6px 10px;
+      padding: 6px 4px;
       font-size: 13px;
       font-family: var(--vscode-editor-font-family);
-      background-color: var(--vscode-input-background);
+      background-color: transparent;
       color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, #444));
-      border-radius: 3px;
+      border: none;
       min-width: 0;
       outline: none;
     }
 
-    #query:focus, #replace-input:focus {
+    .close-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--vscode-descriptionForeground);
+      font-size: 14px;
+      flex-shrink: 0;
+      transition: background-color 0.15s, color 0.15s;
+    }
+
+    .close-btn:hover {
+      background-color: var(--vscode-toolbar-hoverBackground);
+      color: var(--vscode-foreground);
+    }
+
+    .toggle-replace-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--vscode-descriptionForeground);
+      font-size: 16px;
+      flex-shrink: 0;
+      transition: background-color 0.15s, color 0.15s;
+    }
+
+    .toggle-replace-btn:hover {
+      background-color: var(--vscode-toolbar-hoverBackground);
+      color: var(--vscode-foreground);
+    }
+
+    .toggle-replace-btn.active {
+      color: var(--vscode-button-background);
+    }
+
+    /* Replace row (hidden by default) */
+    .replace-field-row {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background-color: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border, #444);
+      border-radius: 6px;
+      padding: 4px 8px;
+    }
+
+    .replace-field-row.visible {
+      display: flex;
+    }
+
+    .replace-field-row:focus-within {
       border-color: var(--vscode-focusBorder);
+    }
+
+    .replace-icon {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+      flex-shrink: 0;
+      opacity: 0.7;
+    }
+
+    #replace-input {
+      flex: 1;
+      padding: 6px 4px;
+      font-size: 13px;
+      font-family: var(--vscode-editor-font-family);
+      background-color: transparent;
+      color: var(--vscode-input-foreground);
+      border: none;
+      min-width: 0;
+      outline: none;
+    }
+
+    .replace-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .replace-actions button {
+      padding: 4px 8px;
+      font-size: 11px;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: 1px solid var(--vscode-widget-border);
+      border-radius: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .replace-actions button:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    .replace-actions button.primary {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-color: var(--vscode-button-background);
+    }
+
+    .replace-actions button.primary:hover {
+      background: var(--vscode-button-hoverBackground);
     }
 
     /* Input validation states - ensure inputs remain clickable */
@@ -927,48 +1048,50 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       outline-offset: -1px;
     }
 
-    /* ===== Scope Selection ===== */
+    /* ===== Row 3: Scope Selector ===== */
     .scope-row {
       display: flex;
-      gap: 8px;
-      align-items: center;
+      justify-content: center;
+      gap: 6px;
       flex-wrap: wrap;
     }
 
     .scope-tabs {
       display: flex;
-      gap: 0;
-      border: 1px solid var(--vscode-widget-border, #444);
-      border-radius: 3px;
-      overflow: hidden;
+      gap: 6px;
+      justify-content: center;
     }
 
     .scope-tab {
-      padding: 4px 10px;
+      padding: 6px 14px;
       font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       background-color: transparent;
-      color: var(--vscode-foreground);
-      border: none;
-      border-right: 1px solid var(--vscode-widget-border, #444);
+      color: var(--vscode-descriptionForeground);
+      border: 1px solid var(--vscode-widget-border, #444);
+      border-radius: 16px;
       cursor: pointer;
-    }
-
-    .scope-tab:last-child {
-      border-right: none;
+      transition: all 0.15s;
     }
 
     .scope-tab:hover {
       background-color: var(--vscode-list-hoverBackground);
+      border-color: var(--vscode-focusBorder);
+      color: var(--vscode-foreground);
     }
 
     .scope-tab.active {
       background-color: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
+      border-color: var(--vscode-button-background);
+      font-weight: 700;
     }
 
     .scope-input {
-      flex: 1;
-      min-width: 150px;
+      width: 100%;
+      margin-top: 6px;
       display: none;
     }
 
@@ -979,12 +1102,12 @@ export function getWebviewHtml(webview: vscode.Webview): string {
     .scope-input input,
     .scope-input select {
       width: 100%;
-      padding: 4px 8px;
-      font-size: 11px;
+      padding: 6px 10px;
+      font-size: 12px;
       background-color: var(--vscode-input-background);
       color: var(--vscode-input-foreground);
       border: 1px solid var(--vscode-input-border, #444);
-      border-radius: 3px;
+      border-radius: 6px;
     }
 
     /* ===== Main Content ===== */
@@ -999,10 +1122,45 @@ export function getWebviewHtml(webview: vscode.Webview): string {
     /* ===== Results List ===== */
     .results-panel {
       height: 40%;
-      min-height: 100px;
+      min-height: 80px;
+      max-height: calc(100% - 80px);
       display: flex;
       flex-direction: column;
-      border-bottom: 1px solid var(--vscode-widget-border, #444);
+      flex-shrink: 0;
+    }
+
+    /* ===== Resizer ===== */
+    .panel-resizer {
+      height: 4px;
+      background-color: var(--vscode-widget-border, #444);
+      cursor: ns-resize;
+      flex-shrink: 0;
+      position: relative;
+      transition: background-color 0.15s;
+    }
+
+    .panel-resizer:hover,
+    .panel-resizer.dragging {
+      background-color: var(--vscode-focusBorder);
+    }
+
+    .panel-resizer::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 30px;
+      height: 2px;
+      background-color: var(--vscode-descriptionForeground);
+      border-radius: 1px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .panel-resizer:hover::after,
+    .panel-resizer.dragging::after {
+      opacity: 0.6;
     }
 
     .results-header {
@@ -1141,6 +1299,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
     /* ===== Preview Panel ===== */
     .preview-panel {
       flex: 1;
+      min-height: 80px;
       display: flex;
       flex-direction: column;
       min-height: 0;
@@ -1481,70 +1640,133 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       background: var(--vscode-scrollbarSlider-hoverBackground);
     }
 
-    /* ===== Search Options ===== */
+    /* ===== Row 2: Options Row ===== */
     .options-row {
       display: flex;
-      gap: 16px;
       align-items: center;
-      margin-top: 8px;
-      padding: 6px 0;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
-    .option-group {
+    .toggle-group {
       display: flex;
+      gap: 6px;
+    }
+
+    .option-toggle {
+      display: inline-flex;
       align-items: center;
-      gap: 5px;
-    }
-
-    .option-group input[type="checkbox"] {
-      width: 14px;
-      height: 14px;
-      margin: 0;
-      cursor: pointer;
-      accent-color: var(--vscode-button-background);
-    }
-
-    .option-group label {
-      font-size: 11px;
-      color: var(--vscode-foreground);
+      justify-content: center;
+      min-width: 32px;
+      height: 28px;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: var(--vscode-editor-font-family, monospace);
+      color: var(--vscode-descriptionForeground);
+      background-color: transparent;
+      border: 1px solid var(--vscode-widget-border, #444);
+      border-radius: 14px;
       cursor: pointer;
       user-select: none;
-      white-space: nowrap;
+      transition: all 0.15s;
     }
 
-    .file-mask-row {
+    .option-toggle:hover {
+      background-color: var(--vscode-list-hoverBackground);
+      border-color: var(--vscode-focusBorder);
+      color: var(--vscode-foreground);
+    }
+
+    .option-toggle.active {
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-color: var(--vscode-button-background);
+    }
+
+    .option-toggle.active:hover {
+      background-color: var(--vscode-button-hoverBackground);
+      border-color: var(--vscode-button-hoverBackground);
+    }
+
+    /* File mask dropdown-style control */
+    .file-mask-control {
       display: flex;
-      gap: 8px;
       align-items: center;
-      margin-top: 6px;
-      padding: 4px 0;
+      position: relative;
     }
 
-    .file-mask-group {
+    .file-mask-btn {
       display: flex;
       align-items: center;
       gap: 6px;
-      flex: 1;
-    }
-
-    .file-mask-group label {
-      font-size: 11px;
+      padding: 6px 12px;
+      font-size: 12px;
       color: var(--vscode-descriptionForeground);
+      background-color: transparent;
+      border: 1px solid var(--vscode-widget-border, #444);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
       white-space: nowrap;
     }
 
-    .file-mask-group input {
-      width: 150px;
-      padding: 3px 8px;
+    .file-mask-btn:hover {
+      background-color: var(--vscode-list-hoverBackground);
+      border-color: var(--vscode-focusBorder);
+      color: var(--vscode-foreground);
+    }
+
+    .file-mask-btn.has-value {
+      background-color: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+
+    .file-mask-arrow {
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .file-mask-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      background-color: var(--vscode-editorWidget-background);
+      border: 1px solid var(--vscode-widget-border, #444);
+      border-radius: 6px;
+      padding: 8px;
+      min-width: 200px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 100;
+      display: none;
+    }
+
+    .file-mask-dropdown.visible {
+      display: block;
+    }
+
+    .file-mask-dropdown label {
+      display: block;
       font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 4px;
+    }
+
+    .file-mask-dropdown input {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 12px;
       background-color: var(--vscode-input-background);
       color: var(--vscode-input-foreground);
       border: 1px solid var(--vscode-input-border, #444);
-      border-radius: 3px;
+      border-radius: 4px;
     }
 
-    .file-mask-group input::placeholder {
-      color: var(--vscode-input-placeholderForeground);
+    .file-mask-dropdown input:focus {
+      border-color: var(--vscode-focusBorder);
+      outline: none;
     }
 
     /* ===== Validation Messages ===== */
@@ -1600,64 +1822,69 @@ export function getWebviewHtml(webview: vscode.Webview): string {
   </style>
 </head>
 <body>
-  <div class="search-header">
-    <div class="search-row">
-      <span class="search-label">Find:</span>
-      <input type="text" id="query" placeholder="Type to search..." autofocus />
-      <button id="toggle-replace" title="Toggle Replace (Option+Shift+F)">&#x2195;</button>
+  <div class="search-bar-card">
+    <!-- Row 1: Search Field -->
+    <div class="search-field-row">
+      <button class="toggle-replace-btn" id="toggle-replace" title="Toggle Replace (Option+Shift+R)">↕</button>
+      <input type="text" id="query" placeholder="" autofocus />
+      <button class="close-btn" id="close-search" title="Close (Esc)">✕</button>
     </div>
     <div id="query-validation-message" class="validation-message"></div>
-    <div class="search-row" id="replace-row">
-      <span class="search-label">Replace:</span>
-      <input type="text" id="replace-input" placeholder="Replace with..." />
-      <button id="replace-btn" title="Replace (Enter)">Replace</button>
-      <button id="replace-all-btn" title="Replace All (Cmd+Enter)">Replace All</button>
+
+    <!-- Replace Row (hidden by default) -->
+    <div class="replace-field-row" id="replace-row">
+      <span class="replace-icon">↔</span>
+      <input type="text" id="replace-input" placeholder="Replace" />
+      <div class="replace-actions">
+        <button id="replace-btn" title="Replace (Enter)">Replace</button>
+        <button id="replace-all-btn" class="primary" title="Replace All (Cmd+Enter)">All</button>
+      </div>
     </div>
+
+    <!-- Row 2: Options Row -->
     <div class="options-row">
-      <div class="option-group">
-        <input type="checkbox" id="match-case" />
-        <label for="match-case">Match Case</label>
+      <div class="toggle-group">
+        <button type="button" class="option-toggle" id="match-case" title="Match Case (Alt+C)">Aa</button>
+        <button type="button" class="option-toggle" id="whole-word" title="Match Whole Word (Alt+W)">W</button>
+        <button type="button" class="option-toggle" id="use-regex" title="Use Regular Expression (Alt+R)">.*</button>
       </div>
-      <div class="option-group">
-        <input type="checkbox" id="whole-word" />
-        <label for="whole-word">Words</label>
-      </div>
-      <div class="option-group">
-        <input type="checkbox" id="use-regex" />
-        <label for="use-regex">Regex</label>
+      <div class="file-mask-control">
+        <button type="button" class="file-mask-btn" id="file-mask-btn">
+          <span id="file-mask-label">File mask</span>
+          <span class="file-mask-arrow">▼</span>
+        </button>
+        <div class="file-mask-dropdown" id="file-mask-dropdown">
+          <label for="file-mask">Filter by file pattern:</label>
+          <input type="text" id="file-mask" placeholder="*.ts, *.js, *.py" />
+        </div>
       </div>
     </div>
-    <div class="file-mask-row">
-      <div class="file-mask-group">
-        <label for="file-mask">File Mask:</label>
-        <input type="text" id="file-mask" placeholder="*.ts, *.js, *.py" />
-      </div>
-      <div id="file-mask-validation-message" class="validation-message"></div>
-    </div>
+    <div id="file-mask-validation-message" class="validation-message"></div>
+
+    <!-- Row 3: Scope Selector -->
     <div class="scope-row">
-      <span class="search-label">In:</span>
       <div class="scope-tabs">
         <button class="scope-tab active" data-scope="project">Project</button>
         <button class="scope-tab" data-scope="module">Module</button>
-        <button class="scope-tab" data-scope="directory">Directory</button>
+        <button class="scope-tab" data-scope="directory">Dir</button>
         <button class="scope-tab" data-scope="file" id="scope-file" style="display: none;">File</button>
       </div>
-      <div class="scope-input" id="directory-input-wrapper">
-        <input type="text" id="directory-input" placeholder="Directory path..." />
-      </div>
-      <div class="scope-input" id="module-input-wrapper">
-        <select id="module-select">
-          <option value="">Select module...</option>
-        </select>
-      </div>
-      <div class="scope-input" id="file-input-wrapper">
-        <input type="text" id="file-input" placeholder="File path..." readonly />
-      </div>
+    </div>
+    <div class="scope-input" id="directory-input-wrapper">
+      <input type="text" id="directory-input" placeholder="Directory path..." />
+    </div>
+    <div class="scope-input" id="module-input-wrapper">
+      <select id="module-select">
+        <option value="">Select module...</option>
+      </select>
+    </div>
+    <div class="scope-input" id="file-input-wrapper">
+      <input type="text" id="file-input" placeholder="File path..." readonly />
     </div>
   </div>
 
   <div class="main-content">
-    <div class="results-panel">
+    <div class="results-panel" id="results-panel">
       <div class="results-header">
         <span>Results</span>
         <span id="results-count"></span>
@@ -1667,7 +1894,9 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       </div>
     </div>
 
-    <div class="preview-panel">
+    <div class="panel-resizer" id="panel-resizer"></div>
+
+    <div class="preview-panel" id="preview-panel">
       <div class="preview-header">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span>Preview</span>
@@ -1778,6 +2007,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       const replaceInput = document.getElementById('replace-input');
       const replaceBtn = document.getElementById('replace-btn');
       const replaceAllBtn = document.getElementById('replace-all-btn');
+      const closeSearchBtn = document.getElementById('close-search');
       const toggleReplaceBtn = document.getElementById('toggle-replace');
       const resultsList = document.getElementById('results-list');
       const resultsCount = document.getElementById('results-count');
@@ -1788,10 +2018,13 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       const moduleInputWrapper = document.getElementById('module-input-wrapper');
       const directoryInput = document.getElementById('directory-input');
       const moduleSelect = document.getElementById('module-select');
-      const matchCaseCheckbox = document.getElementById('match-case');
-      const wholeWordCheckbox = document.getElementById('whole-word');
-      const useRegexCheckbox = document.getElementById('use-regex');
+      const matchCaseToggle = document.getElementById('match-case');
+      const wholeWordToggle = document.getElementById('whole-word');
+      const useRegexToggle = document.getElementById('use-regex');
       const fileMaskInput = document.getElementById('file-mask');
+      const fileMaskBtn = document.getElementById('file-mask-btn');
+      const fileMaskDropdown = document.getElementById('file-mask-dropdown');
+      const fileMaskLabel = document.getElementById('file-mask-label');
 
       const scopeFileBtn = document.getElementById('scope-file');
       const fileInputWrapper = document.getElementById('file-input-wrapper');
@@ -1802,6 +2035,12 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       const editorContainer = document.getElementById('editor-container');
       const editorBackdrop = document.getElementById('editor-backdrop');
       const editorLineNumbers = document.getElementById('editor-line-numbers');
+
+      // Panel resizer elements
+      const resultsPanel = document.getElementById('results-panel');
+      const panelResizer = document.getElementById('panel-resizer');
+      const previewPanel = document.getElementById('preview-panel');
+      const mainContent = document.querySelector('.main-content');
 
       // Virtualized results rendering setup
       let VIRTUAL_ROW_HEIGHT = 46;
@@ -1900,6 +2139,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       // Toggle Replace
       function toggleReplace() {
         const isVisible = replaceRow.classList.toggle('visible');
+        toggleReplaceBtn.classList.toggle('active', isVisible);
         if (isVisible) {
           // If search box has a value, focus on replace; otherwise focus on search
           if (queryInput.value.trim()) {
@@ -1912,7 +2152,59 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         }
       }
 
+      // Toggle replace button click handler
       toggleReplaceBtn.addEventListener('click', toggleReplace);
+
+      // Close button clears search and minimizes
+      closeSearchBtn.addEventListener('click', () => {
+        // Clear the search
+        queryInput.value = '';
+        state.results = [];
+        state.activeIndex = -1;
+        handleSearchResults([], { skipAutoLoad: true });
+        
+        // Clear state from sidebar persistence
+        vscode.postMessage({ type: 'clearState' });
+        
+        // Minimize if in window mode
+        vscode.postMessage({ type: 'minimize', state: {} });
+      });
+
+      // File mask dropdown toggle
+      fileMaskBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileMaskDropdown.classList.toggle('visible');
+        if (fileMaskDropdown.classList.contains('visible')) {
+          fileMaskInput.focus();
+        }
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!fileMaskDropdown.contains(e.target) && e.target !== fileMaskBtn) {
+          fileMaskDropdown.classList.remove('visible');
+        }
+      });
+
+      // Update file mask label when value changes
+      function updateFileMaskLabel() {
+        const value = fileMaskInput.value.trim();
+        if (value) {
+          fileMaskLabel.textContent = value;
+          fileMaskBtn.classList.add('has-value');
+        } else {
+          fileMaskLabel.textContent = 'File mask';
+          fileMaskBtn.classList.remove('has-value');
+        }
+      }
+
+      // Toggle replace on Alt+Shift+F (Option+Shift+F on macOS)
+      document.addEventListener('keydown', (e) => {
+        if (e.altKey && e.shiftKey && e.code === 'KeyF') {
+          e.preventDefault();
+          toggleReplace();
+        }
+      });
 
       // Replace Actions
       replaceBtn.addEventListener('click', replaceOne);
@@ -2588,19 +2880,22 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         console.log('Timeout set, id:', state.searchTimeout);
       });
 
-      // Search options change handlers
-      matchCaseCheckbox.addEventListener('change', () => {
-        state.options.matchCase = matchCaseCheckbox.checked;
+      // Search options toggle handlers
+      matchCaseToggle.addEventListener('click', () => {
+        state.options.matchCase = !state.options.matchCase;
+        matchCaseToggle.classList.toggle('active', state.options.matchCase);
         runSearch();
       });
 
-      wholeWordCheckbox.addEventListener('change', () => {
-        state.options.wholeWord = wholeWordCheckbox.checked;
+      wholeWordToggle.addEventListener('click', () => {
+        state.options.wholeWord = !state.options.wholeWord;
+        wholeWordToggle.classList.toggle('active', state.options.wholeWord);
         runSearch();
       });
 
-      useRegexCheckbox.addEventListener('change', () => {
-        state.options.useRegex = useRegexCheckbox.checked;
+      useRegexToggle.addEventListener('click', () => {
+        state.options.useRegex = !state.options.useRegex;
+        useRegexToggle.classList.toggle('active', state.options.useRegex);
         
         if (state.options.useRegex) {
           // Turning regex ON - validate the current pattern
@@ -2620,6 +2915,9 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       fileMaskInput.addEventListener('input', () => {
         clearTimeout(state.searchTimeout);
         
+        // Update the label
+        updateFileMaskLabel();
+        
         // Validate file mask with debounce
         clearTimeout(validationDebounceTimeout);
         validationDebounceTimeout = setTimeout(() => {
@@ -2630,6 +2928,61 @@ export function getWebviewHtml(webview: vscode.Webview): string {
           state.options.fileMask = fileMaskInput.value;
           runSearch();
         }, 300);
+      });
+
+      // ===== Panel Resizer Logic =====
+      let isResizing = false;
+      let startY = 0;
+      let startHeight = 0;
+      const MIN_PANEL_HEIGHT = 80;
+      const RESIZER_HEIGHT = 4;
+
+      // Restore saved panel height from webview state
+      const savedWebviewState = vscode.getState();
+      if (savedWebviewState && savedWebviewState.resultsPanelHeight) {
+        resultsPanel.style.height = savedWebviewState.resultsPanelHeight + 'px';
+      }
+
+      panelResizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startY = e.clientY;
+        startHeight = resultsPanel.offsetHeight;
+        panelResizer.classList.add('dragging');
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        
+        const containerHeight = mainContent.offsetHeight - RESIZER_HEIGHT;
+        const deltaY = e.clientY - startY;
+        let newHeight = startHeight + deltaY;
+        
+        // Enforce min/max constraints
+        newHeight = Math.max(MIN_PANEL_HEIGHT, newHeight);
+        newHeight = Math.min(containerHeight - MIN_PANEL_HEIGHT, newHeight);
+        
+        resultsPanel.style.height = newHeight + 'px';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (!isResizing) return;
+        isResizing = false;
+        panelResizer.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        
+        // Persist the height to webview state
+        const currentState = vscode.getState() || {};
+        vscode.setState({
+          ...currentState,
+          resultsPanelHeight: resultsPanel.offsetHeight
+        });
+        
+        // Trigger virtual render update for results list
+        scheduleVirtualRender();
       });
 
       // Scope tabs
@@ -2661,13 +3014,13 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         var isInEditor = activeEl === fileEditor || activeEl === localSearchInput || activeEl === localReplaceInput;
         
         // Replace in File (Alt+R)
-        if (e.altKey && e.code === 'KeyR') {
+        if (e.altKey && !e.shiftKey && e.code === 'KeyR') {
           e.preventDefault();
           triggerReplaceInFile();
           return;
         }
 
-        if (e.altKey && e.shiftKey && e.code === 'KeyF') {
+        if (e.altKey && e.shiftKey && e.code === 'KeyR') {
           e.preventDefault();
           toggleReplace();
         } else if (e.key === 'ArrowDown' && !isInEditor) {
@@ -2695,6 +3048,9 @@ export function getWebviewHtml(webview: vscode.Webview): string {
         const message = event.data;
         console.log('Webview received message:', message.type, message);
         switch (message.type) {
+          case 'toggleReplace':
+            toggleReplace();
+            break;
           case 'searchResults':
             if (message.maxResults) {
               state.maxResultsCap = message.maxResults;
@@ -2806,11 +3162,12 @@ export function getWebviewHtml(webview: vscode.Webview): string {
               fileInput.value = s.filePath || '';
               state.options = s.options || { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' };
               
-              // Update UI checkboxes
-              matchCaseCheckbox.checked = state.options.matchCase;
-              wholeWordCheckbox.checked = state.options.wholeWord;
-              useRegexCheckbox.checked = state.options.useRegex;
+              // Update UI toggle buttons
+              matchCaseToggle.classList.toggle('active', state.options.matchCase);
+              wholeWordToggle.classList.toggle('active', state.options.wholeWord);
+              useRegexToggle.classList.toggle('active', state.options.useRegex);
               fileMaskInput.value = state.options.fileMask || '';
+              updateFileMaskLabel();
               
               // Update scope tabs
               scopeTabs.forEach(tab => {
@@ -2882,7 +3239,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
             break;
           case '__test_setUseRegex': // Test utility: set regex mode
             state.options.useRegex = message.value || false;
-            useRegexCheckbox.checked = state.options.useRegex;
+            useRegexToggle.classList.toggle('active', state.options.useRegex);
             break;
           case '__test_triggerSearch': // Test utility: trigger search and report query
             vscode.postMessage({

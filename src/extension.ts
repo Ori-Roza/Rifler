@@ -840,6 +840,13 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       min-width: 0;
     }
 
+    :root {
+      --rifler-highlight: rgba(255, 213, 79, 0.55);
+      --rifler-highlight-strong: rgba(255, 213, 79, 0.72);
+      --rifler-highlight-muted: rgba(255, 213, 79, 0.25);
+      --rifler-highlight-border: #e0b700;
+    }
+
     /* ===== Search Header ===== */
     .search-header {
       padding: 12px;
@@ -1127,7 +1134,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
     }
 
     .result-preview .match {
-      background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(255, 200, 0, 0.4));
+      background-color: var(--rifler-highlight-strong);
       border-radius: 2px;
     }
 
@@ -1295,7 +1302,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
     .hl-type { color: #4ec9b0; } /* Teal */
     .hl-property { color: #9cdcfe; } /* Light Blue */
     .hl-operator { color: #d4d4d4; } /* Light Gray */
-    .hl-match { background-color: rgba(255, 200, 0, 0.4); }
+    .hl-match { background-color: var(--rifler-highlight-strong); }
 
     /* Replace Widget */
     .replace-widget {
@@ -1419,11 +1426,11 @@ export function getWebviewHtml(webview: vscode.Webview): string {
     }
 
     .code-line.has-match {
-      background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(255, 200, 0, 0.15));
+      background-color: var(--rifler-highlight-muted);
     }
 
     .code-line.current-match {
-      background-color: var(--vscode-editor-findMatchBackground, rgba(255, 200, 0, 0.4));
+      background-color: var(--rifler-highlight-strong);
     }
 
     .line-number {
@@ -1443,8 +1450,8 @@ export function getWebviewHtml(webview: vscode.Webview): string {
     }
 
     .line-content .match {
-      background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(255, 200, 0, 0.5));
-      border: 1px solid var(--vscode-editor-findMatchBorder, #f0a000);
+      background-color: var(--rifler-highlight);
+      border: 1px solid var(--rifler-highlight-border);
       border-radius: 2px;
     }
 
@@ -1797,8 +1804,9 @@ export function getWebviewHtml(webview: vscode.Webview): string {
       const editorLineNumbers = document.getElementById('editor-line-numbers');
 
       // Virtualized results rendering setup
-      const VIRTUAL_ROW_HEIGHT = 68;
+      let VIRTUAL_ROW_HEIGHT = 46;
       const VIRTUAL_OVERSCAN = 8;
+      let measuredRowHeight = 0;
       const virtualContent = document.createElement('div');
       virtualContent.id = 'results-virtual-content';
       virtualContent.style.position = 'relative';
@@ -2352,7 +2360,7 @@ export function getWebviewHtml(webview: vscode.Webview): string {
                   
                   // Add the highlighted match
                   const mark = document.createElement('mark');
-                  mark.style.background = 'rgba(255, 200, 0, 0.4)';
+                  mark.style.background = 'var(--rifler-highlight-strong)';
                   mark.style.color = 'inherit';
                   mark.textContent = nodeText.substring(index, index + searchQuery.length);
                   fragment.appendChild(mark);
@@ -3060,6 +3068,23 @@ export function getWebviewHtml(webview: vscode.Webview): string {
 
         virtualContent.innerHTML = '';
         virtualContent.appendChild(fragment);
+
+        measureRowHeightIfNeeded();
+      }
+
+      function measureRowHeightIfNeeded() {
+        if (measuredRowHeight) return;
+        const firstRow = virtualContent.firstElementChild;
+        if (!firstRow) return;
+
+        const rowHeight = firstRow.getBoundingClientRect().height;
+        if (rowHeight && rowHeight > 0) {
+          measuredRowHeight = rowHeight;
+          if (Math.abs(rowHeight - VIRTUAL_ROW_HEIGHT) > 2) {
+            VIRTUAL_ROW_HEIGHT = rowHeight;
+            scheduleVirtualRender();
+          }
+        }
       }
 
       function renderResultRow(result, index) {

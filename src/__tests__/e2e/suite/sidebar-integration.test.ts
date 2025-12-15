@@ -15,6 +15,12 @@ suite('Sidebar Functional E2E Tests', () => {
   let testContent: string;
 
   before(async () => {
+    // Activate the extension before running tests
+    const extension = vscode.extensions.getExtension('Ori-Roza.rifler');
+    if (extension && !extension.isActive) {
+      await extension.activate();
+    }
+
     // Get workspace folder
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {

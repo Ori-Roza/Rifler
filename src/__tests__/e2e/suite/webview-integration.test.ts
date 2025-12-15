@@ -28,6 +28,13 @@ async function step(description: string) {
 }
 
 suite('Rifler Functional E2E Tests', () => {
+  before(async () => {
+    // Activate the extension before running tests
+    const extension = vscode.extensions.getExtension('Ori-Roza.rifler');
+    if (extension && !extension.isActive) {
+      await extension.activate();
+    }
+  });
   let testWorkspaceFolder: vscode.WorkspaceFolder;
   let testFilePath: string;
   let testContent: string;

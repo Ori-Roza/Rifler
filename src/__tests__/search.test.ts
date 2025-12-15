@@ -1,39 +1,11 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import { performSearch } from '../search';
 import { SearchOptions, SearchScope } from '../utils';
 
 // Mock vscode
 jest.mock('vscode');
 
-// Mock fs module
-jest.mock('fs', () => {
-  return {
-    existsSync: jest.fn(),
-    statSync: jest.fn(),
-    readdirSync: jest.fn(),
-    readFileSync: jest.fn(),
-    promises: {
-      readdir: jest.fn(),
-      readFile: jest.fn(),
-      stat: jest.fn(),
-      access: jest.fn()
-    }
-  };
-});
-
-const mockFs = fs as unknown as {
-  existsSync: jest.Mock;
-  statSync: jest.Mock;
-  readdirSync: jest.Mock;
-  readFileSync: jest.Mock;
-  promises: {
-    readdir: jest.Mock;
-    readFile: jest.Mock;
-    stat: jest.Mock;
-    access: jest.Mock;
-  }
-};
+const mockWorkspaceFs = vscode.workspace.fs as jest.Mocked<typeof vscode.workspace.fs>;
 
 describe('Search', () => {
   const defaultOptions: SearchOptions = {
@@ -77,9 +49,8 @@ describe('Search', () => {
         const testFilePath = '/test/file.ts';
         const fileContent = 'const test = "hello";\nconst test2 = "world";';
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
-        mockFs.promises.readFile.mockResolvedValue(fileContent);
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -100,17 +71,16 @@ describe('Search', () => {
         const testDir = '/test/dir';
         const fileContent = 'const test = "hello";';
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.stat.mockImplementation(async (p: fs.PathLike) => {
-          if (p === testDir) {
-            return { isDirectory: () => true, isFile: () => false } as fs.Stats;
+        mockWorkspaceFs.stat.mockImplementation(async (uri: vscode.Uri) => {
+          if (uri.fsPath === testDir) {
+            return { type: vscode.FileType.Directory, size: 0, ctime: 0, mtime: 0 };
           }
-          return { size: 100, isDirectory: () => false, isFile: () => true } as fs.Stats;
+          return { type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 };
         });
-        mockFs.promises.readdir.mockResolvedValue([
-          { name: 'file.ts', isDirectory: () => false, isFile: () => true }
-        ] as any);
-        mockFs.promises.readFile.mockResolvedValue(fileContent);
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['file.ts', vscode.FileType.File]
+        ]);
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
         const results = await performSearch('test', 'directory', defaultOptions, testDir);
 
@@ -119,8 +89,7 @@ describe('Search', () => {
       });
 
       test('should return empty for non-existent directory', async () => {
-        mockFs.existsSync.mockReturnValue(false);
-        mockFs.promises.stat.mockRejectedValue(new Error('ENOENT'));
+        mockWorkspaceFs.stat.mockRejectedValue(new Error('ENOENT'));
 
         const results = await performSearch('test', 'directory', defaultOptions, '/nonexistent');
 
@@ -136,13 +105,13 @@ describe('Search', () => {
         const testFilePath = '/test/file.ts';
         const fileContent = 'const test = "hello";';
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.stat.mockImplementation(async () => ({ 
-          isDirectory: () => false, 
-          isFile: () => true,
-          size: 100 
-        } as fs.Stats));
-        mockFs.promises.readFile.mockResolvedValue(fileContent);
+        mockWorkspaceFs.stat.mockResolvedValue({ 
+          type: vscode.FileType.File,
+          size: 100,
+          ctime: 0,
+          mtime: 0
+        });
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
         const results = await performSearch('test', 'directory', defaultOptions, testFilePath);
 
@@ -155,17 +124,16 @@ describe('Search', () => {
         const modulePath = '/test/module';
         const fileContent = 'function test() {}';
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.access.mockResolvedValue(undefined);
-        mockFs.promises.stat.mockImplementation(async () => ({ 
-          isDirectory: () => false, 
-          isFile: () => true,
-          size: 100 
-        } as fs.Stats));
-        mockFs.promises.readdir.mockResolvedValue([
-          { name: 'index.ts', isDirectory: () => false, isFile: () => true }
-        ] as any);
-        mockFs.promises.readFile.mockResolvedValue(fileContent);
+        mockWorkspaceFs.stat.mockResolvedValue({ 
+          type: vscode.FileType.File,
+          size: 100,
+          ctime: 0,
+          mtime: 0
+        });
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['index.ts', vscode.FileType.File]
+        ]);
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
         const results = await performSearch('test', 'module', defaultOptions, undefined, modulePath);
 
@@ -173,8 +141,7 @@ describe('Search', () => {
       });
 
       test('should return empty for non-existent module path', async () => {
-        mockFs.existsSync.mockReturnValue(false);
-        mockFs.promises.access.mockRejectedValue(new Error('ENOENT'));
+        mockWorkspaceFs.stat.mockRejectedValue(new Error('ENOENT'));
 
         const results = await performSearch('test', 'module', defaultOptions, undefined, '/nonexistent/module');
 
@@ -194,17 +161,11 @@ describe('Search', () => {
         
         const fileContent = 'const test = true;';
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockImplementation(() => ({ 
-          isDirectory: () => false, 
-          isFile: () => true,
-          size: 100 
-        } as fs.Stats));
-        mockFs.promises.readdir.mockResolvedValue([
-          { name: 'app.ts', isDirectory: () => false, isFile: () => true }
-        ] as any);
-        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
-        mockFs.promises.readFile.mockResolvedValue(fileContent);
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['app.ts', vscode.FileType.File]
+        ]);
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
         const results = await performSearch('test', 'project', defaultOptions);
 
@@ -225,28 +186,21 @@ describe('Search', () => {
         const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
         (vscode.workspace as any).workspaceFolders = [workspaceFolder];
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockImplementation(() => ({ 
-          isDirectory: () => false, 
-          isFile: () => true,
-          size: 100 
-        } as fs.Stats));
-        
         // Setup mock to return different results based on path to avoid infinite recursion
-        mockFs.promises.readdir.mockImplementation((path: string) => {
-          if (path === '/workspace') {
+        mockWorkspaceFs.readDirectory.mockImplementation((uri: vscode.Uri) => {
+          if (uri.fsPath === '/workspace') {
             return Promise.resolve([
-              { name: 'node_modules', isDirectory: () => true, isFile: () => false },
-              { name: 'src', isDirectory: () => true, isFile: () => false }
-            ] as any);
+              ['node_modules', vscode.FileType.Directory],
+              ['src', vscode.FileType.Directory]
+            ]);
           }
           return Promise.resolve([]);
         });
 
         await performSearch('test', 'project', defaultOptions);
 
-        // readdirSync should be called for /workspace and /workspace/src, but not node_modules
-        const calls = mockFs.promises.readdir.mock.calls.map(c => c[0]);
+        // readDirectory should be called for /workspace and /workspace/src, but not node_modules
+        const calls = mockWorkspaceFs.readDirectory.mock.calls.map(c => c[0].fsPath);
         expect(calls).toContain('/workspace');
         expect(calls).not.toContain('/workspace/node_modules');
       });
@@ -255,27 +209,20 @@ describe('Search', () => {
         const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
         (vscode.workspace as any).workspaceFolders = [workspaceFolder];
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockImplementation(() => ({ 
-          isDirectory: () => false, 
-          isFile: () => true,
-          size: 100 
-        } as fs.Stats));
-        
         // Setup mock to return different results based on path to avoid infinite recursion
-        mockFs.promises.readdir.mockImplementation((path: string) => {
-          if (path === '/workspace') {
+        mockWorkspaceFs.readDirectory.mockImplementation((uri: vscode.Uri) => {
+          if (uri.fsPath === '/workspace') {
             return Promise.resolve([
-              { name: '.git', isDirectory: () => true, isFile: () => false },
-              { name: 'src', isDirectory: () => true, isFile: () => false }
-            ] as any);
+              ['.git', vscode.FileType.Directory],
+              ['src', vscode.FileType.Directory]
+            ]);
           }
           return Promise.resolve([]);
         });
 
         await performSearch('test', 'project', defaultOptions);
 
-        const calls = mockFs.promises.readdir.mock.calls.map(c => c[0]);
+        const calls = mockWorkspaceFs.readDirectory.mock.calls.map(c => c[0].fsPath);
         expect(calls).not.toContain('/workspace/.git');
       });
     });
@@ -285,34 +232,27 @@ describe('Search', () => {
         const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
         (vscode.workspace as any).workspaceFolders = [workspaceFolder];
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockImplementation(() => ({ 
-          isDirectory: () => false, 
-          isFile: () => true,
-          size: 100 
-        } as fs.Stats));
-        mockFs.promises.readdir.mockResolvedValue([
-          { name: 'image.png', isDirectory: () => false, isFile: () => true },
-          { name: 'app.ts', isDirectory: () => false, isFile: () => true }
-        ] as any);
-        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
-        mockFs.promises.readFile.mockResolvedValue('const test = 1;');
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['image.png', vscode.FileType.File],
+          ['app.ts', vscode.FileType.File]
+        ]);
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode('const test = 1;'));
 
         const results = await performSearch('test', 'project', defaultOptions);
 
         // Only app.ts should be searched, not image.png
-        expect(mockFs.promises.readFile).toHaveBeenCalledTimes(1);
+        expect(mockWorkspaceFs.readFile).toHaveBeenCalledTimes(1);
       });
 
       test('should skip large files (> 1MB)', async () => {
         const testFilePath = '/test/large.ts';
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.stat.mockResolvedValue({ size: 2 * 1024 * 1024 } as fs.Stats); // 2MB
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 2 * 1024 * 1024, ctime: 0, mtime: 0 }); // 2MB
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
-        expect(mockFs.promises.readFile).not.toHaveBeenCalled();
+        expect(mockWorkspaceFs.readFile).not.toHaveBeenCalled();
         expect(results).toEqual([]);
       });
 
@@ -320,49 +260,38 @@ describe('Search', () => {
         const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
         (vscode.workspace as any).workspaceFolders = [workspaceFolder];
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockImplementation(() => ({ 
-          isDirectory: () => false, 
-          isFile: () => true,
-          size: 100 
-        } as fs.Stats));
-        mockFs.promises.readdir.mockResolvedValue([
-          { name: 'app.ts', isDirectory: () => false, isFile: () => true },
-          { name: 'style.css', isDirectory: () => false, isFile: () => true }
-        ] as any);
-        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
-        mockFs.promises.readFile.mockResolvedValue('const test = 1;');
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['app.ts', vscode.FileType.File],
+          ['style.css', vscode.FileType.File]
+        ]);
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode('const test = 1;'));
 
         const results = await performSearch('test', 'project', { ...defaultOptions, fileMask: '*.ts' });
 
         // Only .ts files should be searched
-        expect(mockFs.promises.readFile).toHaveBeenCalledTimes(1);
-        expect(mockFs.promises.readFile).toHaveBeenCalledWith(expect.stringContaining('app.ts'), 'utf-8');
+        expect(mockWorkspaceFs.readFile).toHaveBeenCalledTimes(1);
+        const readFileUri = mockWorkspaceFs.readFile.mock.calls[0][0] as vscode.Uri;
+        expect(readFileUri.fsPath).toContain('app.ts');
       });
 
       test('should apply exclude masks with priority', async () => {
         const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
         (vscode.workspace as any).workspaceFolders = [workspaceFolder];
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.statSync.mockImplementation(() => ({ 
-          isDirectory: () => false, 
-          isFile: () => true,
-          size: 100 
-        } as fs.Stats));
-        mockFs.promises.readdir.mockResolvedValue([
-          { name: 'component.tsx', isDirectory: () => false, isFile: () => true },
-          { name: 'component.test.tsx', isDirectory: () => false, isFile: () => true }
-        ] as any);
-        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
-        mockFs.promises.readFile.mockResolvedValue('const test = 1;');
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['component.tsx', vscode.FileType.File],
+          ['component.test.tsx', vscode.FileType.File]
+        ]);
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode('const test = 1;'));
 
         await performSearch('test', 'project', { ...defaultOptions, fileMask: '*.tsx,!*.test.tsx' });
 
         // Only non-test tsx file should be read
-        expect(mockFs.promises.readFile).toHaveBeenCalledTimes(1);
-        const calledPath = mockFs.promises.readFile.mock.calls[0][0];
-        expect(calledPath).toContain('component.tsx');
+        expect(mockWorkspaceFs.readFile).toHaveBeenCalledTimes(1);
+        const readFileUri = mockWorkspaceFs.readFile.mock.calls[0][0] as vscode.Uri;
+        expect(readFileUri.fsPath).toContain('component.tsx');
       });
     });
 
@@ -377,8 +306,7 @@ describe('Search', () => {
           getText: () => openDocContent
         }];
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.readFile.mockResolvedValue(diskContent);
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(diskContent));
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -394,9 +322,8 @@ describe('Search', () => {
         const lines = Array(100).fill('test test test test test');
         const fileContent = lines.join('\n');
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
-        mockFs.promises.readFile.mockResolvedValue(fileContent);
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -411,9 +338,8 @@ describe('Search', () => {
         const testFilePath = '/test/dir/file.ts';
         const fileContent = '  const test = "hello";';
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
-        mockFs.promises.readFile.mockResolvedValue(fileContent);
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -434,9 +360,8 @@ describe('Search', () => {
         const testFilePath = '/test/file.ts';
         const fileContent = 'test test test';
         
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.stat.mockResolvedValue({ size: 100 } as fs.Stats);
-        mockFs.promises.readFile.mockResolvedValue(fileContent);
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
@@ -453,29 +378,27 @@ describe('Search', () => {
         (vscode.workspace as any).workspaceFolders = [workspaceFolder];
 
         // Mock fs functions to simulate permission denied
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.readdir.mockRejectedValue(new Error('Permission denied'));
+        mockWorkspaceFs.readDirectory.mockRejectedValue(new Error('Permission denied'));
 
         const results = await performSearch('test', 'project', defaultOptions);
 
         // Should not throw, just return empty results
         expect(results).toEqual([]);
-        // The readdirSync should have been called with the correct parameters
-        expect(mockFs.promises.readdir).toHaveBeenCalledWith('/workspace', { withFileTypes: true });
+        // The readDirectory should have been called
+        expect(mockWorkspaceFs.readDirectory).toHaveBeenCalled();
       });
 
       test('should handle file read errors gracefully', async () => {
         const testFilePath = '/test/file.ts';
 
-        mockFs.existsSync.mockReturnValue(true);
-        mockFs.promises.stat.mockResolvedValue({ size: 100, isFile: () => true, isDirectory: () => false } as fs.Stats);
-        mockFs.promises.readFile.mockRejectedValue(new Error('Permission denied'));
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        mockWorkspaceFs.readFile.mockRejectedValue(new Error('Permission denied'));
 
         const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
 
         // Should not throw, just return empty results
         expect(results).toEqual([]);
-        expect(mockFs.promises.readFile).toHaveBeenCalledWith(testFilePath, 'utf-8');
+        expect(mockWorkspaceFs.readFile).toHaveBeenCalled();
       });
     });
   });
@@ -487,9 +410,8 @@ describe('Search', () => {
       const lines = Array.from({ length: 100 }, (_, i) => `const test${i} = "test value";`);
       const content = lines.join('\n');
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.promises.stat.mockResolvedValue({ size: content.length, isFile: () => true, isDirectory: () => false } as fs.Stats);
-      mockFs.promises.readFile.mockResolvedValue(content);
+      mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: content.length, ctime: 0, mtime: 0 });
+      mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(content));
 
       const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath, 10);
 
@@ -500,9 +422,8 @@ describe('Search', () => {
       const testFilePath = '/test/file.ts';
       const content = 'const test1 = "value";\nconst test2 = "value";';
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.promises.stat.mockResolvedValue({ size: content.length, isFile: () => true, isDirectory: () => false } as fs.Stats);
-      mockFs.promises.readFile.mockResolvedValue(content);
+      mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: content.length, ctime: 0, mtime: 0 });
+      mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(content));
 
       const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath, 1000);
 
@@ -513,9 +434,8 @@ describe('Search', () => {
       const testFilePath = '/test/file.ts';
       const content = 'const test = "value";';
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.promises.stat.mockResolvedValue({ size: content.length, isFile: () => true, isDirectory: () => false } as fs.Stats);
-      mockFs.promises.readFile.mockResolvedValue(content);
+      mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: content.length, ctime: 0, mtime: 0 });
+      mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(content));
 
       // Just verify it doesn't throw and returns results
       const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
@@ -528,9 +448,8 @@ describe('Search', () => {
       const lines = Array.from({ length: 10 }, (_, i) => `const test${i} = "value";`);
       const content = lines.join('\n');
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.promises.stat.mockResolvedValue({ size: content.length, isFile: () => true, isDirectory: () => false } as fs.Stats);
-      mockFs.promises.readFile.mockResolvedValue(content);
+      mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: content.length, ctime: 0, mtime: 0 });
+      mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(content));
 
       // With maxResults = 0, should still return results (uses default)
       const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath, 0);

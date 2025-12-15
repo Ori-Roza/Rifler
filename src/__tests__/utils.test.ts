@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import {
   buildSearchRegex,
   matchesFileMask,
@@ -15,8 +16,10 @@ import {
   SearchOptions
 } from '../utils';
 
-// Mock fs for collectFiles tests
-jest.mock('fs');
+// Mock vscode
+jest.mock('vscode');
+
+const mockWorkspaceFs = vscode.workspace.fs as jest.Mocked<typeof vscode.workspace.fs>;
 
 describe('buildSearchRegex', () => {
   const defaultOptions: SearchOptions = {
@@ -313,125 +316,120 @@ describe('BINARY_EXTENSIONS constant', () => {
 });
 
 describe('collectFiles', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const mockFs = require('fs');
-  
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test('should collect files from directory', () => {
-    mockFs.readdirSync.mockReturnValue([
-      { name: 'file1.ts', isDirectory: () => false, isFile: () => true },
-      { name: 'file2.ts', isDirectory: () => false, isFile: () => true }
+  test('should collect files from directory', async () => {
+    mockWorkspaceFs.readDirectory.mockResolvedValue([
+      ['file1.ts', vscode.FileType.File],
+      ['file2.ts', vscode.FileType.File]
     ]);
 
-    const files = collectFiles('/test/dir');
+    const files = await collectFiles('/test/dir');
 
     expect(files.length).toBe(2);
     expect(files).toContain('/test/dir/file1.ts');
     expect(files).toContain('/test/dir/file2.ts');
   });
 
-  test('should recursively search subdirectories', () => {
-    mockFs.readdirSync.mockImplementation((dirPath: string) => {
-      if (dirPath === '/test/dir') {
-        return [
-          { name: 'subdir', isDirectory: () => true, isFile: () => false },
-          { name: 'file1.ts', isDirectory: () => false, isFile: () => true }
-        ];
+  test('should recursively search subdirectories', async () => {
+    mockWorkspaceFs.readDirectory.mockImplementation((uri: vscode.Uri) => {
+      if (uri.fsPath === '/test/dir') {
+        return Promise.resolve([
+          ['subdir', vscode.FileType.Directory],
+          ['file1.ts', vscode.FileType.File]
+        ]);
       }
-      if (dirPath === '/test/dir/subdir') {
-        return [
-          { name: 'file2.ts', isDirectory: () => false, isFile: () => true }
-        ];
+      if (uri.fsPath === '/test/dir/subdir') {
+        return Promise.resolve([
+          ['file2.ts', vscode.FileType.File]
+        ]);
       }
-      return [];
+      return Promise.resolve([]);
     });
 
-    const files = collectFiles('/test/dir');
+    const files = await collectFiles('/test/dir');
 
     expect(files.length).toBe(2);
     expect(files).toContain('/test/dir/file1.ts');
     expect(files).toContain('/test/dir/subdir/file2.ts');
   });
 
-  test('should exclude node_modules directory', () => {
-    mockFs.readdirSync.mockImplementation((dirPath: string) => {
-      if (dirPath === '/test/dir') {
-        return [
-          { name: 'node_modules', isDirectory: () => true, isFile: () => false },
-          { name: 'src', isDirectory: () => true, isFile: () => false }
-        ];
+  test('should exclude node_modules directory', async () => {
+    mockWorkspaceFs.readDirectory.mockImplementation((uri: vscode.Uri) => {
+      if (uri.fsPath === '/test/dir') {
+        return Promise.resolve([
+          ['node_modules', vscode.FileType.Directory],
+          ['src', vscode.FileType.Directory]
+        ]);
       }
-      if (dirPath === '/test/dir/src') {
-        return [
-          { name: 'file.ts', isDirectory: () => false, isFile: () => true }
-        ];
+      if (uri.fsPath === '/test/dir/src') {
+        return Promise.resolve([
+          ['file.ts', vscode.FileType.File]
+        ]);
       }
-      return [];
+      return Promise.resolve([]);
     });
 
-    const files = collectFiles('/test/dir');
+    const files = await collectFiles('/test/dir');
 
     expect(files.length).toBe(1);
     expect(files).toContain('/test/dir/src/file.ts');
   });
 
-  test('should exclude binary files', () => {
-    mockFs.readdirSync.mockReturnValue([
-      { name: 'file.ts', isDirectory: () => false, isFile: () => true },
-      { name: 'image.png', isDirectory: () => false, isFile: () => true },
-      { name: 'binary.exe', isDirectory: () => false, isFile: () => true }
+  test('should exclude binary files', async () => {
+    mockWorkspaceFs.readDirectory.mockResolvedValue([
+      ['file.ts', vscode.FileType.File],
+      ['image.png', vscode.FileType.File],
+      ['binary.exe', vscode.FileType.File]
     ]);
 
-    const files = collectFiles('/test/dir');
+    const files = await collectFiles('/test/dir');
 
     expect(files.length).toBe(1);
     expect(files).toContain('/test/dir/file.ts');
   });
 
-  test('should respect file mask', () => {
-    mockFs.readdirSync.mockReturnValue([
-      { name: 'file.ts', isDirectory: () => false, isFile: () => true },
-      { name: 'file.js', isDirectory: () => false, isFile: () => true },
-      { name: 'style.css', isDirectory: () => false, isFile: () => true }
+  test('should respect file mask', async () => {
+    mockWorkspaceFs.readDirectory.mockResolvedValue([
+      ['file.ts', vscode.FileType.File],
+      ['file.js', vscode.FileType.File],
+      ['style.css', vscode.FileType.File]
     ]);
 
-    const files = collectFiles('/test/dir', '*.ts');
+    const files = await collectFiles('/test/dir', '*.ts');
 
     expect(files.length).toBe(1);
     expect(files).toContain('/test/dir/file.ts');
   });
 
-  test('should respect maxFiles limit', () => {
-    mockFs.readdirSync.mockReturnValue([
-      { name: 'file1.ts', isDirectory: () => false, isFile: () => true },
-      { name: 'file2.ts', isDirectory: () => false, isFile: () => true },
-      { name: 'file3.ts', isDirectory: () => false, isFile: () => true },
-      { name: 'file4.ts', isDirectory: () => false, isFile: () => true },
-      { name: 'file5.ts', isDirectory: () => false, isFile: () => true }
+  test('should respect maxFiles limit', async () => {
+    mockWorkspaceFs.readDirectory.mockResolvedValue([
+      ['file1.ts', vscode.FileType.File],
+      ['file2.ts', vscode.FileType.File],
+      ['file3.ts', vscode.FileType.File],
+      ['file4.ts', vscode.FileType.File],
+      ['file5.ts', vscode.FileType.File]
     ]);
 
-    const files = collectFiles('/test/dir', '', 3);
+    const files = await collectFiles('/test/dir', '', 3);
 
     expect(files.length).toBe(3);
   });
 
-  test('should handle directory read errors gracefully', () => {
-    mockFs.readdirSync.mockImplementation(() => {
-      throw new Error('Permission denied');
-    });
+  test('should handle directory read errors gracefully', async () => {
+    mockWorkspaceFs.readDirectory.mockRejectedValue(new Error('Permission denied'));
 
-    const files = collectFiles('/test/dir');
+    const files = await collectFiles('/test/dir');
 
     expect(files).toEqual([]);
   });
 
-  test('should handle empty directory', () => {
-    mockFs.readdirSync.mockReturnValue([]);
+  test('should handle empty directory', async () => {
+    mockWorkspaceFs.readDirectory.mockResolvedValue([]);
 
-    const files = collectFiles('/test/dir');
+    const files = await collectFiles('/test/dir');
 
     expect(files).toEqual([]);
   });

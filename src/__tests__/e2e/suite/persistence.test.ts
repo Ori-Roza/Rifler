@@ -1,11 +1,19 @@
 import * as assert from 'assert';
-import { after } from 'mocha';
+import { after, before } from 'mocha';
 
 // You can import and use all API from the 'vscode' module
 // as well as import your extension to test it
 import * as vscode from 'vscode';
 
 suite('Persistent Storage and Toggle Features', () => {
+  before(async () => {
+    // Activate the extension before running tests
+    const extension = vscode.extensions.getExtension('Ori-Roza.rifler');
+    if (extension && !extension.isActive) {
+      await extension.activate();
+    }
+  });
+
   after(() => {
     vscode.window.showInformationMessage('Persistence and toggle tests done!');
   });

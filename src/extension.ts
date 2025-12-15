@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 import {
   SearchOptions
 } from './utils';
@@ -17,8 +15,15 @@ import {
   IncomingMessage
 } from './messaging/types';
 
+// Cache for webview HTML template
+let cachedBodyHtml: string | null = null;
+
 // Webview HTML assembly
 export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+  if (!cachedBodyHtml) {
+    throw new Error('Webview HTML template not loaded. Call loadWebviewTemplate() during activation.');
+  }
+  
   const nonce = getNonce();
   const stylesUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'styles.css')
@@ -26,8 +31,6 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
   const scriptUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'script.js')
   );
-  const indexPath = path.join(extensionUri.fsPath, 'out', 'webview', 'index.html');
-  const bodyHtml = fs.readFileSync(indexPath, 'utf8');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -40,12 +43,25 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
   <link rel="stylesheet" href="${stylesUri}">
 </head>
 <body>
-${bodyHtml}
+${cachedBodyHtml}
 <!-- TODO: Add integrity attribute with SRI hash or bundle locally -->
 <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" crossorigin="anonymous"></script>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
+}
+
+// Load and cache the webview HTML template
+async function loadWebviewTemplate(extensionUri: vscode.Uri): Promise<void> {
+  try {
+    const indexUri = vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'index.html');
+    const content = await vscode.workspace.fs.readFile(indexUri);
+    cachedBodyHtml = new TextDecoder('utf-8').decode(content);
+  } catch (error) {
+    console.error('Failed to load webview template:', error);
+    // Provide a minimal fallback template
+    cachedBodyHtml = '<div id="root"></div>';
+  }
 }
 
 function getNonce(): string {
@@ -216,10 +232,13 @@ let stateStore: StateStore;
 let viewManager: ViewManager;
 let panelManager: PanelManager;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log('Rifler extension is now active');
 
   const extensionUri = context.extensionUri;
+
+  // Load webview HTML template (async, cached)
+  await loadWebviewTemplate(extensionUri);
 
   // Initialize StateStore
   stateStore = new StateStore(context);

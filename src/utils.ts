@@ -1,5 +1,5 @@
 import * as path from 'path';
-import * as fs from 'fs';
+import * as vscode from 'vscode';
 
 // ============================================================================
 // Types
@@ -183,31 +183,33 @@ export function searchInContent(
 /**
  * Collect files recursively from a directory
  */
-export function collectFiles(
+export async function collectFiles(
   dirPath: string,
   fileMask: string = '',
   maxFiles: number = 10000
-): string[] {
+): Promise<string[]> {
   const files: string[] = [];
   
-  function walk(currentPath: string): void {
+  async function walk(currentPath: string): Promise<void> {
     if (files.length >= maxFiles) return;
     
     try {
-      const entries = fs.readdirSync(currentPath, { withFileTypes: true });
+      const uri = vscode.Uri.file(currentPath);
+      const entries = await vscode.workspace.fs.readDirectory(uri);
       
       for (const entry of entries) {
         if (files.length >= maxFiles) break;
         
-        const fullPath = path.join(currentPath, entry.name);
+        const [entryName, entryType] = entry;
+        const fullPath = path.join(currentPath, entryName);
         
-        if (entry.isDirectory()) {
-          if (!shouldExcludeDirectory(entry.name)) {
-            walk(fullPath);
+        if (entryType === vscode.FileType.Directory) {
+          if (!shouldExcludeDirectory(entryName)) {
+            await walk(fullPath);
           }
-        } else if (entry.isFile()) {
-          const ext = path.extname(entry.name).toLowerCase();
-          if (!isBinaryExtension(ext) && matchesFileMask(entry.name, fileMask)) {
+        } else if (entryType === vscode.FileType.File) {
+          const ext = path.extname(entryName).toLowerCase();
+          if (!isBinaryExtension(ext) && matchesFileMask(entryName, fileMask)) {
             files.push(fullPath);
           }
         }
@@ -217,7 +219,7 @@ export function collectFiles(
     }
   }
   
-  walk(dirPath);
+  await walk(dirPath);
   return files;
 }
 

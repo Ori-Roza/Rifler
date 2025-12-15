@@ -74,18 +74,57 @@ item.innerHTML = '<div class="result-header">' +
 ## 4. File System Operations
 
 ### Path Traversal Protection
-✅ **GOOD**: All file operations use VS Code's URI-based file system API
+✅ **GOOD**: All file operations use VS Code's URI-based file system API (Fixed in December 2025)
 
-**Analysis**:
-- Uses `vscode.Uri.parse()` for URI handling
-- Uses `vscode.workspace.fs.readFile()` instead of raw Node.js fs
-- No direct string concatenation for file paths
-- VS Code API provides built-in path validation
+**Security Issue #72 Resolution**:
+Previously, the security report incorrectly claimed all file operations used VS Code's API. In reality, three critical files used direct Node.js `fs` module:
+- `src/search.ts` - Used `fs.promises.stat()`, `fs.promises.readFile()`, `fs.promises.readdir()`
+- `src/utils.ts` - Used synchronous `fs.readdirSync()` in `collectFiles()`
+- `src/extension.ts` - Used synchronous `fs.readFileSync()` for webview template loading
+
+**Fixes Implemented**:
+1. **search.ts** - Replaced all `fs.promises.*` calls with `vscode.workspace.fs` API
+   - `fs.promises.stat()` → `vscode.workspace.fs.stat()`
+   - `fs.promises.readFile()` → `vscode.workspace.fs.readFile()` with `TextDecoder`
+   - `fs.promises.readdir()` → `vscode.workspace.fs.readDirectory()`
+   - `fs.promises.access()` → `vscode.workspace.fs.stat()` (throws on error)
+
+2. **utils.ts** - Converted `collectFiles()` to async and replaced synchronous fs operations
+   - `fs.readdirSync()` → `await vscode.workspace.fs.readDirectory()`
+   - Function signature changed from `function` to `async function` returning `Promise<string[]>`
+
+3. **extension.ts** - Implemented async template loading with caching
+   - Removed `fs.readFileSync()` 
+   - Added `loadWebviewTemplate()` async function
+   - HTML template loaded once during extension activation and cached
+   - `activate()` function now async to support template loading
+
+**Current State**:
+- ✅ All file operations now use `vscode.Uri` for URI handling
+- ✅ All file reads use `vscode.workspace.fs.readFile()` with proper encoding
+- ✅ All directory operations use `vscode.workspace.fs.readDirectory()`
+- ✅ No direct Node.js `fs` module usage in production code
+- ✅ VS Code API provides built-in path validation and security
+- ✅ All unit tests updated to mock `vscode.workspace.fs` instead of Node.js `fs`
 
 **Example**:
 ```typescript
-const uri = vscode.Uri.parse(uriString);
-const fileContent = await vscode.workspace.fs.readFile(uri);
+// Reading a file
+const uri = vscode.Uri.file(filePath);
+const stats = await vscode.workspace.fs.stat(uri);
+const contentBytes = await vscode.workspace.fs.readFile(uri);
+const content = new TextDecoder('utf-8').decode(contentBytes);
+
+// Reading a directory
+const dirUri = vscode.Uri.file(dirPath);
+const entries = await vscode.workspace.fs.readDirectory(dirUri);
+for (const [entryName, entryType] of entries) {
+  if (entryType === vscode.FileType.Directory) {
+    // Handle directory
+  } else if (entryType === vscode.FileType.File) {
+    // Handle file
+  }
+}
 ```
 
 ---
@@ -230,12 +269,20 @@ const regex = new RegExp(
 
 ## Conclusion
 
-The Rifler extension demonstrates good security practices overall. No critical vulnerabilities were found. The main areas for improvement are:
+The Rifler extension demonstrates good security practices overall. No critical vulnerabilities were found. 
 
+**Recent Security Improvements (December 2025)**:
+- ✅ **Issue #72 Resolved**: Eliminated all direct Node.js `fs` module usage in production code
+- ✅ All file system operations now use VS Code's secure URI-based API
+- ✅ Removed synchronous blocking file operations
+- ✅ Added proper async/await patterns for all I/O operations
+- ✅ Updated all test suites to reflect security improvements
+
+**Remaining areas for improvement**:
 1. ReDoS protection for user-provided regex patterns
 2. Enhanced external resource integrity checks
 3. Additional input validation
 
 The extension is suitable for publication with the recommendation to address the high-priority items before wide distribution.
 
-**Overall Grade**: B+ (Good security posture with room for improvement)
+**Overall Grade**: A- (Strong security posture after December 2025 improvements)

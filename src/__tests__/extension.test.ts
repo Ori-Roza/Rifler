@@ -14,12 +14,12 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       subscriptions: [],
       workspaceState: {
         get: jest.fn(),
-        update: jest.fn(),
+        update: jest.fn().mockResolvedValue(undefined),
         keys: jest.fn().mockReturnValue([]),
       } as any,
       globalState: {
         get: jest.fn(),
-        update: jest.fn(),
+        update: jest.fn().mockResolvedValue(undefined),
         keys: jest.fn().mockReturnValue([]),
         setKeysForSync: jest.fn(),
       } as any,
@@ -40,7 +40,7 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
   });
 
   describe('Persistent State Storage', () => {
-    test('should load persisted state from globalState on activation', () => {
+    test('should not load persisted state when persistence is disabled by default', async () => {
       const mockState = {
         query: 'test',
         replaceText: 'replacement',
@@ -59,9 +59,24 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
 
       (context.globalState.get as jest.Mock).mockReturnValue(mockState);
 
+      // Mock getConfiguration to return default values (persistence off)
+      const mockGetConfiguration = jest.fn().mockReturnValue({
+        get: jest.fn((key: string, defaultValue?: any) => {
+          if (key === 'persistSearchState') return false;
+          if (key === 'persistenceScope') return 'off';
+          return defaultValue;
+        }),
+      });
+      (vscode.workspace.getConfiguration as jest.Mock) = mockGetConfiguration;
+
       activate(context);
 
-      expect(context.globalState.get).toHaveBeenCalledWith('rifler.persistedSearchState');
+      // Wait for async operations to complete
+      await new Promise(resolve => setImmediate(resolve));
+
+      // With persistence off by default, state stores should be cleared
+      expect(context.workspaceState.update).toHaveBeenCalledWith('rifler.sidebarState', undefined);
+      expect(context.workspaceState.update).toHaveBeenCalledWith('rifler.persistedSearchState', undefined);
     });
 
     test('should handle missing persisted state gracefully', () => {
@@ -149,14 +164,28 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
   });
 
   describe('Storage key constants', () => {
-    test('should use correct storage key', () => {
-      // Verify the constant is defined and used correctly
+    test('should clear persisted state when persistence is disabled', async () => {
+      // Verify state is cleared when persistence is off (default)
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
+
+      // Mock getConfiguration to return default values (persistence off)
+      const mockGetConfiguration = jest.fn().mockReturnValue({
+        get: jest.fn((key: string, defaultValue?: any) => {
+          if (key === 'persistSearchState') return false;
+          if (key === 'persistenceScope') return 'off';
+          return defaultValue;
+        }),
+      });
+      (vscode.workspace.getConfiguration as jest.Mock) = mockGetConfiguration;
 
       activate(context);
 
-      // The key should be called with the correct constant
-      expect(context.globalState.get).toHaveBeenCalledWith('rifler.persistedSearchState');
+      // Wait for async operations to complete
+      await new Promise(resolve => setImmediate(resolve));
+
+      // With default settings (persistence off), both stores should be cleared
+      expect(context.workspaceState.update).toHaveBeenCalledWith('rifler.sidebarState', undefined);
+      expect(context.globalState.update).toHaveBeenCalledWith('rifler.sidebarState', undefined);
     });
   });
 

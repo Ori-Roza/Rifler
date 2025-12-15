@@ -23,12 +23,16 @@ export class PanelManager {
     private getWebviewHtml: GetWebviewHtmlFn,
     private stateStore: StateStore
   ) {
-    // Load persisted state from storage
-    const persistedState = context.globalState.get<MinimizeMessage['state']>(
-      'rifler.persistedSearchState'
-    );
-    if (persistedState) {
-      this.stateStore.setSavedState(persistedState);
+    // Load persisted state honoring scope and setting
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
+    const store = scope === 'global' ? context.globalState : context.workspaceState;
+    if (persist) {
+      const persistedState = store.get<MinimizeMessage['state']>('rifler.persistedSearchState');
+      if (persistedState) {
+        this.stateStore.setSavedState(persistedState);
+      }
     }
   }
 
@@ -182,7 +186,12 @@ export class PanelManager {
     });
 
     // Clear saved state after restoring
-    this.stateStore.setSavedState(undefined);
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
+    if (!persist) {
+      this.stateStore.setSavedState(undefined);
+    }
 
     // Ensure the panel is focused
     if (this.currentPanel) {

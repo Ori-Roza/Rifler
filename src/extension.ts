@@ -288,6 +288,41 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
+  // If persistence is disabled, clear any prior leftover state on activation
+  {
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'off');
+    const persist = cfg.get<boolean>('persistSearchState', false) && scope !== 'off';
+    if (!persist) {
+      context.workspaceState.update('rifler.sidebarState', undefined);
+      context.workspaceState.update('rifler.persistedSearchState', undefined);
+      context.globalState.update('rifler.sidebarState', undefined);
+      context.globalState.update('rifler.persistedSearchState', undefined);
+      stateStore.setSavedState(undefined);
+    }
+  }
+
+  // Clear persisted state when workspace folders change (for workspace-scoped or off)
+  vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    if (scope === 'workspace' || scope === 'off') {
+      context.workspaceState.update('rifler.sidebarState', undefined);
+      context.workspaceState.update('rifler.persistedSearchState', undefined);
+      stateStore.setSavedState(undefined);
+      // Also clear any visible UI state in sidebar/window
+      if (sidebarProvider) {
+        sidebarProvider.postMessage({ type: 'clearState' });
+        sidebarProvider.postMessage({ type: 'focusSearch' });
+      }
+      const panel = panelManager.panel;
+      if (panel) {
+        panel.webview.postMessage({ type: 'clearState' });
+        panel.webview.postMessage({ type: 'focusSearch' });
+      }
+    }
+  }, undefined, context.subscriptions);
+
   // Status bar toggle
   const replaceToggleStatusBar = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,

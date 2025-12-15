@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { SearchScope, SearchOptions, SearchResult, validateRegex, validateFileMask, buildSearchRegex } from '../utils';
-import { performSearch } from '../search';
-import { replaceOne, replaceAll } from '../replacer';
-import { getWebviewHtml } from '../extension';
+import { SearchScope, SearchOptions, SearchResult, buildSearchRegex } from '../utils';
 import { IncomingMessage } from '../messaging/types';
+import { performSearch } from '../search';
+import { replaceAll } from '../replacer';
+import { getWebviewHtml } from '../extension';
 import { MessageHandler } from '../messaging/handler';
 import { registerCommonHandlers } from '../messaging/registerCommonHandlers';
 
@@ -99,7 +99,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _handleMessage(message: any): Promise<void> {
+  private async _handleMessage(message: { type: string; [key: string]: unknown }): Promise<void> {
     // Delegate common message types to shared handler first
     const commonTypes = new Set([
       'runSearch',
@@ -118,7 +118,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       'error'
     ]);
     if (commonTypes.has(message.type)) {
-      await this._messageHandler?.handle(message);
+      await this._messageHandler?.handle(message as IncomingMessage);
       return;
     }
 
@@ -162,7 +162,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async _runSearch(message: any): Promise<void> {
+  private async _runSearch(message: { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string; activeIndex?: number }): Promise<void> {
     if (!message.query || !message.scope || !message.options) {
       return;
     }
@@ -197,7 +197,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _openLocation(message: any): Promise<void> {
+  private async _openLocation(message: { type: string; uri: string; line: number; character: number }): Promise<void> {
     if (!message.uri || message.line === undefined || message.character === undefined) {
       return;
     }
@@ -215,7 +215,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
   }
 
-  private async _replaceAll(message: any): Promise<void> {
+  private async _replaceAll(message: { query: string; replaceText: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string }): Promise<void> {
     if (!message.query || message.replaceText === undefined || !message.scope || !message.options) {
       return;
     }
@@ -379,7 +379,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  public postMessage(message: any): void {
+  public postMessage(message: { type: string; [key: string]: unknown }): void {
     // If view is ready, forward immediately
     if (this._view) {
       this._view.webview.postMessage(message);
@@ -392,7 +392,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         this._pendingInitOptions = {};
       }
       if (message.type === 'setSearchQuery') {
-        this._pendingInitOptions.initialQuery = message.query;
+        this._pendingInitOptions.initialQuery = message.query as string;
       } else {
         this._pendingInitOptions.showReplace = true;
       }

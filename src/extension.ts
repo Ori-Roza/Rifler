@@ -2,14 +2,10 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  SearchResult,
   SearchScope,
-  SearchOptions,
-  validateRegex,
-  validateFileMask
+  SearchOptions
 } from './utils';
 import { performSearch } from './search';
-import { replaceOne, replaceAll } from './replacer';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
 import { PanelManager } from './services/PanelManager';
@@ -20,15 +16,6 @@ import {
   MinimizeMessage,
   ValidateRegexMessage,
   ValidateFileMaskMessage,
-  RunSearchMessage,
-  OpenLocationMessage,
-  GetModulesMessage,
-  GetCurrentDirectoryMessage,
-  GetFileContentMessage,
-  ReplaceOneMessage,
-  ReplaceAllMessage,
-  WebviewReadyMessage,
-  SaveFileMessage,
   IncomingMessage
 } from './messaging/types';
 
@@ -205,31 +192,6 @@ async function saveFile(
       message: `Failed to save file: ${error}`
     });
   }
-}
-
-async function runSearch(
-  panel: vscode.WebviewPanel,
-  query: string,
-  scope: SearchScope,
-  options: SearchOptions,
-  directoryPath?: string,
-  modulePath?: string,
-  filePath?: string
-): Promise<void> {
-  const results = await performSearch(
-    query,
-    scope,
-    options,
-    directoryPath,
-    modulePath,
-    filePath
-  );
-
-  panel.webview.postMessage({
-    type: 'searchResults',
-    results,
-    maxResults: 10000
-  });
 }
 
 async function openLocation(

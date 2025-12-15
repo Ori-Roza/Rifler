@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { SearchOptions } from '../utils';
-import { MinimizeMessage } from '../messaging/types';
+import { MinimizeMessage, IncomingMessage } from '../messaging/types';
 import { StateStore } from '../state/StateStore';
 import { MessageHandler } from '../messaging/handler';
 
@@ -15,7 +14,7 @@ export interface PanelOptions {
 export class PanelManager {
   private currentPanel: vscode.WebviewPanel | undefined;
   private statusBarItem: vscode.StatusBarItem | undefined;
-  private messageHandlers: Map<string, (message: any) => Promise<void>> = new Map();
+  private messageHandlers: Map<string, (message: IncomingMessage) => Promise<void>> = new Map();
   private _messageHandler?: MessageHandler;
   private _handlerConfigurator?: (handler: MessageHandler) => void;
 
@@ -37,7 +36,7 @@ export class PanelManager {
   /**
    * Register a handler for a specific message type from the webview
    */
-  registerMessageHandler(type: string, handler: (message: any) => Promise<void>): void {
+  registerMessageHandler(type: string, handler: (message: IncomingMessage) => Promise<void>): void {
     this.messageHandlers.set(type, handler);
   }
 
@@ -102,7 +101,7 @@ export class PanelManager {
     const queryToSet = initialQuery;
 
     this.currentPanel.webview.onDidReceiveMessage(
-      async (message: any) => {
+      async (message: IncomingMessage) => {
         console.log('Extension received message from webview:', message.type);
         
         // First, delegate to unified message handler (shared/common message types)

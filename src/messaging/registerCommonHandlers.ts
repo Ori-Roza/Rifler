@@ -1,11 +1,10 @@
-import * as vscode from 'vscode';
 import { MessageHandler } from './handler';
 import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
 import { validateRegex, validateFileMask, SearchOptions, SearchScope } from '../utils';
 
 export interface CommonHandlerDeps {
-  postMessage: (message: any) => void;
+  postMessage: (message: Record<string, unknown>) => void;
   openLocation: (uri: string, line: number, character: number) => Promise<void>;
   sendModules: () => Promise<void>;
   sendCurrentDirectory: () => void;
@@ -14,20 +13,22 @@ export interface CommonHandlerDeps {
 }
 
 export function registerCommonHandlers(handler: MessageHandler, deps: CommonHandlerDeps) {
-  handler.registerHandler('runSearch', async (message: { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string; }) => {
+  handler.registerHandler('runSearch', async (message) => {
+    const msg = message as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string; };
     const results = await performSearch(
-      message.query,
-      message.scope,
-      message.options,
-      message.directoryPath,
-      message.modulePath,
-      message.filePath
+      msg.query,
+      msg.scope,
+      msg.options,
+      msg.directoryPath,
+      msg.modulePath,
+      msg.filePath
     );
     deps.postMessage({ type: 'searchResults', results, maxResults: 10000 });
   });
 
-  handler.registerHandler('openLocation', async (message: { uri: string; line: number; character: number; }) => {
-    await deps.openLocation(message.uri, message.line, message.character);
+  handler.registerHandler('openLocation', async (message) => {
+    const msg = message as { uri: string; line: number; character: number; };
+    await deps.openLocation(msg.uri, msg.line, msg.character);
   });
 
   handler.registerHandler('getModules', async () => {
@@ -38,49 +39,55 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     deps.sendCurrentDirectory();
   });
 
-  handler.registerHandler('getFileContent', async (message: { uri: string; query: string; options: SearchOptions; activeIndex?: number; }) => {
-    await deps.sendFileContent(message.uri, message.query, message.options, message.activeIndex);
+  handler.registerHandler('getFileContent', async (message) => {
+    const msg = message as { uri: string; query: string; options: SearchOptions; activeIndex?: number; };
+    await deps.sendFileContent(msg.uri, msg.query, msg.options, msg.activeIndex);
   });
 
-  handler.registerHandler('saveFile', async (message: { uri: string; content: string }) => {
-    await deps.saveFile(message.uri, message.content);
+  handler.registerHandler('saveFile', async (message) => {
+    const msg = message as { uri: string; content: string };
+    await deps.saveFile(msg.uri, msg.content);
   });
 
-  handler.registerHandler('replaceOne', async (message: { uri: string; line: number; character: number; length: number; replaceText: string }) => {
-    await replaceOne(message.uri, message.line, message.character, message.length, message.replaceText);
+  handler.registerHandler('replaceOne', async (message) => {
+    const msg = message as { uri: string; line: number; character: number; length: number; replaceText: string };
+    await replaceOne(msg.uri, msg.line, msg.character, msg.length, msg.replaceText);
   });
 
-  handler.registerHandler('replaceAll', async (message: { query: string; replaceText: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string; }) => {
+  handler.registerHandler('replaceAll', async (message) => {
+    const msg = message as { query: string; replaceText: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string; };
     await replaceAll(
-      message.query,
-      message.replaceText,
-      message.scope,
-      message.options,
-      message.directoryPath,
-      message.modulePath,
-      message.filePath,
+      msg.query,
+      msg.replaceText,
+      msg.scope,
+      msg.options,
+      msg.directoryPath,
+      msg.modulePath,
+      msg.filePath,
       async () => {
         // After replace, re-run search and post updated results
         const results = await performSearch(
-          message.query,
-          message.scope,
-          message.options,
-          message.directoryPath,
-          message.modulePath,
-          message.filePath
+          msg.query,
+          msg.scope,
+          msg.options,
+          msg.directoryPath,
+          msg.modulePath,
+          msg.filePath
         );
         deps.postMessage({ type: 'searchResults', results, maxResults: 10000 });
       }
     );
   });
 
-  handler.registerHandler('validateRegex', async (message: { pattern: string; useRegex: boolean }) => {
-    const result = validateRegex(message.pattern, message.useRegex);
+  handler.registerHandler('validateRegex', async (message) => {
+    const msg = message as { pattern: string; useRegex: boolean };
+    const result = validateRegex(msg.pattern, msg.useRegex);
     deps.postMessage({ type: 'validationResult', field: 'regex', isValid: result.isValid, error: result.error });
   });
 
-  handler.registerHandler('validateFileMask', async (message: { fileMask: string }) => {
-    const result = validateFileMask(message.fileMask);
+  handler.registerHandler('validateFileMask', async (message) => {
+    const msg = message as { fileMask: string };
+    const result = validateFileMask(msg.fileMask);
     deps.postMessage({ type: 'validationResult', field: 'fileMask', isValid: result.isValid, message: result.message, fallbackToAll: result.fallbackToAll });
   });
 
@@ -88,7 +95,8 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     console.log('Received webview diag ping');
   });
 
-  handler.registerHandler('error', async (message: { message: string; source?: string; lineno?: number; colno?: number; error?: unknown }) => {
-    console.error('Webview error:', message.message, message);
+  handler.registerHandler('error', async (message) => {
+    const msg = message as { message: string; source?: string; lineno?: number; colno?: number; error?: unknown };
+    console.error('Webview error:', msg.message, msg);
   });
 }

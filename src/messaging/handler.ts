@@ -4,7 +4,7 @@ import { IncomingMessage } from './types';
 /**
  * Type definition for message handler functions
  */
-export type MessageHandlerFn = (message: any) => Promise<void>;
+export type MessageHandlerFn = (message: IncomingMessage | Record<string, unknown>) => Promise<void>;
 
 /**
  * Unified message handler for webview messages
@@ -44,7 +44,7 @@ export class MessageHandler {
   /**
    * Send a message to the webview
    */
-  postMessage(message: any): void {
+  postMessage(message: Record<string, unknown>): void {
     // Support both WebviewPanel and WebviewView
     if ('webview' in this.panel) {
       (this.panel as vscode.WebviewPanel).webview.postMessage(message);

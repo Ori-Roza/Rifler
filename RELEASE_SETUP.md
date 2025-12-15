@@ -50,7 +50,7 @@ This will install `standard-version` and all other dependencies.
 1. Go to your GitHub repository: https://github.com/Ori-Roza/Rifler
 2. Settings → Secrets and variables → Actions
 3. Click "New repository secret"
-4. Name: `VSCODE_MARKETPLACE_TOKEN`
+4. Name: `VSCE_PAT`
 5. Value: Paste the token from Step 2
 6. Click "Add secret"
 
@@ -144,8 +144,8 @@ git push origin v0.1.9
 ### Issue: "Marketplace Token not found"
 
 **Solution:** Verify secret is correctly set in GitHub:
-- Go to Settings → Secrets → Check `VSCODE_MARKETPLACE_TOKEN` exists
-- Check the workflow is referencing it: `${{ secrets.VSCODE_MARKETPLACE_TOKEN }}`
+- Go to Settings → Secrets → Check `VSCE_PAT` exists
+- Check the workflow is referencing it: `${{ secrets.VSCE_PAT }}`
 
 ### Issue: "Package already published"
 

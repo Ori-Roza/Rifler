@@ -314,7 +314,7 @@ Rifler uses **automated CI/CD** for releases with GitHub Actions and standard-ve
 2. Create a Personal Access Token (PAT) with `Marketplace > Manage` scope
 3. Add it to GitHub Secrets:
    - Repository → Settings → Secrets and variables → Actions
-   - Create secret: `VSCODE_MARKETPLACE_TOKEN` = `<your-pat>`
+   - Create secret: `VSCE_PAT` = `<your-pat>`
 
 ### Manual Release Workaround
 

@@ -27,6 +27,8 @@ export const workspace = {
     get: jest.fn().mockReturnValue('ctrl+shift+r'),
     update: jest.fn().mockResolvedValue(undefined),
   }),
+  onDidChangeConfiguration: jest.fn().mockReturnValue({ dispose: jest.fn() }),
+  onDidChangeWorkspaceFolders: jest.fn().mockReturnValue({ dispose: jest.fn() }),
   textDocuments: [],
   workspaceFolders: [],
   fs: {

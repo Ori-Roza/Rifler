@@ -172,12 +172,23 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       case 'minimize':
         // Save state before minimize
         if (message.state) {
-          await this._context.globalState.update('rifler.sidebarState', message.state);
+          const cfg = vscode.workspace.getConfiguration('rifler');
+          const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+          const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
+          const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
+          if (persist) {
+            await store.update('rifler.sidebarState', message.state as unknown as SidebarState);
+          }
         }
         break;
       case 'clearState':
         // Clear saved state when search is cleared
-        await this._context.globalState.update('rifler.sidebarState', undefined);
+        {
+          const cfg = vscode.workspace.getConfiguration('rifler');
+          const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+          const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
+          await store.update('rifler.sidebarState', undefined);
+        }
         break;
     }
   }
@@ -205,7 +216,12 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     });
 
     // Save search state for persistence
-    await this._context.globalState.update('rifler.sidebarState', {
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
+    const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
+    if (persist) {
+      await store.update('rifler.sidebarState', {
       query: message.query,
       scope: message.scope,
       options: message.options,
@@ -214,7 +230,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       filePath: message.filePath,
       results: results,
       activeIndex
-    });
+      });
+    }
   }
 
   private async _openLocation(message: { type: string; uri: string; line: number; character: number }): Promise<void> {
@@ -351,12 +368,18 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       this._view?.webview.postMessage(payload);
 
       // Persist last preview and active index for instant restore
-      const existing = this._context.globalState.get<SidebarState>('rifler.sidebarState') || {};
-      await this._context.globalState.update('rifler.sidebarState', {
+      const cfg = vscode.workspace.getConfiguration('rifler');
+      const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+      const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
+      const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
+      const existing = store.get<SidebarState>('rifler.sidebarState') || {};
+      if (persist) {
+        await store.update('rifler.sidebarState', {
         ...existing,
         lastPreview: payload,
         activeIndex: activeIndex ?? existing.activeIndex ?? 0
-      });
+        });
+      }
     } catch (error) {
       console.error('Error reading file for preview:', error);
     }
@@ -384,7 +407,10 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
 
   private _restoreState(): void {
     // Restore saved search state
-    const state = this._context.globalState.get('rifler.sidebarState');
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
+    const state = store.get('rifler.sidebarState');
     if (state && this._view) {
       this._view.webview.postMessage({
         type: 'restoreState',

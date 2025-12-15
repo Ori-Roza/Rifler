@@ -136,6 +136,24 @@
     "configuration": {
       "title": "Rifler",
       "properties": {
+        "rifler.persistSearchState": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Persist search state across sessions. Turn off to avoid restoring previous searches.",
+          "order": 0
+        },
+        "rifler.persistenceScope": {
+          "type": "string",
+          "enum": ["workspace", "global", "off"],
+          "enumDescriptions": [
+            "Persist state per workspace (recommended)",
+            "Persist state globally across all workspaces",
+            "Do not persist state"
+          ],
+          "default": "off",
+          "markdownDescription": "Controls where Rifler persists UI/search state: per workspace, globally, or disabled.",
+          "order": 0
+        },
         "rifler.panelLocation": {
           "type": "string",
           "enum": ["sidebar", "window"],

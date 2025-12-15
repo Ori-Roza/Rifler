@@ -12,9 +12,17 @@ export class StateStore {
   private visibilityCallbacks: Array<(visible: boolean) => void> = [];
 
   constructor(private readonly context: vscode.ExtensionContext) {
-    const persisted = context.globalState.get<MinimizeMessage['state']>('rifler.persistedSearchState');
-    if (persisted) {
-      this.savedState = persisted;
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
+    const store = scope === 'global' ? context.globalState : context.workspaceState;
+    if (persist) {
+      const persisted = store.get<MinimizeMessage['state']>('rifler.persistedSearchState');
+      if (persisted) {
+        this.savedState = persisted;
+      }
+    } else {
+      this.savedState = undefined;
     }
   }
 
@@ -45,6 +53,12 @@ export class StateStore {
 
   setSavedState(state: MinimizeMessage['state'] | undefined): void {
     this.savedState = state;
-    this.context.globalState.update('rifler.persistedSearchState', state);
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
+    const store = scope === 'global' ? this.context.globalState : this.context.workspaceState;
+    if (persist) {
+      store.update('rifler.persistedSearchState', state);
+    }
   }
 }

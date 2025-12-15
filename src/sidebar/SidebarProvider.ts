@@ -151,6 +151,14 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         });
         break;
       }
+      case 'setSearchQuery':
+      case 'showReplace':
+      case 'focusSearch':
+        // Forward initialization messages to webview
+        if (this._view) {
+          this._view.webview.postMessage(message);
+        }
+        break;
     }
   }
 

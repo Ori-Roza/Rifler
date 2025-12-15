@@ -9,7 +9,7 @@ export function openCommand(ctx: CommandContext): void {
   const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
 
   if (viewMode === 'sidebar') {
-    if (ctx.sidebarVisible) {
+    if (ctx.getSidebarVisible()) {
       vscode.commands.executeCommand('workbench.action.closeSidebar');
     } else {
       const selectedText = getSelectedText();

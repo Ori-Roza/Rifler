@@ -13,7 +13,8 @@ import { replaceOne, replaceAll } from './replacer';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
 import { PanelManager } from './services/PanelManager';
-import { registerCommands, CommandContext } from './commands';
+import { StateStore } from './state/StateStore';
+import { registerCommands } from './commands';
 import {
   MinimizeMessage,
   ValidateRegexMessage,
@@ -248,7 +249,7 @@ async function openLocation(
 }
 
 // State tracking
-let sidebarVisible: boolean = false;
+let stateStore: StateStore;
 let viewManager: ViewManager;
 let panelManager: PanelManager;
 
@@ -257,8 +258,11 @@ export function activate(context: vscode.ExtensionContext) {
 
   const extensionUri = context.extensionUri;
 
+  // Initialize StateStore
+  stateStore = new StateStore(context);
+
   // Initialize PanelManager
-  panelManager = new PanelManager(context, extensionUri, getWebviewHtml);
+  panelManager = new PanelManager(context, extensionUri, getWebviewHtml, stateStore);
 
   // Initialize ViewManager
   viewManager = new ViewManager(context);
@@ -275,7 +279,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Set up sidebar visibility tracking
   sidebarProvider.setVisibilityCallback((visible: boolean) => {
-    sidebarVisible = visible;
+    stateStore.setSidebarVisible(visible);
   });
 
   // Register message handlers with PanelManager
@@ -399,11 +403,11 @@ export function activate(context: vscode.ExtensionContext) {
     panelManager,
     viewManager,
     sidebarProvider,
-    sidebarVisible,
+    getSidebarVisible: () => stateStore.getSidebarVisible(),
     onSidebarVisibilityChange: (callback) => {
-      sidebarProvider.setVisibilityCallback(callback);
+      stateStore.onSidebarVisibilityChange(callback);
     }
-  } as CommandContext);
+  });
 
   // Status bar toggle
   const replaceToggleStatusBar = vscode.window.createStatusBarItem(

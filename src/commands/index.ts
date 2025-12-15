@@ -23,7 +23,7 @@ export interface CommandContext {
   panelManager: PanelManager;
   viewManager: ViewManager;
   sidebarProvider: RiflerSidebarProvider;
-  sidebarVisible: boolean;
+  getSidebarVisible: () => boolean;
   onSidebarVisibilityChange: (callback: (visible: boolean) => void) => void;
 }
 

@@ -9,7 +9,7 @@ export function toggleReplaceCommand(ctx: CommandContext): void {
     ctx.panelManager.panel.webview.postMessage({ type: 'toggleReplace' });
     return;
   }
-  if (ctx.sidebarVisible) {
+  if (ctx.getSidebarVisible()) {
     ctx.sidebarProvider.postMessage({ type: 'toggleReplace' });
   }
 }

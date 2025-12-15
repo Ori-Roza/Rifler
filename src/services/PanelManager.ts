@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { SearchOptions } from '../utils';
 import { MinimizeMessage } from '../messaging/types';
+import { StateStore } from '../state/StateStore';
 
 export type GetWebviewHtmlFn = (webview: vscode.Webview, extensionUri: vscode.Uri) => string;
 
@@ -13,21 +14,20 @@ export interface PanelOptions {
 export class PanelManager {
   private currentPanel: vscode.WebviewPanel | undefined;
   private statusBarItem: vscode.StatusBarItem | undefined;
-  private savedState: MinimizeMessage['state'] | undefined;
-  private isMinimized: boolean = false;
   private messageHandlers: Map<string, (message: any) => Promise<void>> = new Map();
 
   constructor(
     private context: vscode.ExtensionContext,
     private extensionUri: vscode.Uri,
-    private getWebviewHtml: GetWebviewHtmlFn
+    private getWebviewHtml: GetWebviewHtmlFn,
+    private stateStore: StateStore
   ) {
     // Load persisted state from storage
     const persistedState = context.globalState.get<MinimizeMessage['state']>(
       'rifler.persistedSearchState'
     );
     if (persistedState) {
-      this.savedState = persistedState;
+      this.stateStore.setSavedState(persistedState);
     }
   }
 
@@ -132,10 +132,7 @@ export class PanelManager {
    */
   minimize(state?: MinimizeMessage['state']): void {
     // Save the state before closing
-    if (state) {
-      this.savedState = state;
-      this.context.globalState.update('rifler.persistedSearchState', state);
-    }
+    this.stateStore.setSavedState(state);
 
     // Hide the panel
     if (this.currentPanel) {
@@ -144,7 +141,7 @@ export class PanelManager {
     }
 
     // Mark as minimized
-    this.isMinimized = true;
+    this.stateStore.setMinimized(true);
 
     // Create status bar item if it doesn't exist
     if (!this.statusBarItem) {
@@ -172,16 +169,15 @@ export class PanelManager {
     }
 
     // Mark as no longer minimized
-    this.isMinimized = false;
+    this.stateStore.setMinimized(false);
 
     // Open the panel and restore state
     this.createOrShowPanel({
-      restoreState: this.savedState
+      restoreState: this.stateStore.getSavedState()
     });
 
     // Clear saved state after restoring
-    this.savedState = undefined;
-    this.context.globalState.update('rifler.persistedSearchState', undefined);
+    this.stateStore.setSavedState(undefined);
 
     // Ensure the panel is focused
     if (this.currentPanel) {
@@ -214,7 +210,7 @@ export class PanelManager {
    * Check if panel is minimized
    */
   get minimized(): boolean {
-    return this.isMinimized;
+    return this.stateStore.isMinimized();
   }
 
   /**

@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   SearchResult,
   SearchScope,
@@ -37,8 +39,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
   const scriptUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'script.js')
   );
-
-  const bodyHtml = '';
+  const indexPath = path.join(extensionUri.fsPath, 'src', 'webview', 'index.html');
+  const bodyHtml = fs.readFileSync(indexPath, 'utf8');
 
   return `<!DOCTYPE html>
 <html lang="en">

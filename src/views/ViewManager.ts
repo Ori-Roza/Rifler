@@ -21,6 +21,10 @@ export class ViewManager {
     initialQueryFocus?: boolean;
     forcedLocation?: PanelLocation;
   } = {}): Promise<void> {
+    // Sanitize options
+    if (typeof options.initialQuery === 'string' && options.initialQuery.length > 2000) {
+      options.initialQuery = options.initialQuery.slice(0, 2000);
+    }
     const config = vscode.workspace.getConfiguration('rifler');
     
     let panelLocation = options.forcedLocation;

@@ -75,6 +75,18 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
 
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
+      // Basic payload validation: require a type string and limit size of known fields
+      if (!message || typeof (message as any).type !== 'string') {
+        return;
+      }
+      const m = message as Record<string, unknown>;
+      if (typeof m['query'] === 'string' && (m['query'] as string).length > 2000) {
+        // prevent excessively large queries
+        return;
+      }
+      if (typeof m['replaceText'] === 'string' && (m['replaceText'] as string).length > 2000) {
+        return;
+      }
       await this._handleMessage(message);
     });
     // Restore state when view becomes visible

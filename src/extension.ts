@@ -37,12 +37,14 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; style-src ${webview.cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet">
+  <!-- TODO: Consider bundling highlight.js locally or add SRI -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet" crossorigin="anonymous">
   <link rel="stylesheet" href="${stylesUri}">
 </head>
 <body>
 ${bodyHtml}
-<script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<!-- TODO: Add integrity attribute with SRI hash or bundle locally -->
+<script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" crossorigin="anonymous"></script>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

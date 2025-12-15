@@ -2,10 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  SearchScope,
   SearchOptions
 } from './utils';
-import { performSearch } from './search';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
 import { PanelManager } from './services/PanelManager';

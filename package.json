@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
@@ -181,8 +181,9 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run compile && npm run copy-webview",
     "compile": "tsc -p ./",
+    "copy-webview": "mkdir -p out/webview && cp src/webview/index.html src/webview/script.js src/webview/styles.css out/webview/",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
     "test": "jest",

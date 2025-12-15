@@ -21,12 +21,12 @@ import {
 export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   const nonce = getNonce();
   const stylesUri = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'styles.css')
+    vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'styles.css')
   );
   const scriptUri = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'script.js')
+    vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'script.js')
   );
-  const indexPath = path.join(extensionUri.fsPath, 'src', 'webview', 'index.html');
+  const indexPath = path.join(extensionUri.fsPath, 'out', 'webview', 'index.html');
   const bodyHtml = fs.readFileSync(indexPath, 'utf8');
 
   return `<!DOCTYPE html>

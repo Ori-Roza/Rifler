@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { SearchOptions } from '../utils';
 import { MinimizeMessage } from '../messaging/types';
 import { StateStore } from '../state/StateStore';
+import { MessageHandler } from '../messaging/handler';
 
 export type GetWebviewHtmlFn = (webview: vscode.Webview, extensionUri: vscode.Uri) => string;
 
@@ -15,6 +16,8 @@ export class PanelManager {
   private currentPanel: vscode.WebviewPanel | undefined;
   private statusBarItem: vscode.StatusBarItem | undefined;
   private messageHandlers: Map<string, (message: any) => Promise<void>> = new Map();
+  private _messageHandler?: MessageHandler;
+  private _handlerConfigurator?: (handler: MessageHandler) => void;
 
   constructor(
     private context: vscode.ExtensionContext,
@@ -36,6 +39,14 @@ export class PanelManager {
    */
   registerMessageHandler(type: string, handler: (message: any) => Promise<void>): void {
     this.messageHandlers.set(type, handler);
+  }
+
+  /**
+   * Provide a configurator to register common/shared handlers on a MessageHandler
+   * This will be invoked each time a new panel is created.
+   */
+  setHandlerConfigurator(configure: (handler: MessageHandler) => void): void {
+    this._handlerConfigurator = configure;
   }
 
   /**
@@ -79,6 +90,12 @@ export class PanelManager {
       this.extensionUri
     );
 
+    // Create unified message handler for the panel and configure common handlers
+    this._messageHandler = new MessageHandler(this.currentPanel);
+    if (this._handlerConfigurator) {
+      this._handlerConfigurator(this._messageHandler);
+    }
+
     // Store options to send when webview is ready
     const shouldShowReplace = showReplace;
     const stateToRestore = restoreState;
@@ -88,7 +105,12 @@ export class PanelManager {
       async (message: any) => {
         console.log('Extension received message from webview:', message.type);
         
-        // Check if there's a registered handler for this message type
+        // First, delegate to unified message handler (shared/common message types)
+        if (this._messageHandler) {
+          await this._messageHandler.handle(message);
+        }
+
+        // Then, check if there's a registered handler for this message type
         const handler = this.messageHandlers.get(message.type);
         if (handler) {
           try {
@@ -96,21 +118,21 @@ export class PanelManager {
           } catch (error) {
             console.error(`Error handling message type '${message.type}':`, error);
           }
-        } else {
-          // Handle built-in panel messages
-          switch (message.type) {
-            case 'webviewReady': {
-              this.handleWebviewReady(
-                shouldShowReplace,
-                stateToRestore,
-                queryToSet
-              );
-              break;
-            }
-            case 'minimize': {
-              this.minimize(message.state);
-              break;
-            }
+        }
+
+        // Handle built-in panel messages that are not part of common handlers
+        switch (message.type) {
+          case 'webviewReady': {
+            this.handleWebviewReady(
+              shouldShowReplace,
+              stateToRestore,
+              queryToSet
+            );
+            break;
+          }
+          case 'minimize': {
+            this.minimize(message.state);
+            break;
           }
         }
       },

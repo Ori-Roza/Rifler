@@ -15,6 +15,7 @@ import { ViewManager } from './views/ViewManager';
 import { PanelManager } from './services/PanelManager';
 import { StateStore } from './state/StateStore';
 import { registerCommands } from './commands';
+import { registerCommonHandlers } from './messaging/registerCommonHandlers';
 import {
   MinimizeMessage,
   ValidateRegexMessage,
@@ -282,119 +283,35 @@ export function activate(context: vscode.ExtensionContext) {
     stateStore.setSidebarVisible(visible);
   });
 
-  // Register message handlers with PanelManager
-  panelManager.registerMessageHandler('runSearch', async (message: RunSearchMessage) => {
-    const panel = panelManager.panel;
-    if (!panel) return;
-
-    await runSearch(
-      panel,
-      message.query,
-      message.scope,
-      message.options,
-      message.directoryPath,
-      message.modulePath,
-      message.filePath
-    );
-  });
-
-  panelManager.registerMessageHandler('openLocation', async (message: OpenLocationMessage) => {
-    await openLocation(message.uri, message.line, message.character);
-  });
-
-  panelManager.registerMessageHandler('getModules', async (message: GetModulesMessage) => {
-    const panel = panelManager.panel;
-    if (!panel) return;
-    await sendModulesList(panel);
-  });
-
-  panelManager.registerMessageHandler('getCurrentDirectory', async (message: GetCurrentDirectoryMessage) => {
-    const panel = panelManager.panel;
-    if (!panel) return;
-    sendCurrentDirectory(panel);
-  });
-
-  panelManager.registerMessageHandler('getFileContent', async (message: GetFileContentMessage) => {
-    const panel = panelManager.panel;
-    if (!panel) return;
-    await sendFileContent(panel, message.uri, message.query, message.options);
-  });
-
-  panelManager.registerMessageHandler('saveFile', async (message: SaveFileMessage) => {
-    const panel = panelManager.panel;
-    if (!panel) return;
-    await saveFile(panel, message.uri, message.content);
-  });
-
-  panelManager.registerMessageHandler('replaceOne', async (message: ReplaceOneMessage) => {
-    await replaceOne(
-      message.uri,
-      message.line,
-      message.character,
-      message.length,
-      message.replaceText
-    );
-  });
-
-  panelManager.registerMessageHandler('replaceAll', async (message: ReplaceAllMessage) => {
-    await replaceAll(
-      message.query,
-      message.replaceText,
-      message.scope,
-      message.options,
-      message.directoryPath,
-      message.modulePath,
-      message.filePath,
-      async () => {
+  // Configure shared/common message handlers for the panel
+  panelManager.setHandlerConfigurator((handler) => {
+    registerCommonHandlers(handler, {
+      postMessage: (msg) => handler.postMessage(msg),
+      openLocation: openLocation,
+      sendModules: async () => {
         const panel = panelManager.panel;
-        if (panel) {
-          await runSearch(
-            panel,
-            message.query,
-            message.scope,
-            message.options,
-            message.directoryPath,
-            message.modulePath,
-            message.filePath
-          );
-        }
+        if (!panel) return;
+        await sendModulesList(panel);
+      },
+      sendCurrentDirectory: () => {
+        const panel = panelManager.panel;
+        if (!panel) return;
+        sendCurrentDirectory(panel);
+      },
+      sendFileContent: async (uri, query, options, _activeIndex) => {
+        const panel = panelManager.panel;
+        if (!panel) return;
+        await sendFileContent(panel, uri, query, options);
+      },
+      saveFile: async (uri, content) => {
+        const panel = panelManager.panel;
+        if (!panel) return;
+        await saveFile(panel, uri, content);
       }
-    );
-  });
-
-  panelManager.registerMessageHandler('validateRegex', async (message: ValidateRegexMessage) => {
-    const panel = panelManager.panel;
-    if (!panel) return;
-
-    const regexValidation = validateRegex(message.pattern, message.useRegex);
-    panel.webview.postMessage({
-      type: 'validationResult',
-      field: 'regex',
-      isValid: regexValidation.isValid,
-      error: regexValidation.error
     });
-  });
-
-  panelManager.registerMessageHandler('validateFileMask', async (message: ValidateFileMaskMessage) => {
-    const panel = panelManager.panel;
-    if (!panel) return;
-
-    const maskValidation = validateFileMask(message.fileMask);
-    panel.webview.postMessage({
-      type: 'validationResult',
-      field: 'fileMask',
-      isValid: maskValidation.isValid,
-      message: maskValidation.message,
-      fallbackToAll: maskValidation.fallbackToAll
-    });
-  });
-
-  // Test message handlers
-  panelManager.registerMessageHandler('__test_searchCompleted', async () => {});
-  panelManager.registerMessageHandler('__test_searchResultsReceived', async () => {});
-  panelManager.registerMessageHandler('error', async () => {});
-  panelManager.registerMessageHandler('__diag_ping', async () => {
-    console.log('Received webview diag ping');
+    // No-op handlers for test signals
+    handler.registerHandler('__test_searchCompleted', async () => {});
+    handler.registerHandler('__test_searchResultsReceived', async () => {});
   });
 
   // Register all commands

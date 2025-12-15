@@ -61,6 +61,9 @@ export class PanelManager {
       return;
     }
 
+    // If no restore state provided, try to load from StateStore
+    const effectiveRestoreState = restoreState || this.stateStore.getSavedState();
+
     // Create a new webview panel
     this.currentPanel = vscode.window.createWebviewPanel(
       'rifler',
@@ -89,7 +92,7 @@ export class PanelManager {
 
     // Store options to send when webview is ready
     const shouldShowReplace = showReplace;
-    const stateToRestore = restoreState;
+    const stateToRestore = effectiveRestoreState;
     const queryToSet = initialQuery;
 
     this.currentPanel.webview.onDidReceiveMessage(

@@ -49,10 +49,28 @@ src/
 ├── search.ts             # Search functionality
 ├── replacer.ts           # Replace functionality
 ├── utils.ts              # Utility functions
+├── commands/             # Command implementations
+│   ├── index.ts          # Command registration
+│   ├── open.ts           # Open command
+│   ├── minimize.ts       # Minimize command
+│   ├── restore.ts        # Restore command
+│   └── ...               # Other commands
+├── messaging/            # Message handling
+│   ├── handler.ts        # Unified message handler
+│   ├── registerCommonHandlers.ts  # Common handlers
+│   └── types.ts          # Message types
+├── services/
+│   └── PanelManager.ts   # Panel lifecycle management
+├── state/
+│   └── StateStore.ts     # State persistence
 ├── sidebar/
 │   └── SidebarProvider.ts # Sidebar UI provider
 ├── views/
 │   └── ViewManager.ts    # View mode switching
+├── webview/              # Webview assets
+│   ├── index.html        # HTML template
+│   ├── script.js         # Client-side logic
+│   └── styles.css        # Styles
 └── __tests__/            # Test files
 ```
 
@@ -193,10 +211,10 @@ Defined in `package.json` under `contributes.keybindings`:
    - Include screenshots if UI changes
 
 4. **Pass all checks**
-   - Tests must pass (156+ unit tests)
+   - Tests must pass (160+ unit tests)
    - Linter must pass (ESLint)
    - TypeScript compilation must succeed
-   - E2E tests should pass (78+ tests)
+   - E2E tests should pass (89+ tests)
 
 ## Common Tasks
 

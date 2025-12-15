@@ -75,6 +75,18 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
 
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
+      // Basic payload validation: require a type string and limit size of known fields
+      if (!message || typeof (message as Record<string, unknown>).type !== 'string') {
+        return;
+      }
+      const m = message as Record<string, unknown>;
+      if (typeof m['query'] === 'string' && (m['query'] as string).length > 2000) {
+        // prevent excessively large queries
+        return;
+      }
+      if (typeof m['replaceText'] === 'string' && (m['replaceText'] as string).length > 2000) {
+        return;
+      }
       await this._handleMessage(message);
     });
     // Restore state when view becomes visible
@@ -101,8 +113,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
 
   private async _handleMessage(message: { type: string; [key: string]: unknown }): Promise<void> {
     // Delegate common message types to shared handler first
+    // NOTE: runSearch is NOT in this set - we handle it specially below to save state
     const commonTypes = new Set([
-      'runSearch',
       'openLocation',
       'replaceOne',
       'replaceAll',
@@ -123,6 +135,12 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     switch (message.type) {
+      case 'runSearch': {
+        // Handle search locally to persist state after each search
+        const searchMessage = message as unknown as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string; activeIndex?: number };
+        await this._runSearch(searchMessage);
+        break;
+      }
       case 'webviewReady': {
         // Send pending initialization options when webview is ready
         if (this._pendingInitOptions) {
@@ -138,6 +156,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           }
           this._pendingInitOptions = undefined;
         }
+        // Restore persisted sidebar state immediately on initial ready
+        this._restoreState();
         break;
       }
       case 'requestStateForMinimize':

@@ -1103,6 +1103,7 @@
         if (message.state) {
           const s = message.state;
           queryInput.value = s.query || '';
+          state.currentQuery = s.query || '';
           replaceInput.value = s.replaceText || '';
           state.currentScope = s.scope || 'project';
           directoryInput.value = s.directoryPath || '';

@@ -14,7 +14,6 @@ export interface PanelOptions {
 export class PanelManager {
   private currentPanel: vscode.WebviewPanel | undefined;
   private statusBarItem: vscode.StatusBarItem | undefined;
-  private messageHandlers: Map<string, (message: IncomingMessage) => Promise<void>> = new Map();
   private _messageHandler?: MessageHandler;
   private _handlerConfigurator?: (handler: MessageHandler) => void;
 
@@ -31,13 +30,6 @@ export class PanelManager {
     if (persistedState) {
       this.stateStore.setSavedState(persistedState);
     }
-  }
-
-  /**
-   * Register a handler for a specific message type from the webview
-   */
-  registerMessageHandler(type: string, handler: (message: IncomingMessage) => Promise<void>): void {
-    this.messageHandlers.set(type, handler);
   }
 
   /**
@@ -102,24 +94,7 @@ export class PanelManager {
 
     this.currentPanel.webview.onDidReceiveMessage(
       async (message: IncomingMessage) => {
-        console.log('Extension received message from webview:', message.type);
-        
-        // First, delegate to unified message handler (shared/common message types)
-        if (this._messageHandler) {
-          await this._messageHandler.handle(message);
-        }
-
-        // Then, check if there's a registered handler for this message type
-        const handler = this.messageHandlers.get(message.type);
-        if (handler) {
-          try {
-            await handler(message);
-          } catch (error) {
-            console.error(`Error handling message type '${message.type}':`, error);
-          }
-        }
-
-        // Handle built-in panel messages that are not part of common handlers
+        // Handle built-in panel messages first
         switch (message.type) {
           case 'webviewReady': {
             this.handleWebviewReady(
@@ -133,6 +108,12 @@ export class PanelManager {
             this.minimize(message.state);
             break;
           }
+          default:
+            // Delegate all other messages to unified handler
+            if (this._messageHandler) {
+              await this._messageHandler.handle(message);
+            }
+            break;
         }
       },
       undefined,

@@ -58,7 +58,19 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       message.options,
       message.directoryPath,
       message.modulePath,
-      message.filePath
+      message.filePath,
+      async () => {
+        // After replace, re-run search and post updated results
+        const results = await performSearch(
+          message.query,
+          message.scope,
+          message.options,
+          message.directoryPath,
+          message.modulePath,
+          message.filePath
+        );
+        deps.postMessage({ type: 'searchResults', results, maxResults: 10000 });
+      }
     );
   });
 

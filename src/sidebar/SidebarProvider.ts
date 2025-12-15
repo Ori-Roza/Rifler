@@ -260,7 +260,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     this._view?.webview.postMessage({
-      type: 'modules',
+      type: 'modulesList',
       modules
     });
   }

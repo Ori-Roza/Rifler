@@ -11,7 +11,6 @@ module.exports = defineConfig([
       timeout: 20000,
     },
     launchArgs: [
-      '--disable-extensions',
       '--disable-workspace-trust',
       '--user-data-dir=/tmp/vscode-test'
     ],
@@ -26,7 +25,6 @@ module.exports = defineConfig([
       timeout: 20000,
     },
     launchArgs: [
-      '--disable-extensions',
       '--disable-workspace-trust',
       '--user-data-dir=/tmp/vscode-test',
       '--new-window',

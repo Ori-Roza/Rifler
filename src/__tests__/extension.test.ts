@@ -65,11 +65,11 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
           if (key === 'persistSearchState') return false;
           if (key === 'persistenceScope') return 'off';
           return defaultValue;
-        }),
+        })
       });
       (vscode.workspace.getConfiguration as jest.Mock) = mockGetConfiguration;
 
-      activate(context);
+      await activate(context);
 
       // Wait for async operations to complete
       await new Promise(resolve => setImmediate(resolve));
@@ -79,17 +79,17 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       expect(context.workspaceState.update).toHaveBeenCalledWith('rifler.persistedSearchState', undefined);
     });
 
-    test('should handle missing persisted state gracefully', () => {
+    test('should handle missing persisted state gracefully', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
       // Should not throw
-      expect(() => activate(context)).not.toThrow();
+      await expect(async () => await activate(context)).resolves;
     });
 
     test('should persist state to globalState when minimizing', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       // Simulate minimize command being registered
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
@@ -101,10 +101,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
   });
 
   describe('Keyboard Toggle - cmd+shift+f', () => {
-    test('should register rifler.open command', () => {
+    test('should register rifler.open command', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const openCommandCall = commands.find((call: any) => call[0] === 'rifler.open');
@@ -112,10 +112,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.ok(openCommandCall, 'rifler.open command should be registered');
     });
 
-    test('should register rifler.openReplace command', () => {
+    test('should register rifler.openReplace command', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const openReplaceCall = commands.find((call: any) => call[0] === 'rifler.openReplace');
@@ -123,10 +123,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.ok(openReplaceCall, 'rifler.openReplace command should be registered');
     });
 
-    test('should register minimize command', () => {
+    test('should register minimize command', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const minimizeCall = commands.find((call: any) => call[0] === 'rifler.minimize');
@@ -134,10 +134,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.ok(minimizeCall, 'rifler.minimize command should be registered');
     });
 
-    test('should register restore command', () => {
+    test('should register restore command', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const restoreCall = commands.find((call: any) => call[0] === 'rifler.restore');
@@ -147,10 +147,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
   });
 
   describe('Command subscriptions', () => {
-    test('should add all registered commands to context.subscriptions', () => {
+    test('should add all registered commands to context.subscriptions', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       // Should have at least 4 commands registered
       assert.ok(context.subscriptions.length >= 4, 'Should register at least 4 commands');
@@ -202,10 +202,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       (vscode.workspace.getConfiguration as jest.Mock) = mockGetConfiguration;
     });
 
-    test('should default to sidebar mode', () => {
+    test('should default to sidebar mode', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const openCommandCall = commands.find((call: any) => call[0] === 'rifler.open');
@@ -214,7 +214,7 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.strictEqual(typeof openCommandCall[1], 'function', 'Command handler should be a function');
     });
 
-    test('should respect viewMode=sidebar configuration when opening with rifler.open', () => {
+    test('should respect viewMode=sidebar configuration when opening with rifler.open', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
       const mockGetConfiguration = jest.fn().mockReturnValue({
@@ -226,7 +226,7 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       });
       (vscode.workspace.getConfiguration as jest.Mock) = mockGetConfiguration;
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const openCommandCall = commands.find((call: any) => call[0] === 'rifler.open');
@@ -235,7 +235,7 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.strictEqual(typeof openCommandCall[1], 'function', 'Command handler should be a function');
     });
 
-    test('should respect viewMode=tab configuration when opening with rifler.open', () => {
+    test('should respect viewMode=tab configuration when opening with rifler.open', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
       const mockGetConfiguration = jest.fn().mockReturnValue({
@@ -247,7 +247,7 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       });
       (vscode.workspace.getConfiguration as jest.Mock) = mockGetConfiguration;
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const openCommandCall = commands.find((call: any) => call[0] === 'rifler.open');
@@ -256,10 +256,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.strictEqual(typeof openCommandCall[1], 'function', 'Command handler should be a function');
     });
 
-    test('should respect viewMode configuration when opening with rifler.openReplace', () => {
+    test('should respect viewMode configuration when opening with rifler.openReplace', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const openReplaceCall = commands.find((call: any) => call[0] === 'rifler.openReplace');
@@ -268,10 +268,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.strictEqual(typeof openReplaceCall[1], 'function', 'Command handler should be a function');
     });
 
-    test('should register rifler.openSidebar command', () => {
+    test('should register rifler.openSidebar command', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const openSidebarCall = commands.find((call: any) => call[0] === 'rifler.openSidebar');
@@ -279,10 +279,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.ok(openSidebarCall, 'rifler.openSidebar command should be registered');
     });
 
-    test('should register rifler.toggleView command', () => {
+    test('should register rifler.toggleView command', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const toggleViewCall = commands.find((call: any) => call[0] === 'rifler.toggleView');
@@ -290,10 +290,10 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.ok(toggleViewCall, 'rifler.toggleView command should be registered');
     });
 
-    test('should toggle behavior based on viewMode', () => {
+    test('should toggle behavior based on viewMode', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      activate(context);
+      await activate(context);
 
       const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
       const openCommandCall = commands.find((call: any) => call[0] === 'rifler.open');

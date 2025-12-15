@@ -1,6 +1,10 @@
 export const Uri = {
   parse: jest.fn((path) => ({ fsPath: path, toString: () => path })),
   file: jest.fn((path) => ({ fsPath: path, toString: () => path })),
+  joinPath: jest.fn((base, ...pathSegments) => ({
+    fsPath: `${base.fsPath}/${pathSegments.join('/')}`,
+    toString: () => `${base.fsPath}/${pathSegments.join('/')}`
+  })),
 };
 
 export const Range = jest.fn((startLine, startChar, endLine, endChar) => ({
@@ -33,6 +37,13 @@ export const workspace = {
   workspaceFolders: [],
   fs: {
     readDirectory: jest.fn().mockResolvedValue([]),
+    readFile: jest.fn().mockResolvedValue(new Uint8Array()),
+    writeFile: jest.fn().mockResolvedValue(undefined),
+    stat: jest.fn().mockResolvedValue({ type: 1, size: 0, ctime: 0, mtime: 0 }),
+    delete: jest.fn().mockResolvedValue(undefined),
+    rename: jest.fn().mockResolvedValue(undefined),
+    copy: jest.fn().mockResolvedValue(undefined),
+    createDirectory: jest.fn().mockResolvedValue(undefined),
   },
 };
 

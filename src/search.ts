@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
 import {
   SearchOptions,
@@ -62,9 +61,10 @@ export async function performSearch(
     const searchPath = (directoryPath || '').trim();
     try {
       if (searchPath) {
-        const stat = await fs.promises.stat(searchPath);
+        const uri = vscode.Uri.file(searchPath);
+        const stat = await vscode.workspace.fs.stat(uri);
         console.log('Directory search path:', searchPath, 'exists: true');
-        if (stat.isDirectory()) {
+        if (stat.type === vscode.FileType.Directory) {
           await searchInDirectory(searchPath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
         } else {
           console.log('Path is a file, searching only in:', searchPath);
@@ -78,7 +78,8 @@ export async function performSearch(
     }
   } else if (scope === 'module' && modulePath) {
     try {
-      await fs.promises.access(modulePath);
+      const uri = vscode.Uri.file(modulePath);
+      await vscode.workspace.fs.stat(uri);
       await searchInDirectory(modulePath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
     } catch {
       // Module path doesn't exist
@@ -110,19 +111,21 @@ async function searchInDirectory(
   perFileTimeBudgetMs: number
 ): Promise<void> {
   try {
-    const entries = await limiter.run(() => fs.promises.readdir(dirPath, { withFileTypes: true }));
+    const uri = vscode.Uri.file(dirPath);
+    const entries = await limiter.run(() => Promise.resolve(vscode.workspace.fs.readDirectory(uri)));
     const tasks: Promise<void>[] = [];
     for (const entry of entries) {
       if (results.length >= maxResults) break;
-      const fullPath = path.join(dirPath, entry.name);
-      if (entry.isDirectory()) {
-        if (!EXCLUDE_DIRS.has(entry.name) && !entry.name.startsWith('.')) {
+      const [entryName, entryType] = entry;
+      const fullPath = path.join(dirPath, entryName);
+      if (entryType === vscode.FileType.Directory) {
+        if (!EXCLUDE_DIRS.has(entryName) && !entryName.startsWith('.')) {
           tasks.push(searchInDirectory(fullPath, regex, fileMask, results, maxResults, limiter, perFileTimeBudgetMs));
         }
-      } else if (entry.isFile()) {
-        const ext = path.extname(entry.name).toLowerCase();
+      } else if (entryType === vscode.FileType.File) {
+        const ext = path.extname(entryName).toLowerCase();
         const isBinary = BINARY_EXTENSIONS.has(ext);
-        const matchesMask = matchesFileMask(entry.name, fileMask);
+        const matchesMask = matchesFileMask(entryName, fileMask);
         if (!isBinary && matchesMask) {
           tasks.push(limiter.run(() => searchInFileAsync(fullPath, regex, results, maxResults, perFileTimeBudgetMs)));
         }
@@ -147,9 +150,11 @@ async function searchInFileAsync(
     if (openDoc) {
       content = openDoc.getText();
     } else {
-      const stats = await fs.promises.stat(filePath);
+      const uri = vscode.Uri.file(filePath);
+      const stats = await vscode.workspace.fs.stat(uri);
       if (stats.size > 1024 * 1024) return; // 1MB limit (aligned with tests)
-      content = await fs.promises.readFile(filePath, 'utf-8');
+      const contentBytes = await vscode.workspace.fs.readFile(uri);
+      content = new TextDecoder('utf-8').decode(contentBytes);
     }
 
     const lines = content.split('\n');

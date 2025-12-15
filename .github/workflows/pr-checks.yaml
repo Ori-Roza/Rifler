@@ -74,3 +74,34 @@ jobs:
       
       - name: Compile TypeScript
         run: npm run compile
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Compile TypeScript
+        run: npm run compile
+      
+      - name: Copy webview assets
+        run: npm run copy-webview
+      
+      - name: Run E2E tests
+        run: xvfb-run -a npm run test:e2e
+        env:
+          # Prevent VS Code from showing dialogs during tests
+          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true

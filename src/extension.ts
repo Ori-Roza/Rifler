@@ -11,138 +11,21 @@ import { replaceOne, replaceAll } from './replacer';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
 import { PanelManager } from './services/PanelManager';
-
-// Message type definitions
-interface MinimizeMessage {
-  type: 'minimize';
-  state: {
-    query: string;
-    replaceText: string;
-    scope: string;
-    directoryPath: string;
-    modulePath: string;
-    filePath: string;
-    options: SearchOptions;
-    showReplace: boolean;
-  };
-}
-
-interface ValidateRegexMessage {
-  type: 'validateRegex';
-  pattern: string;
-  useRegex: boolean;
-}
-
-interface ValidateFileMaskMessage {
-  type: 'validateFileMask';
-  fileMask: string;
-}
-
-interface RunSearchMessage {
-  type: 'runSearch';
-  query: string;
-  scope: SearchScope;
-  options: SearchOptions;
-  directoryPath?: string;
-  modulePath?: string;
-  filePath?: string;
-}
-
-interface OpenLocationMessage {
-  type: 'openLocation';
-  uri: string;
-  line: number;
-  character: number;
-}
-
-interface GetModulesMessage {
-  type: 'getModules';
-}
-
-interface GetCurrentDirectoryMessage {
-  type: 'getCurrentDirectory';
-}
-
-interface GetFileContentMessage {
-  type: 'getFileContent';
-  uri: string;
-  query: string;
-  options: SearchOptions;
-  activeIndex?: number;
-}
-
-interface ReplaceOneMessage {
-  type: 'replaceOne';
-  uri: string;
-  line: number;
-  character: number;
-  length: number;
-  replaceText: string;
-}
-
-interface ReplaceAllMessage {
-  type: 'replaceAll';
-  query: string;
-  replaceText: string;
-  scope: SearchScope;
-  options: SearchOptions;
-  directoryPath?: string;
-  modulePath?: string;
-  filePath?: string;
-}
-
-interface WebviewReadyMessage {
-  type: 'webviewReady';
-}
-
-interface SaveFileMessage {
-  type: 'saveFile';
-  uri: string;
-  content: string;
-}
-
-// Test message types
-interface TestSearchCompletedMessage {
-  type: '__test_searchCompleted';
-  results: SearchResult[];
-}
-
-interface TestSearchResultsReceivedMessage {
-  type: '__test_searchResultsReceived';
-  results: SearchResult[];
-}
-
-interface TestErrorMessage {
-  type: 'error';
-  message: string;
-  source?: string;
-  lineno?: number;
-  colno?: number;
-  error?: unknown;
-}
-
-interface DiagPingMessage {
-  type: '__diag_ping';
-  ts: number;
-}
-
-type WebviewMessage =
-  | RunSearchMessage
-  | OpenLocationMessage
-  | GetModulesMessage
-  | GetCurrentDirectoryMessage
-  | GetFileContentMessage
-  | ReplaceOneMessage
-  | ReplaceAllMessage
-  | WebviewReadyMessage
-  | SaveFileMessage
-  | MinimizeMessage
-  | ValidateRegexMessage
-  | ValidateFileMaskMessage
-  | TestSearchCompletedMessage
-  | TestSearchResultsReceivedMessage
-  | TestErrorMessage
-  | DiagPingMessage;
+import {
+  MinimizeMessage,
+  ValidateRegexMessage,
+  ValidateFileMaskMessage,
+  RunSearchMessage,
+  OpenLocationMessage,
+  GetModulesMessage,
+  GetCurrentDirectoryMessage,
+  GetFileContentMessage,
+  ReplaceOneMessage,
+  ReplaceAllMessage,
+  WebviewReadyMessage,
+  SaveFileMessage,
+  IncomingMessage
+} from './messaging/types';
 
 // Webview HTML assembly
 export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
@@ -678,3 +561,6 @@ export const testHelpers = {
   getPanelManager: () => panelManager,
   getCurrentPanel: () => panelManager?.panel
 };
+
+// Re-export messaging types for backward compatibility with tests
+export type { IncomingMessage, MinimizeMessage, ValidateRegexMessage, ValidateFileMaskMessage };

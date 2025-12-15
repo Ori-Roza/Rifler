@@ -4,6 +4,7 @@ import { SearchScope, SearchOptions, SearchResult, validateRegex, validateFileMa
 import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
 import { getWebviewHtml } from '../extension';
+import { IncomingMessage } from '../messaging/types';
 
 interface SidebarState {
   query?: string;
@@ -15,33 +16,6 @@ interface SidebarState {
   options?: SearchOptions;
   showReplace?: boolean;
   results?: SearchResult[];
-  activeIndex?: number;
-  lastPreview?: {
-    uri: string;
-    content: string;
-    fileName: string;
-    matches: Array<{ line: number; start: number; end: number }>;
-  };
-}
-
-interface SearchMessage {
-  type: string;
-  query?: string;
-  scope?: string;
-  options?: SearchOptions;
-  directoryPath?: string;
-  modulePath?: string;
-  filePath?: string;
-  uri?: string;
-  line?: number;
-  character?: number;
-  length?: number;
-  replaceText?: string;
-  content?: string;
-  state?: SidebarState;
-  pattern?: string;
-  useRegex?: boolean;
-  fileMask?: string;
   activeIndex?: number;
   lastPreview?: {
     uri: string;
@@ -108,7 +82,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _handleMessage(message: SearchMessage): Promise<void> {
+  private async _handleMessage(message: any): Promise<void> {
     // Implement message handling (same as window panel)
     switch (message.type) {
       case 'runSearch':
@@ -180,7 +154,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async _runSearch(message: SearchMessage): Promise<void> {
+  private async _runSearch(message: any): Promise<void> {
     if (!message.query || !message.scope || !message.options) {
       return;
     }
@@ -215,7 +189,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _openLocation(message: SearchMessage): Promise<void> {
+  private async _openLocation(message: any): Promise<void> {
     if (!message.uri || message.line === undefined || message.character === undefined) {
       return;
     }
@@ -233,7 +207,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
   }
 
-  private async _replaceAll(message: SearchMessage): Promise<void> {
+  private async _replaceAll(message: any): Promise<void> {
     if (!message.query || message.replaceText === undefined || !message.scope || !message.options) {
       return;
     }
@@ -397,7 +371,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  public postMessage(message: SearchMessage): void {
+  public postMessage(message: any): void {
     this._view?.webview.postMessage(message);
   }
 }

@@ -1,19 +1,6 @@
 import * as vscode from 'vscode';
 import { SearchOptions } from '../utils';
-
-interface MinimizeMessage {
-  type: 'minimize';
-  state: {
-    query: string;
-    replaceText: string;
-    scope: string;
-    directoryPath: string;
-    modulePath: string;
-    filePath: string;
-    options: SearchOptions;
-    showReplace: boolean;
-  };
-}
+import { MinimizeMessage } from '../messaging/types';
 
 export type GetWebviewHtmlFn = (webview: vscode.Webview, extensionUri: vscode.Uri) => string;
 

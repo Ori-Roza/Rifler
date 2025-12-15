@@ -5,6 +5,8 @@ import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
 import { getWebviewHtml } from '../extension';
 import { IncomingMessage } from '../messaging/types';
+import { MessageHandler } from '../messaging/handler';
+import { registerCommonHandlers } from '../messaging/registerCommonHandlers';
 
 interface SidebarState {
   query?: string;
@@ -36,6 +38,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     initialQuery?: string;
     showReplace?: boolean;
   };
+  private _messageHandler?: MessageHandler;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this._context = context;
@@ -59,11 +62,21 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = getWebviewHtml(webviewView.webview, this.context.extensionUri);
 
+    // Initialize unified message handler before wiring message listener
+    this._messageHandler = new MessageHandler(webviewView);
+    registerCommonHandlers(this._messageHandler, {
+      postMessage: (msg) => this._view?.webview.postMessage(msg),
+      openLocation: (uri, line, character) => this._openLocation({ type: 'openLocation', uri, line, character }),
+      sendModules: () => this._sendModules(),
+      sendCurrentDirectory: () => this._sendCurrentDirectory(),
+      sendFileContent: (uri, query, options, activeIndex) => this._sendFileContent(uri, query, options, activeIndex),
+      saveFile: (uri, content) => this._saveFile(uri, content)
+    });
+
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
       await this._handleMessage(message);
     });
-
     // Restore state when view becomes visible
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
@@ -87,7 +100,28 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _handleMessage(message: any): Promise<void> {
-    // Implement message handling (same as window panel)
+    // Delegate common message types to shared handler first
+    const commonTypes = new Set([
+      'runSearch',
+      'openLocation',
+      'replaceOne',
+      'replaceAll',
+      'getModules',
+      'getCurrentDirectory',
+      'getFileContent',
+      'saveFile',
+      'validateRegex',
+      'validateFileMask',
+      '__diag_ping',
+      '__test_searchCompleted',
+      '__test_searchResultsReceived',
+      'error'
+    ]);
+    if (commonTypes.has(message.type)) {
+      await this._messageHandler?.handle(message);
+      return;
+    }
+
     switch (message.type) {
       case 'webviewReady': {
         // Send pending initialization options when webview is ready
@@ -106,20 +140,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
-      case 'runSearch':
-        await this._runSearch(message);
-        break;
-      case 'openLocation':
-        await this._openLocation(message);
-        break;
-      case 'replaceOne':
-        if (message.uri && message.line !== undefined && message.character !== undefined && message.length !== undefined && message.replaceText) {
-          await replaceOne(message.uri, message.line, message.character, message.length, message.replaceText);
-        }
-        break;
-      case 'replaceAll':
-        await this._replaceAll(message);
-        break;
       case 'requestStateForMinimize':
         // Return state for minimize
         if (this._view) {
@@ -128,18 +148,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
             source: 'sidebar'
           });
         }
-        break;
-      case 'getModules':
-        await this._sendModules();
-        break;
-      case 'getCurrentDirectory':
-        this._sendCurrentDirectory();
-        break;
-      case 'getFileContent':
-        await this._sendFileContent(message.uri, message.query, message.options, message.activeIndex);
-        break;
-      case 'saveFile':
-        await this._saveFile(message.uri, message.content);
         break;
       case 'minimize':
         // Save state before minimize
@@ -151,27 +159,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         // Clear saved state when search is cleared
         await this._context.globalState.update('rifler.sidebarState', undefined);
         break;
-      case 'validateRegex': {
-        const regexValidation = validateRegex(message.pattern || '', message.useRegex || false);
-        this._view?.webview.postMessage({ 
-          type: 'validationResult', 
-          field: 'regex',
-          isValid: regexValidation.isValid,
-          error: regexValidation.error 
-        });
-        break;
-      }
-      case 'validateFileMask': {
-        const maskValidation = validateFileMask(message.fileMask || '');
-        this._view?.webview.postMessage({ 
-          type: 'validationResult', 
-          field: 'fileMask',
-          isValid: maskValidation.isValid,
-          message: maskValidation.message,
-          fallbackToAll: maskValidation.fallbackToAll
-        });
-        break;
-      }
     }
   }
 
@@ -393,18 +380,22 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public postMessage(message: any): void {
-    // Queue initialization messages until webview is ready
+    // If view is ready, forward immediately
+    if (this._view) {
+      this._view.webview.postMessage(message);
+      return;
+    }
+
+    // Otherwise queue initialization messages until webview is ready
     if (message.type === 'setSearchQuery' || message.type === 'showReplace') {
       if (!this._pendingInitOptions) {
         this._pendingInitOptions = {};
       }
       if (message.type === 'setSearchQuery') {
         this._pendingInitOptions.initialQuery = message.query;
-      } else if (message.type === 'showReplace') {
+      } else {
         this._pendingInitOptions.showReplace = true;
       }
-    } else {
-      this._view?.webview.postMessage(message);
     }
   }
 }

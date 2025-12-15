@@ -7,15 +7,27 @@ import { CommandContext } from './index';
 export function openCommand(ctx: CommandContext): void {
   const config = vscode.workspace.getConfiguration('rifler');
   const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+  const selectedText = getSelectedText();
 
   if (viewMode === 'sidebar') {
     if (ctx.getSidebarVisible()) {
-      vscode.commands.executeCommand('workbench.action.closeSidebar');
+      if (selectedText) {
+        // Sidebar is visible: update search with selected text
+        ctx.viewManager.openView({
+          forcedLocation: 'sidebar',
+          initialQuery: selectedText,
+          initialQueryFocus: false
+        });
+      } else {
+        // No selection: toggle (close) the sidebar
+        vscode.commands.executeCommand('workbench.action.closeSidebar');
+      }
     } else {
-      const selectedText = getSelectedText();
+      // Sidebar is closed: open it
       ctx.viewManager.openView({
         forcedLocation: 'sidebar',
-        initialQuery: selectedText
+        initialQuery: selectedText,
+        initialQueryFocus: true
       });
     }
   } else {

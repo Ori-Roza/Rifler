@@ -1036,16 +1036,15 @@
         }
         break;
       case 'setSearchQuery':
-        if (message.query) {
+        if (typeof message.query === 'string') {
           queryInput.value = message.query;
           state.currentQuery = message.query;
-          queryInput.focus();
-          queryInput.select();
+          if (message.focus !== false) {
+            queryInput.focus();
+            queryInput.select();
+          }
           if (message.query.length >= 2) {
-            setTimeout(() => {
-              console.log('Triggering search for:', message.query);
-              runSearch();
-            }, 100);
+            runSearch();
           }
         }
         break;

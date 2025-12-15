@@ -18,6 +18,7 @@ export class ViewManager {
   public async openView(options: {
     showReplace?: boolean;
     initialQuery?: string;
+    initialQueryFocus?: boolean;
     forcedLocation?: PanelLocation;
   } = {}): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
@@ -40,7 +41,7 @@ export class ViewManager {
     }
   }
 
-  private _openSidebar(options: { showReplace?: boolean; initialQuery?: string }): void {
+  private _openSidebar(options: { showReplace?: boolean; initialQuery?: string; initialQueryFocus?: boolean }): void {
     if (this._sidebarProvider) {
       // Reveal the sidebar view container first
       vscode.commands.executeCommand('workbench.view.extension.rifler-sidebar');
@@ -48,11 +49,15 @@ export class ViewManager {
       // Then show the sidebar provider view
       this._sidebarProvider.show();
       
-      if (options.initialQuery) {
+      if (typeof options.initialQuery === 'string') {
         this._sidebarProvider.postMessage({ 
           type: 'setSearchQuery', 
-          query: options.initialQuery 
+          query: options.initialQuery,
+          focus: options.initialQueryFocus !== false
         });
+      } else {
+        // No initial query provided, ensure input receives focus on open
+        this._sidebarProvider.postMessage({ type: 'focusSearch' });
       }
       
       if (options.showReplace) {

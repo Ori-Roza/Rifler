@@ -79,7 +79,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this.context.extensionUri]
     };
 
-    webviewView.webview.html = getWebviewHtml(webviewView.webview);
+    webviewView.webview.html = getWebviewHtml(webviewView.webview, this.context.extensionUri);
 
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {

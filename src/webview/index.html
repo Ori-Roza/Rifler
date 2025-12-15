@@ -1,0 +1,122 @@
+<!-- Rifler Webview Body -->
+<!-- Extracted from extension.ts as part of Phase 1 refactoring (Issue #46) -->
+
+<div class="search-bar-card">
+  <!-- Row 1: Search Field -->
+  <div class="search-field-row">
+    <button class="toggle-replace-btn" id="toggle-replace" title="Toggle Replace (Option+Shift+R)">↕</button>
+    <input type="text" id="query" placeholder="" autofocus />
+    <button class="close-btn" id="close-search" title="Close (Esc)">✕</button>
+  </div>
+  <div id="query-validation-message" class="validation-message"></div>
+
+  <!-- Replace Row (hidden by default) -->
+  <div class="replace-field-row" id="replace-row">
+    <span class="replace-icon">↔</span>
+    <input type="text" id="replace-input" placeholder="Replace" />
+    <div class="replace-actions">
+      <button id="replace-btn" title="Replace (Enter)">Replace</button>
+      <button id="replace-all-btn" class="primary" title="Replace All (Cmd+Enter)">All</button>
+    </div>
+  </div>
+
+  <!-- Row 2: Options Row -->
+  <div class="options-row">
+    <div class="toggle-group">
+      <button type="button" class="option-toggle" id="match-case" title="Match Case (Alt+C)">Aa</button>
+      <button type="button" class="option-toggle" id="whole-word" title="Match Whole Word (Alt+W)">W</button>
+      <button type="button" class="option-toggle" id="use-regex" title="Use Regular Expression (Alt+R)">.*</button>
+    </div>
+    <div class="file-mask-control">
+      <button type="button" class="file-mask-btn" id="file-mask-btn">
+        <span id="file-mask-label">File mask</span>
+        <span class="file-mask-arrow">▼</span>
+      </button>
+      <div class="file-mask-dropdown" id="file-mask-dropdown">
+        <label for="file-mask">Filter by file pattern:</label>
+        <input type="text" id="file-mask" placeholder="*.ts, *.js, *.py" />
+      </div>
+    </div>
+  </div>
+  <div id="file-mask-validation-message" class="validation-message"></div>
+
+  <!-- Row 3: Scope Selector -->
+  <div class="scope-row">
+    <div class="scope-tabs">
+      <button class="scope-tab active" data-scope="project">Project</button>
+      <button class="scope-tab" data-scope="module">Module</button>
+      <button class="scope-tab" data-scope="directory">Dir</button>
+      <button class="scope-tab" data-scope="file" id="scope-file" style="display: none;">File</button>
+    </div>
+  </div>
+  <div class="scope-input" id="directory-input-wrapper">
+    <input type="text" id="directory-input" placeholder="Directory path..." />
+  </div>
+  <div class="scope-input" id="module-input-wrapper">
+    <select id="module-select">
+      <option value="">Select module...</option>
+    </select>
+  </div>
+  <div class="scope-input" id="file-input-wrapper">
+    <input type="text" id="file-input" placeholder="File path..." readonly />
+  </div>
+</div>
+
+<div class="main-content">
+  <div class="results-panel" id="results-panel">
+    <div class="results-header">
+      <span>Results</span>
+      <span id="results-count"></span>
+    </div>
+    <div class="results-list" id="results-list">
+      <div class="empty-state">Type to search...</div>
+    </div>
+  </div>
+
+  <div class="panel-resizer" id="panel-resizer"></div>
+
+  <div class="preview-panel" id="preview-panel">
+    <div class="preview-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span>Preview</span>
+        <span class="preview-filename" id="preview-filename"></span>
+      </div>
+      <div class="preview-actions" id="preview-actions" style="display: none;">
+        <button id="replace-in-file-btn" title="Replace in this file (Cmd+Shift+R)">Replace in File</button>
+      </div>
+    </div>
+    <div class="preview-body">
+      <div class="preview-content" id="preview-content">
+        <div class="empty-state">Select a result to preview file</div>
+      </div>
+      
+      <div class="editor-container" id="editor-container">
+        <div class="editor-wrapper">
+          <div class="editor-line-numbers" id="editor-line-numbers"></div>
+          <div class="editor-content-wrapper">
+            <div id="editor-backdrop"></div>
+            <textarea id="file-editor" spellcheck="false"></textarea>
+          </div>
+        </div>
+        <div id="replace-widget" class="replace-widget">
+          <div class="replace-widget-row">
+            <span class="replace-widget-label">Find:</span>
+            <input type="text" id="local-search-input" placeholder="Search term...">
+            <button id="local-prev-btn" class="nav-btn" title="Previous match (Shift+Enter)">▲</button>
+            <button id="local-next-btn" class="nav-btn" title="Next match (Enter)">▼</button>
+            <span class="replace-match-count" id="local-match-count"></span>
+          </div>
+          <div class="replace-widget-row">
+            <span class="replace-widget-label">Replace:</span>
+            <input type="text" id="local-replace-input" placeholder="Replace with...">
+          </div>
+          <div class="replace-widget-actions">
+            <button id="local-replace-btn" title="Replace next (Enter)">Replace</button>
+            <button id="local-replace-all-btn" class="primary" title="Replace All (Cmd+Enter)">Replace All</button>
+            <button id="local-replace-close" title="Close (Esc)">✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

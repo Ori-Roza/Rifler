@@ -32,6 +32,10 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   private _context: vscode.ExtensionContext;
   activeIndex?: number;
   private _onVisibilityChanged?: (visible: boolean) => void;
+  private _pendingInitOptions?: {
+    initialQuery?: string;
+    showReplace?: boolean;
+  };
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this._context = context;
@@ -85,6 +89,23 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   private async _handleMessage(message: any): Promise<void> {
     // Implement message handling (same as window panel)
     switch (message.type) {
+      case 'webviewReady': {
+        // Send pending initialization options when webview is ready
+        if (this._pendingInitOptions) {
+          const { initialQuery, showReplace } = this._pendingInitOptions;
+          if (showReplace) {
+            this._view?.webview.postMessage({ type: 'showReplace' });
+          }
+          if (initialQuery) {
+            this._view?.webview.postMessage({
+              type: 'setSearchQuery',
+              query: initialQuery
+            });
+          }
+          this._pendingInitOptions = undefined;
+        }
+        break;
+      }
       case 'runSearch':
         await this._runSearch(message);
         break;
@@ -151,14 +172,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         });
         break;
       }
-      case 'setSearchQuery':
-      case 'showReplace':
-      case 'focusSearch':
-        // Forward initialization messages to webview
-        if (this._view) {
-          this._view.webview.postMessage(message);
-        }
-        break;
     }
   }
 
@@ -380,6 +393,18 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public postMessage(message: any): void {
-    this._view?.webview.postMessage(message);
+    // Queue initialization messages until webview is ready
+    if (message.type === 'setSearchQuery' || message.type === 'showReplace') {
+      if (!this._pendingInitOptions) {
+        this._pendingInitOptions = {};
+      }
+      if (message.type === 'setSearchQuery') {
+        this._pendingInitOptions.initialQuery = message.query;
+      } else if (message.type === 'showReplace') {
+        this._pendingInitOptions.showReplace = true;
+      }
+    } else {
+      this._view?.webview.postMessage(message);
+    }
   }
 }

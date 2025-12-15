@@ -11,6 +11,7 @@ import { replaceOne, replaceAll } from './replacer';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
 import { PanelManager } from './services/PanelManager';
+import { registerCommands, CommandContext } from './commands';
 import {
   MinimizeMessage,
   ValidateRegexMessage,
@@ -66,17 +67,6 @@ function getNonce(): string {
 }
 
 // Helper functions
-function getSelectedText(): string | undefined {
-  const editor = vscode.window.activeTextEditor;
-  if (editor) {
-    const selection = editor.selection;
-    if (!selection.isEmpty) {
-      return editor.document.getText(selection);
-    }
-  }
-  return undefined;
-}
-
 async function findWorkspaceModules(): Promise<{ name: string; path: string }[]> {
   const modules: { name: string; path: string }[] = [];
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -401,98 +391,17 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('Received webview diag ping');
   });
 
-  // Register commands
-  const openCommand = vscode.commands.registerCommand('rifler.open', () => {
-    const config = vscode.workspace.getConfiguration('rifler');
-    const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
-
-    if (viewMode === 'sidebar') {
-      if (sidebarVisible) {
-        vscode.commands.executeCommand('workbench.action.closeSidebar');
-      } else {
-        const selectedText = getSelectedText();
-        viewManager.openView({
-          forcedLocation: 'sidebar',
-          initialQuery: selectedText
-        });
-      }
-    } else {
-      if (panelManager.panel) {
-        panelManager.panel.dispose();
-      } else if (panelManager.minimized) {
-        panelManager.restore();
-      } else {
-        const selectedText = getSelectedText();
-        panelManager.createOrShowPanel({ initialQuery: selectedText });
-      }
+  // Register all commands
+  registerCommands({
+    extensionContext: context,
+    panelManager,
+    viewManager,
+    sidebarProvider,
+    sidebarVisible,
+    onSidebarVisibilityChange: (callback) => {
+      sidebarProvider.setVisibilityCallback(callback);
     }
-  });
-
-  const openReplaceCommand = vscode.commands.registerCommand('rifler.openReplace', () => {
-    const config = vscode.workspace.getConfiguration('rifler');
-    const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
-    const selectedText = getSelectedText();
-
-    if (viewMode === 'sidebar') {
-      viewManager.openView({
-        forcedLocation: 'sidebar',
-        showReplace: true,
-        initialQuery: selectedText
-      });
-    } else {
-      panelManager.createOrShowPanel({
-        showReplace: true,
-        initialQuery: selectedText
-      });
-    }
-  });
-
-  const openSidebarCommand = vscode.commands.registerCommand('rifler.openSidebar', () => {
-    const selectedText = getSelectedText();
-    viewManager.openView({
-      forcedLocation: 'sidebar',
-      initialQuery: selectedText
-    });
-  });
-
-  const openSidebarReplaceCommand = vscode.commands.registerCommand(
-    'rifler.openSidebarReplace',
-    () => {
-      const selectedText = getSelectedText();
-      viewManager.openView({
-        forcedLocation: 'sidebar',
-        showReplace: true,
-        initialQuery: selectedText
-      });
-    }
-  );
-
-  const toggleViewCommand = vscode.commands.registerCommand('rifler.toggleView', () =>
-    viewManager.switchView()
-  );
-
-  const toggleReplaceCommand = vscode.commands.registerCommand(
-    'rifler.toggleReplace',
-    () => {
-      if (panelManager.panel) {
-        panelManager.panel.webview.postMessage({ type: 'toggleReplace' });
-        return;
-      }
-      if (sidebarVisible) {
-        sidebarProvider.postMessage({ type: 'toggleReplace' });
-      }
-    }
-  );
-
-  const restoreCommand = vscode.commands.registerCommand('rifler.restore', () => {
-    panelManager.restore();
-  });
-
-  const minimizeCommand = vscode.commands.registerCommand('rifler.minimize', () => {
-    if (panelManager.panel) {
-      panelManager.panel.webview.postMessage({ type: 'requestStateForMinimize' });
-    }
-  });
+  } as CommandContext);
 
   // Status bar toggle
   const replaceToggleStatusBar = vscode.window.createStatusBarItem(
@@ -504,50 +413,6 @@ export function activate(context: vscode.ExtensionContext) {
   replaceToggleStatusBar.command = 'rifler.toggleReplace';
   context.subscriptions.push(replaceToggleStatusBar);
   replaceToggleStatusBar.show();
-
-  // Test-only command
-  const testEnsureOpenCommand = vscode.commands.registerCommand(
-    '__test_ensurePanelOpen',
-    () => {
-      if (!panelManager.panel) {
-        panelManager.createOrShowPanel();
-      }
-    }
-  );
-
-  // Internal commands for ViewManager
-  const openWindowInternalCommand = vscode.commands.registerCommand(
-    'rifler._openWindowInternal',
-    (options?: { initialQuery?: string; showReplace?: boolean }) => {
-      panelManager.createOrShowPanel({
-        showReplace: options?.showReplace ?? false,
-        initialQuery: options?.initialQuery
-      });
-    }
-  );
-
-  const closeWindowInternalCommand = vscode.commands.registerCommand(
-    'rifler._closeWindowInternal',
-    () => {
-      if (panelManager.panel) {
-        panelManager.panel.dispose();
-      }
-    }
-  );
-
-  context.subscriptions.push(
-    openCommand,
-    openReplaceCommand,
-    openSidebarCommand,
-    openSidebarReplaceCommand,
-    toggleViewCommand,
-    toggleReplaceCommand,
-    restoreCommand,
-    minimizeCommand,
-    testEnsureOpenCommand,
-    openWindowInternalCommand,
-    closeWindowInternalCommand
-  );
 }
 
 export function deactivate() {

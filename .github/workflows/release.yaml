@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0)'
+        required: false
+
+jobs:
+  validate:
+    name: Validate & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test -- --coverage
+
+      - name: Compile
+        run: npm run compile
+
+  package:
+    name: Package Extension
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      vsix-path: ${{ steps.package.outputs.vsix-path }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare for publication
+        run: npm run vscode:prepublish
+
+      - name: Package extension
+        id: package
+        run: |
+          npm run package
+          VSIX_FILE=$(ls *.vsix | head -1)
+          echo "vsix-path=$VSIX_FILE" >> $GITHUB_OUTPUT
+          echo "Extension packaged: $VSIX_FILE"
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rifler-vsix
+          path: '*.vsix'
+          retention-days: 30
+
+  publish:
+    name: Publish to Marketplace
+    needs: package
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare for publication
+        run: npm run vscode:prepublish
+
+      - name: Publish to Marketplace
+        run: |
+          npx vsce publish -p ${{ secrets.VSCE_PAT }}
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: rifler-vsix
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: '*.vsix'
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -273,6 +273,57 @@ When adding features, update:
 3. JSDoc for public functions
 4. This CONTRIBUTING.md if adding new processes
 
+## Release Process
+
+Rifler uses **automated CI/CD** for releases with GitHub Actions and standard-version.
+
+### For Maintainers: Creating a Release
+
+1. **Create conventional commits** as you make changes:
+   - `feat: add new feature` → minor version bump
+   - `fix: resolve bug` → patch version bump
+   - `BREAKING CHANGE:` → major version bump
+
+2. **Generate release version and changelog**:
+   ```bash
+   npm run release
+   # or for specific version:
+   npm run release:major
+   npm run release:minor
+   npm run release:patch
+   ```
+
+3. **Review generated CHANGELOG.md** and commit messages
+
+4. **Push the release commit and tag**:
+   ```bash
+   git push origin master --follow-tags
+   ```
+
+5. **GitHub Actions automatically**:
+   - ✅ Runs all tests and linting
+   - ✅ Builds and packages the extension (VSIX)
+   - ✅ Publishes to VS Code Marketplace (requires VSCODE_MARKETPLACE_TOKEN secret)
+   - ✅ Creates a GitHub release with CHANGELOG notes and VSIX artifact
+
+### Prerequisites for Releases
+
+**VS Code Marketplace Publisher Token**: Required to publish to the Marketplace.
+
+1. Go to [VS Code Marketplace Publisher Dashboard](https://marketplace.visualstudio.com/manage/publishers)
+2. Create a Personal Access Token (PAT) with `Marketplace > Manage` scope
+3. Add it to GitHub Secrets:
+   - Repository → Settings → Secrets and variables → Actions
+   - Create secret: `VSCE_PAT` = `<your-pat>`
+
+### Manual Release Workaround
+
+If needed, manually publish without CI:
+```bash
+npm run vscode:prepublish
+vsce publish -p $VSCODE_MARKETPLACE_TOKEN
+```
+
 ## Questions?
 
 - Open an issue for bug reports

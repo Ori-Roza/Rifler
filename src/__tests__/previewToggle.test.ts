@@ -99,17 +99,14 @@ describe('Preview Toggle Feature', () => {
     test('should not update last expanded height when dragging to minimum', () => {
       const oldLastExpanded = 250;
       const newHeight = PREVIEW_MIN_HEIGHT;
-      let lastExpanded = oldLastExpanded;
-      if (newHeight > PREVIEW_MIN_HEIGHT) {
-        lastExpanded = newHeight;
-      }
+      const lastExpanded = oldLastExpanded;
       assert.strictEqual(lastExpanded, 250); // unchanged
     });
 
     test('should not overwrite last expanded height when collapsing via button', () => {
       const oldLastExpanded = 220;
       const newHeight = PREVIEW_MIN_HEIGHT;
-      let lastExpanded = oldLastExpanded;
+      const lastExpanded = oldLastExpanded;
       // When collapsing via button, we don't update lastExpanded
       // (it remains the old value)
       assert.strictEqual(lastExpanded, 220);
@@ -247,7 +244,7 @@ describe('Preview Toggle Feature', () => {
 
       // Collapse again
       mockState.previewHeight = result.newHeight;
-      let result2 = togglePreviewSize(
+      const result2 = togglePreviewSize(
         mockState.previewHeight,
         result.newLastExpanded,
         false

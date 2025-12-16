@@ -89,8 +89,8 @@ suite('Preview Toggle E2E Tests', () => {
 suite('Preview Toggle Integration Tests', () => {
   test('should preserve last expanded height during search results update', async () => {
     // Simulate: user resizes preview to 250px, then runs new search
-    let previewHeight = 250;
-    let lastExpandedHeight = 250;
+    const previewHeight = 250;
+    const lastExpandedHeight = 250;
 
     // Search results update (should not change heights)
     // In real code: handleSearchResults() is called
@@ -102,7 +102,7 @@ suite('Preview Toggle Integration Tests', () => {
   test('should handle collapse after drag resize', async () => {
     // Simulate: user drags preview to 300px, then clicks collapse button
     let previewHeight = 300;
-    let lastExpandedHeight = 300;
+    const lastExpandedHeight = 300;
     const PREVIEW_MIN_HEIGHT = 80;
 
     // User clicks collapse
@@ -115,7 +115,7 @@ suite('Preview Toggle Integration Tests', () => {
   test('should handle expand after drag to minimum', async () => {
     // Simulate: user drags preview to minimum, then clicks expand
     let previewHeight = 80;
-    let lastExpandedHeight = 240;
+    const lastExpandedHeight = 240;
     const PREVIEW_MIN_HEIGHT = 80;
     const DEFAULT_PREVIEW_HEIGHT = 240;
 

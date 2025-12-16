@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { RiflerSidebarProvider } from '../sidebar/SidebarProvider';
 import { StateStore } from '../state/StateStore';
+import { MinimizeMessage } from '../messaging/types';
 
 export type PanelLocation = 'sidebar' | 'window';
 
@@ -112,9 +113,9 @@ export class ViewManager {
     
     // Get the saved state from the current view
     // Sidebar uses 'rifler.sidebarState', window uses StateStore ('rifler.persistedSearchState')
-    let savedState: unknown;
+    let savedState: MinimizeMessage['state'] | undefined;
     if (currentLocation === 'sidebar') {
-      savedState = store.get('rifler.sidebarState');
+      savedState = store.get<MinimizeMessage['state']>('rifler.sidebarState');
     } else if (this._stateStore) {
       savedState = this._stateStore.getSavedState();
     }
@@ -140,7 +141,7 @@ export class ViewManager {
         await store.update('rifler.sidebarState', savedState);
       } else if (this._stateStore) {
         // Save to StateStore for window panel
-        this._stateStore.setSavedState(savedState as any);
+        this._stateStore.setSavedState(savedState);
       }
     }
     

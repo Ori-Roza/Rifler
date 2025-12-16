@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
@@ -144,7 +144,11 @@
         },
         "rifler.persistenceScope": {
           "type": "string",
-          "enum": ["workspace", "global", "off"],
+          "enum": [
+            "workspace",
+            "global",
+            "off"
+          ],
           "enumDescriptions": [
             "Persist state per workspace - cleared when switching workspaces (recommended)",
             "Persist state globally across all workspaces",
@@ -156,7 +160,10 @@
         },
         "rifler.panelLocation": {
           "type": "string",
-          "enum": ["sidebar", "window"],
+          "enum": [
+            "sidebar",
+            "window"
+          ],
           "enumDescriptions": [
             "Open as a sidebar panel in the Activity Bar",
             "Open as a full editor tab beside your files"
@@ -167,7 +174,10 @@
         },
         "rifler.viewMode": {
           "type": "string",
-          "enum": ["sidebar", "tab"],
+          "enum": [
+            "sidebar",
+            "tab"
+          ],
           "enumDescriptions": [
             "Open as a sidebar panel",
             "Open as a full editor tab"

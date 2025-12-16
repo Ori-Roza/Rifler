@@ -94,6 +94,7 @@
 
   const resultsPanel = document.getElementById('results-panel');
   const panelResizer = document.getElementById('panel-resizer');
+  const previewToggleBtn = document.getElementById('preview-toggle-btn');
   const previewPanel = document.getElementById('preview-panel');
   const mainContent = document.querySelector('.main-content');
 
@@ -175,9 +176,20 @@
   var localMatchIndex = 0;
   var searchBoxFocusedOnStartup = false;
 
+  // Wait for DOM to be fully ready before showing content
   requestAnimationFrame(() => {
-    queryInput.focus();
-    searchBoxFocusedOnStartup = true;
+    requestAnimationFrame(() => {
+      // Hide loading spinner
+      const loadingOverlay = document.getElementById('loading-overlay');
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('hidden');
+      }
+      
+      // Fade in content
+      document.body.classList.add('loaded');
+      queryInput.focus();
+      searchBoxFocusedOnStartup = true;
+    });
   });
 
   vscode.postMessage({ type: 'webviewReady' });
@@ -901,19 +913,101 @@
 
   let isResizing = false;
   let startY = 0;
-  let startHeight = 0;
+  let startResultsHeight = 0;
+  let containerHeightAtDragStart = 0;
   const MIN_PANEL_HEIGHT = 80;
-  const RESIZER_HEIGHT = 4;
+  const PREVIEW_MIN_HEIGHT = 80;
+  const DEFAULT_PREVIEW_HEIGHT = 240;
+  let previewHeight = 0;
+  let lastExpandedHeight = 0;
+  const RESIZER_HEIGHT = 22;
 
-  const savedWebviewState = vscode.getState();
-  if (savedWebviewState && savedWebviewState.resultsPanelHeight) {
-    resultsPanel.style.height = savedWebviewState.resultsPanelHeight + 'px';
+  const savedWebviewState = vscode.getState() || {};
+
+  function getContainerHeight() {
+    return Math.max(0, mainContent.offsetHeight - RESIZER_HEIGHT);
   }
 
+  function getDefaultPreviewHeight() {
+    const containerHeight = getContainerHeight();
+    if (containerHeight <= 0) return DEFAULT_PREVIEW_HEIGHT;
+    const proposed = Math.round(containerHeight * 0.55);
+    const maxPreview = Math.max(PREVIEW_MIN_HEIGHT, containerHeight - MIN_PANEL_HEIGHT);
+    return Math.min(Math.max(PREVIEW_MIN_HEIGHT, proposed), maxPreview);
+  }
+
+  function applyPreviewHeight(height, { updateLastExpanded = true, persist = false } = {}) {
+    const containerHeight = getContainerHeight();
+    const maxPreviewHeight = Math.max(PREVIEW_MIN_HEIGHT, containerHeight - MIN_PANEL_HEIGHT);
+    const clamped = Math.min(Math.max(PREVIEW_MIN_HEIGHT, height), maxPreviewHeight);
+    const newResultsHeight = containerHeight - clamped;
+    
+    resultsPanel.style.height = newResultsHeight + 'px';
+    previewPanel.style.height = clamped + 'px';
+    previewHeight = clamped;
+    
+    if (updateLastExpanded && clamped > PREVIEW_MIN_HEIGHT) {
+      lastExpandedHeight = clamped;
+    }
+    
+    if (persist) {
+      const currentState = vscode.getState() || {};
+      vscode.setState({
+        ...currentState,
+        previewHeight: previewHeight,
+        lastExpandedHeight: lastExpandedHeight,
+        resultsPanelHeight: newResultsHeight
+      });
+    }
+
+    updatePreviewToggleButton();
+  }
+
+  function isPreviewCollapsed() {
+    return previewHeight <= PREVIEW_MIN_HEIGHT + 0.5;
+  }
+
+  function updatePreviewToggleButton() {
+    if (!previewToggleBtn) return;
+    const collapsed = isPreviewCollapsed();
+    previewToggleBtn.textContent = collapsed ? '+' : '-';
+    previewToggleBtn.setAttribute('aria-label', collapsed ? 'Expand preview' : 'Collapse preview');
+    previewToggleBtn.title = collapsed ? 'Expand preview' : 'Collapse preview';
+  }
+
+  function initializePanelHeights() {
+    let initialPreviewHeight = getDefaultPreviewHeight();
+    
+    if (typeof savedWebviewState.previewHeight === 'number') {
+      initialPreviewHeight = savedWebviewState.previewHeight;
+    } else if (typeof savedWebviewState.resultsPanelHeight === 'number') {
+      const containerHeight = getContainerHeight();
+      initialPreviewHeight = Math.max(PREVIEW_MIN_HEIGHT, containerHeight - savedWebviewState.resultsPanelHeight);
+    }
+
+    if (typeof savedWebviewState.lastExpandedHeight === 'number') {
+      lastExpandedHeight = savedWebviewState.lastExpandedHeight;
+    }
+
+    if (!lastExpandedHeight) {
+      lastExpandedHeight = initialPreviewHeight > PREVIEW_MIN_HEIGHT ? initialPreviewHeight : getDefaultPreviewHeight();
+    }
+    
+    applyPreviewHeight(initialPreviewHeight, { updateLastExpanded: initialPreviewHeight > PREVIEW_MIN_HEIGHT, persist: false });
+  }
+
+  requestAnimationFrame(() => {
+    initializePanelHeights();
+  });
+
   panelResizer.addEventListener('mousedown', (e) => {
+    if (previewToggleBtn && (e.target === previewToggleBtn || (e.target && e.target.closest('.panel-resizer-buttons')))) {
+      return;
+    }
     isResizing = true;
     startY = e.clientY;
-    startHeight = resultsPanel.offsetHeight;
+    startResultsHeight = resultsPanel.offsetHeight;
+    containerHeightAtDragStart = getContainerHeight();
     panelResizer.classList.add('dragging');
     document.body.style.cursor = 'ns-resize';
     document.body.style.userSelect = 'none';
@@ -923,14 +1017,15 @@
   document.addEventListener('mousemove', (e) => {
     if (!isResizing) return;
     
-    const containerHeight = mainContent.offsetHeight - RESIZER_HEIGHT;
+    const containerHeight = containerHeightAtDragStart || getContainerHeight();
     const deltaY = e.clientY - startY;
-    let newHeight = startHeight + deltaY;
+    let newResultsHeight = startResultsHeight + deltaY;
+
+    const maxResultsHeight = containerHeight - PREVIEW_MIN_HEIGHT;
+    newResultsHeight = Math.max(MIN_PANEL_HEIGHT, Math.min(maxResultsHeight, newResultsHeight));
     
-    newHeight = Math.max(MIN_PANEL_HEIGHT, newHeight);
-    newHeight = Math.min(containerHeight - MIN_PANEL_HEIGHT, newHeight);
-    
-    resultsPanel.style.height = newHeight + 'px';
+    const newPreviewHeight = containerHeight - newResultsHeight;
+    applyPreviewHeight(newPreviewHeight, { updateLastExpanded: newPreviewHeight > PREVIEW_MIN_HEIGHT, persist: false });
   });
 
   document.addEventListener('mouseup', () => {
@@ -940,12 +1035,34 @@
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     
-    const currentState = vscode.getState() || {};
-    vscode.setState({
-      ...currentState,
-      resultsPanelHeight: resultsPanel.offsetHeight
-    });
+    applyPreviewHeight(previewHeight, { updateLastExpanded: previewHeight > PREVIEW_MIN_HEIGHT, persist: true });
     
+    scheduleVirtualRender();
+  });
+
+  if (previewToggleBtn) {
+    previewToggleBtn.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+    });
+    previewToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (isPreviewCollapsed()) {
+        if (!lastExpandedHeight || lastExpandedHeight <= PREVIEW_MIN_HEIGHT) {
+          lastExpandedHeight = getDefaultPreviewHeight();
+        }
+        applyPreviewHeight(Math.max(PREVIEW_MIN_HEIGHT, lastExpandedHeight), { updateLastExpanded: false, persist: true });
+      } else {
+        applyPreviewHeight(PREVIEW_MIN_HEIGHT, { updateLastExpanded: false, persist: true });
+      }
+      scheduleVirtualRender();
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    if (!previewHeight) return;
+    applyPreviewHeight(previewHeight, { updateLastExpanded: false, persist: false });
     scheduleVirtualRender();
   });
 
@@ -1152,7 +1269,10 @@
             modulePath: moduleSelect.value,
             filePath: fileInput.value,
             options: state.options,
-            showReplace: replaceRow.classList.contains('visible')
+            showReplace: replaceRow.classList.contains('visible'),
+            results: state.results,
+            activeIndex: state.activeIndex,
+            lastPreview: state.lastPreview
           }
         });
         break;

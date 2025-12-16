@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "0.1.8",
+  "version": "1.0.9",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
@@ -138,25 +138,32 @@
       "properties": {
         "rifler.persistSearchState": {
           "type": "boolean",
-          "default": false,
-          "markdownDescription": "Persist search state across sessions. Turn off to avoid restoring previous searches.",
+          "default": true,
+          "markdownDescription": "Persist search state within the current session. State is automatically cleared when switching workspaces. Turn off to avoid restoring previous searches.",
           "order": 0
         },
         "rifler.persistenceScope": {
           "type": "string",
-          "enum": ["workspace", "global", "off"],
+          "enum": [
+            "workspace",
+            "global",
+            "off"
+          ],
           "enumDescriptions": [
-            "Persist state per workspace (recommended)",
+            "Persist state per workspace - cleared when switching workspaces (recommended)",
             "Persist state globally across all workspaces",
             "Do not persist state"
           ],
-          "default": "off",
-          "markdownDescription": "Controls where Rifler persists UI/search state: per workspace, globally, or disabled.",
+          "default": "workspace",
+          "markdownDescription": "Controls where Rifler persists UI/search state: per workspace (cleared when switching workspaces), globally, or disabled.",
           "order": 0
         },
         "rifler.panelLocation": {
           "type": "string",
-          "enum": ["sidebar", "window"],
+          "enum": [
+            "sidebar",
+            "window"
+          ],
           "enumDescriptions": [
             "Open as a sidebar panel in the Activity Bar",
             "Open as a full editor tab beside your files"
@@ -167,7 +174,10 @@
         },
         "rifler.viewMode": {
           "type": "string",
-          "enum": ["sidebar", "tab"],
+          "enum": [
+            "sidebar",
+            "tab"
+          ],
           "enumDescriptions": [
             "Open as a sidebar panel",
             "Open as a full editor tab"
@@ -213,8 +223,8 @@
     "test:e2e:slow": "E2E_SLOW_MODE=true vscode-test --label e2e-tests-visible",
     "test:e2e:coverage": "node scripts/analyze-e2e-coverage.js",
     "test:combined-coverage": "npm run test:coverage && echo '\\n=== UNIT TEST COVERAGE ABOVE ===\\n' && npm run test:e2e && echo '\\n=== E2E TESTS PASSED ===\\n'",
-    "package": "vsce package",
-    "build:package": "npm run vscode:prepublish && vsce package",
+    "package": "npx vsce package",
+    "build:package": "npm run vscode:prepublish && npx vsce package",
     "release": "standard-version",
     "release:minor": "standard-version --release-as minor",
     "release:major": "standard-version --release-as major",
@@ -234,7 +244,8 @@
     "mocha": "^11.7.5",
     "standard-version": "^9.5.0",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vsce": "^2.15.0"
   },
   "dependencies": {
     "highlight.js": "^11.11.1"

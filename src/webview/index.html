@@ -1,6 +1,10 @@
 <!-- Rifler Webview Body -->
 <!-- Extracted from extension.ts as part of Phase 1 refactoring (Issue #46) -->
 
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+</div>
+
 <div class="search-bar-card">
   <!-- Row 1: Search Field -->
   <div class="search-field-row">
@@ -73,7 +77,13 @@
     </div>
   </div>
 
-  <div class="panel-resizer" id="panel-resizer"></div>
+  <div class="panel-resizer" id="panel-resizer">
+    <div class="panel-resizer-control" id="panel-resizer-control">
+      <div class="panel-resizer-buttons">
+        <button type="button" id="preview-toggle-btn" aria-label="Toggle preview size">-</button>
+      </div>
+    </div>
+  </div>
 
   <div class="preview-panel" id="preview-panel">
     <div class="preview-header">

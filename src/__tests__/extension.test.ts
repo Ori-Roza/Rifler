@@ -40,7 +40,7 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
   });
 
   describe('Persistent State Storage', () => {
-    test('should not load persisted state when persistence is disabled by default', async () => {
+    test('should not load persisted state when persistence is explicitly disabled', async () => {
       const mockState = {
         query: 'test',
         replaceText: 'replacement',
@@ -59,7 +59,7 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
 
       (context.globalState.get as jest.Mock).mockReturnValue(mockState);
 
-      // Mock getConfiguration to return default values (persistence off)
+      // Mock getConfiguration to return persistence disabled values
       const mockGetConfiguration = jest.fn().mockReturnValue({
         get: jest.fn((key: string, defaultValue?: any) => {
           if (key === 'persistSearchState') return false;
@@ -74,7 +74,7 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       // Wait for async operations to complete
       await new Promise(resolve => setImmediate(resolve));
 
-      // With persistence off by default, state stores should be cleared
+      // With persistence explicitly off, state stores should be cleared
       expect(context.workspaceState.update).toHaveBeenCalledWith('rifler.sidebarState', undefined);
       expect(context.workspaceState.update).toHaveBeenCalledWith('rifler.persistedSearchState', undefined);
     });
@@ -164,11 +164,11 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
   });
 
   describe('Storage key constants', () => {
-    test('should clear persisted state when persistence is disabled', async () => {
-      // Verify state is cleared when persistence is off (default)
+    test('should clear persisted state when persistence is explicitly disabled', async () => {
+      // Verify state is cleared when persistence is explicitly off
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 
-      // Mock getConfiguration to return default values (persistence off)
+      // Mock getConfiguration to return persistence disabled values
       const mockGetConfiguration = jest.fn().mockReturnValue({
         get: jest.fn((key: string, defaultValue?: any) => {
           if (key === 'persistSearchState') return false;
@@ -183,7 +183,7 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       // Wait for async operations to complete
       await new Promise(resolve => setImmediate(resolve));
 
-      // With default settings (persistence off), both stores should be cleared
+      // With persistence explicitly off, both stores should be cleared
       expect(context.workspaceState.update).toHaveBeenCalledWith('rifler.sidebarState', undefined);
       expect(context.globalState.update).toHaveBeenCalledWith('rifler.sidebarState', undefined);
     });

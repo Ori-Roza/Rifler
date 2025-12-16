@@ -175,9 +175,20 @@
   var localMatchIndex = 0;
   var searchBoxFocusedOnStartup = false;
 
+  // Wait for DOM to be fully ready before showing content
   requestAnimationFrame(() => {
-    queryInput.focus();
-    searchBoxFocusedOnStartup = true;
+    requestAnimationFrame(() => {
+      // Hide loading spinner
+      const loadingOverlay = document.getElementById('loading-overlay');
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('hidden');
+      }
+      
+      // Fade in content
+      document.body.classList.add('loaded');
+      queryInput.focus();
+      searchBoxFocusedOnStartup = true;
+    });
   });
 
   vscode.postMessage({ type: 'webviewReady' });
@@ -1152,7 +1163,10 @@
             modulePath: moduleSelect.value,
             filePath: fileInput.value,
             options: state.options,
-            showReplace: replaceRow.classList.contains('visible')
+            showReplace: replaceRow.classList.contains('visible'),
+            results: state.results,
+            activeIndex: state.activeIndex,
+            lastPreview: state.lastPreview
           }
         });
         break;

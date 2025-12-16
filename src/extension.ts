@@ -248,6 +248,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Initialize ViewManager
   viewManager = new ViewManager(context);
+  viewManager.setStateStore(stateStore);
 
   // Register sidebar provider
   const sidebarProvider = new RiflerSidebarProvider(context);
@@ -310,8 +311,8 @@ export async function activate(context: vscode.ExtensionContext) {
   // If persistence is disabled, clear any prior leftover state on activation
   {
     const cfg = vscode.workspace.getConfiguration('rifler');
-    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'off');
-    const persist = cfg.get<boolean>('persistSearchState', false) && scope !== 'off';
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
     if (!persist) {
       context.workspaceState.update('rifler.sidebarState', undefined);
       context.workspaceState.update('rifler.persistedSearchState', undefined);

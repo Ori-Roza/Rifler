@@ -39,6 +39,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     showReplace?: boolean;
   };
   private _messageHandler?: MessageHandler;
+  private _stateSaveResolver?: () => void;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this._context = context;
@@ -54,6 +55,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ): void | Thenable<void> {
     this._view = webviewView;
+    console.log('Rifler Sidebar WebviewView resolved');
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -89,8 +91,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       }
       await this._handleMessage(message);
     });
-    // Restore state when view becomes visible
+    // Restore state when view becomes visible, save when hidden
     webviewView.onDidChangeVisibility(() => {
+      console.log('SidebarProvider: visibility changed, visible =', webviewView.visible);
       if (webviewView.visible) {
         this._restoreState();
         // Notify that sidebar is now visible
@@ -98,6 +101,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           this._onVisibilityChanged(true);
         }
       } else {
+        // Save state before hiding - request state from webview
+        console.log('SidebarProvider: sidebar hidden, requesting state save');
+        webviewView.webview.postMessage({ type: 'requestStateForMinimize' });
         // Notify that sidebar is now hidden
         if (this._onVisibilityChanged) {
           this._onVisibilityChanged(false);
@@ -171,6 +177,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         break;
       case 'minimize':
         // Save state before minimize
+        console.log('SidebarProvider: received minimize message with state:', message.state);
         if (message.state) {
           const cfg = vscode.workspace.getConfiguration('rifler');
           const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
@@ -178,6 +185,12 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
           if (persist) {
             await store.update('rifler.sidebarState', message.state as unknown as SidebarState);
+            console.log('SidebarProvider: state saved to rifler.sidebarState');
+          }
+          // Resolve any pending save promise
+          if (this._stateSaveResolver) {
+            this._stateSaveResolver();
+            this._stateSaveResolver = undefined;
           }
         }
         break;
@@ -411,7 +424,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
     const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
     const state = store.get('rifler.sidebarState');
+    console.log('SidebarProvider._restoreState: state =', state ? 'exists' : 'undefined', state);
     if (state && this._view) {
+      console.log('SidebarProvider._restoreState: sending restoreState message');
       this._view.webview.postMessage({
         type: 'restoreState',
         state
@@ -443,5 +458,27 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         this._pendingInitOptions.showReplace = true;
       }
     }
+  }
+
+  /**
+   * Request the webview to save its current state and wait for completion
+   */
+  public async requestSaveState(): Promise<void> {
+    if (!this._view) {
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      this._stateSaveResolver = resolve;
+      this._view!.webview.postMessage({ type: 'requestStateForMinimize' });
+      
+      // Timeout fallback in case webview doesn't respond
+      setTimeout(() => {
+        if (this._stateSaveResolver) {
+          this._stateSaveResolver();
+          this._stateSaveResolver = undefined;
+        }
+      }, 500);
+    });
   }
 }

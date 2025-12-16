@@ -138,20 +138,20 @@
       "properties": {
         "rifler.persistSearchState": {
           "type": "boolean",
-          "default": false,
-          "markdownDescription": "Persist search state across sessions. Turn off to avoid restoring previous searches.",
+          "default": true,
+          "markdownDescription": "Persist search state within the current session. State is automatically cleared when switching workspaces. Turn off to avoid restoring previous searches.",
           "order": 0
         },
         "rifler.persistenceScope": {
           "type": "string",
           "enum": ["workspace", "global", "off"],
           "enumDescriptions": [
-            "Persist state per workspace (recommended)",
+            "Persist state per workspace - cleared when switching workspaces (recommended)",
             "Persist state globally across all workspaces",
             "Do not persist state"
           ],
-          "default": "off",
-          "markdownDescription": "Controls where Rifler persists UI/search state: per workspace, globally, or disabled.",
+          "default": "workspace",
+          "markdownDescription": "Controls where Rifler persists UI/search state: per workspace (cleared when switching workspaces), globally, or disabled.",
           "order": 0
         },
         "rifler.panelLocation": {

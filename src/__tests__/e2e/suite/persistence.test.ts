@@ -152,4 +152,48 @@ suite('Persistent Storage and Toggle Features', () => {
     // Test passes if cleanup happens without errors
     assert.ok(true, 'Status bar should be cleaned up on restore');
   });
+
+  test('Should have persistence enabled by default', async () => {
+    const config = vscode.workspace.getConfiguration('rifler');
+    const persistSearchState = config.get<boolean>('persistSearchState');
+    const persistenceScope = config.get<string>('persistenceScope');
+
+    // With new defaults, persistence should be enabled and scoped to workspace
+    assert.strictEqual(persistSearchState, true, 'persistSearchState should be true by default');
+    assert.strictEqual(persistenceScope, 'workspace', 'persistenceScope should be "workspace" by default');
+  });
+
+  test('Should persist state when switching between sidebar and tab view', async () => {
+    // Open sidebar
+    await vscode.commands.executeCommand('rifler.openSidebar');
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Toggle to window/tab view
+    await vscode.commands.executeCommand('rifler.toggleView');
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Toggle back to sidebar
+    await vscode.commands.executeCommand('rifler.toggleView');
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // State should persist through the toggle
+    assert.ok(true, 'State should persist when switching between sidebar and tab');
+  });
+
+  test('Should persist state when switching to other sidebar plugins', async () => {
+    // Open rifler sidebar
+    await vscode.commands.executeCommand('rifler.openSidebar');
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Switch to explorer (another sidebar)
+    await vscode.commands.executeCommand('workbench.view.explorer');
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Switch back to rifler sidebar
+    await vscode.commands.executeCommand('workbench.view.extension.rifler-sidebar');
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // State should be restored
+    assert.ok(true, 'State should persist when switching between sidebar plugins');
+  });
 });

@@ -1,14 +1,20 @@
 import * as vscode from 'vscode';
 import { RiflerSidebarProvider } from '../sidebar/SidebarProvider';
+import { StateStore } from '../state/StateStore';
 
 export type PanelLocation = 'sidebar' | 'window';
 
 export class ViewManager {
   private _sidebarProvider?: RiflerSidebarProvider;
   private _context: vscode.ExtensionContext;
+  private _stateStore?: StateStore;
 
   constructor(context: vscode.ExtensionContext) {
     this._context = context;
+  }
+
+  public setStateStore(stateStore: StateStore): void {
+    this._stateStore = stateStore;
   }
 
   public registerSidebarProvider(provider: RiflerSidebarProvider): void {
@@ -91,7 +97,31 @@ export class ViewManager {
     
     const newLocation: PanelLocation = currentLocation === 'sidebar' ? 'window' : 'sidebar';
     
-    // Close current view first
+    // Request state to be saved from current view before closing
+    const scope = config.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
+    
+    if (currentLocation === 'sidebar' && this._sidebarProvider) {
+      // Request sidebar to save its current state and wait for it
+      await this._sidebarProvider.requestSaveState();
+    } else {
+      // Request window panel to save its state
+      await vscode.commands.executeCommand('rifler.minimize');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Get the saved state from the current view
+    // Sidebar uses 'rifler.sidebarState', window uses StateStore ('rifler.persistedSearchState')
+    let savedState: unknown;
+    if (currentLocation === 'sidebar') {
+      savedState = store.get('rifler.sidebarState');
+    } else if (this._stateStore) {
+      savedState = this._stateStore.getSavedState();
+    }
+    
+    console.log('ViewManager.switchView: savedState =', savedState);
+    
+    // Close current view
     if (currentLocation === 'sidebar') {
       await vscode.commands.executeCommand('workbench.action.closeSidebar');
     } else {
@@ -102,6 +132,17 @@ export class ViewManager {
     await config.update('panelLocation', newLocation, vscode.ConfigurationTarget.Global);
     // Also update deprecated viewMode setting
     await config.update('viewMode', newLocation === 'window' ? 'tab' : 'sidebar', vscode.ConfigurationTarget.Global);
+    
+    // Transfer state to the new view location if we have saved state
+    if (savedState) {
+      if (newLocation === 'sidebar') {
+        // Save to sidebar state key
+        await store.update('rifler.sidebarState', savedState);
+      } else if (this._stateStore) {
+        // Save to StateStore for window panel
+        this._stateStore.setSavedState(savedState as any);
+      }
+    }
     
     // Open in new location
     await this.openView({ forcedLocation: newLocation });

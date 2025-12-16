@@ -2,26 +2,36 @@ import * as assert from 'assert';
 import { after, before } from 'mocha';
 import * as vscode from 'vscode';
 
-suite('No Persistence (Default Behavior)', () => {
+suite('No Persistence (Explicitly Disabled)', () => {
   before(async () => {
     // Activate the extension before running tests
     const extension = vscode.extensions.getExtension('Ori-Roza.rifler');
     if (extension && !extension.isActive) {
       await extension.activate();
     }
+    
+    // Explicitly disable persistence for these tests (defaults are now ON)
+    const config = vscode.workspace.getConfiguration('rifler');
+    await config.update('persistSearchState', false, vscode.ConfigurationTarget.Global);
+    await config.update('persistenceScope', 'off', vscode.ConfigurationTarget.Global);
+    await new Promise(resolve => setTimeout(resolve, 300));
   });
 
-  after(() => {
+  after(async () => {
+    // Reset to defaults (persistence enabled)
+    const config = vscode.workspace.getConfiguration('rifler');
+    await config.update('persistSearchState', undefined, vscode.ConfigurationTarget.Global);
+    await config.update('persistenceScope', undefined, vscode.ConfigurationTarget.Global);
     vscode.window.showInformationMessage('No persistence tests done!');
   });
 
-  test('Should have persistence disabled by default', async () => {
+  test('Should have persistence disabled when explicitly set', async () => {
     const config = vscode.workspace.getConfiguration('rifler');
     const persistSearchState = config.get<boolean>('persistSearchState');
     const persistenceScope = config.get<string>('persistenceScope');
 
-    assert.strictEqual(persistSearchState, false, 'persistSearchState should be false by default');
-    assert.strictEqual(persistenceScope, 'off', 'persistenceScope should be "off" by default');
+    assert.strictEqual(persistSearchState, false, 'persistSearchState should be false when explicitly disabled');
+    assert.strictEqual(persistenceScope, 'off', 'persistenceScope should be "off" when explicitly disabled');
   });
 
   test('Should not restore state when persistence is off', async () => {
@@ -130,7 +140,7 @@ suite('No Persistence (Default Behavior)', () => {
     await config.update('persistenceScope', 'off', vscode.ConfigurationTarget.Global);
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Reset to defaults
+    // Keep persistence disabled for remaining tests in this suite
     await config.update('persistSearchState', false, vscode.ConfigurationTarget.Global);
     await config.update('persistenceScope', 'off', vscode.ConfigurationTarget.Global);
     

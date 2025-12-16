@@ -223,8 +223,8 @@
     "test:e2e:slow": "E2E_SLOW_MODE=true vscode-test --label e2e-tests-visible",
     "test:e2e:coverage": "node scripts/analyze-e2e-coverage.js",
     "test:combined-coverage": "npm run test:coverage && echo '\\n=== UNIT TEST COVERAGE ABOVE ===\\n' && npm run test:e2e && echo '\\n=== E2E TESTS PASSED ===\\n'",
-    "package": "npx vsce package",
-    "build:package": "npm run vscode:prepublish && npx vsce package",
+    "package": "npx @vscode/vsce package",
+    "build:package": "npm run vscode:prepublish && npx @vscode/vsce package",
     "release": "standard-version",
     "release:minor": "standard-version --release-as minor",
     "release:major": "standard-version --release-as major",
@@ -239,13 +239,13 @@
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^8.55.0",
-    "glob": "^13.0.0",
+    "glob": "^10.3.10",
     "jest": "^29.7.0",
     "mocha": "^11.7.5",
     "standard-version": "^9.5.0",
     "ts-jest": "^29.1.1",
     "typescript": "^5.3.0",
-    "vsce": "^2.15.0"
+    "@vscode/vsce": "^2.24.0"
   },
   "dependencies": {
     "highlight.js": "^11.11.1"

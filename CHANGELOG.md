@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.10](https://github.com/Ori-Roza/Rifler/compare/v0.1.9...v0.1.10) (2025-12-16)
+
+
+### Refactoring
+
+* Update variable declarations to use const for immutability in preview toggle tests and view manager ([77770c7](https://github.com/Ori-Roza/Rifler/commit/77770c76e2b55ba8b2ead4a7bcb6637a4711da40))
+
 ### 0.1.9 (2025-12-16)
 
 

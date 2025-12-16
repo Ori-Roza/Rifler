@@ -92,7 +92,7 @@ jobs:
 
       - name: Publish to Marketplace
         run: |
-          npx vsce publish -p ${{ secrets.VSCE_PAT }}
+          npx @vscode/vsce publish -p ${{ secrets.VSCE_PAT }}
 
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -108,3 +108,4 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -34,6 +34,8 @@ console.log('[Rifler] Webview script starting...');
     fileContent: null,
     lastPreview: null,
     searchTimeout: null,
+    searchStartTime: 0,
+    lastSearchDuration: 0,
     replaceKeybinding: 'ctrl+shift+r',
     maxResultsCap: 10000,
     collapsedFiles: new Set(),
@@ -943,6 +945,7 @@ console.log('[Rifler] Webview script starting...');
       state.currentQuery = '';
       state.fileContent = null;
       state.lastPreview = null;
+      state.lastSearchDuration = 0;
       
       applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
       
@@ -1360,6 +1363,7 @@ console.log('[Rifler] Webview script starting...');
         state.results = [];
         state.activeIndex = -1;
         state.lastPreview = null;
+        state.lastSearchDuration = 0;
         applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
         handleSearchResults([], { skipAutoLoad: true });
         break;
@@ -1596,7 +1600,13 @@ console.log('[Rifler] Webview script starting...');
       const uniqueFiles = new Set(results.map(r => r.uri)).size;
       const isCapped = state.maxResultsCap && results.length >= state.maxResultsCap;
       const suffix = isCapped ? '+' : '';
-      resultsCountText.textContent = `${results.length}${suffix} result${results.length !== 1 ? 's' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`;
+      let text = `${results.length}${suffix} result${results.length !== 1 ? 's' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`;
+      
+      if (state.lastSearchDuration > 0) {
+        text += ` (${state.lastSearchDuration.toFixed(2)}s)`;
+      }
+      
+      resultsCountText.textContent = text;
     }
     resultsCountText.style.opacity = '1';
   }
@@ -1645,6 +1655,7 @@ console.log('[Rifler] Webview script starting...');
 
       showPlaceholder('Searching...');
       clearResultsCountDisplay();
+      state.searchStartTime = performance.now();
 
       const message = {
         type: 'runSearch',
@@ -1674,6 +1685,11 @@ console.log('[Rifler] Webview script starting...');
     state.results = results;
     state.activeIndex = resolvedActiveIndex;
     resultsList.scrollTop = 0;
+
+    if (state.searchStartTime > 0) {
+      state.lastSearchDuration = (performance.now() - state.searchStartTime) / 1000;
+      state.searchStartTime = 0; // Reset after use
+    }
 
     // Group results by file
     const groups = [];

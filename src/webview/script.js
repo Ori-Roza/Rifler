@@ -57,19 +57,16 @@
     }
   });
 
-  // DOM Elements
+  // DOM Elements - Updated for Issue #83 redesign
   const queryInput = document.getElementById('query');
   const replaceRow = document.getElementById('replace-row');
   const replaceInput = document.getElementById('replace-input');
   const replaceBtn = document.getElementById('replace-btn');
   const replaceAllBtn = document.getElementById('replace-all-btn');
   const closeSearchBtn = document.getElementById('close-search');
-  const toggleReplaceBtn = document.getElementById('toggle-replace');
   const resultsList = document.getElementById('results-list');
-  const resultsCount = document.getElementById('results-count');
   const previewContent = document.getElementById('preview-content');
   const previewFilename = document.getElementById('preview-filename');
-  const scopeTabs = document.querySelectorAll('.scope-tab');
   const directoryInputWrapper = document.getElementById('directory-input-wrapper');
   const moduleInputWrapper = document.getElementById('module-input-wrapper');
   const directoryInput = document.getElementById('directory-input');
@@ -78,11 +75,25 @@
   const wholeWordToggle = document.getElementById('whole-word');
   const useRegexToggle = document.getElementById('use-regex');
   const fileMaskInput = document.getElementById('file-mask');
-  const fileMaskBtn = document.getElementById('file-mask-btn');
-  const fileMaskDropdown = document.getElementById('file-mask-dropdown');
-  const fileMaskLabel = document.getElementById('file-mask-label');
 
-  const scopeFileBtn = document.getElementById('scope-file');
+  // New elements for Issue #83 redesign
+  const scopeButtons = document.querySelectorAll('.scope-btn');
+  const filtersRow = document.getElementById('filters-row');
+  const filterToggleBtn = document.getElementById('filter-toggle');
+  const dragHandle = document.getElementById('drag-handle');
+  const previewPanelContainer = document.getElementById('preview-panel-container');
+  const resultsCountText = document.getElementById('results-count-text');
+  const collapseAllBtn = document.getElementById('collapse-all-btn');
+  const previewFilepath = document.getElementById('preview-filepath');
+  
+  // Create a fallback for resultsCount if needed (backward compatibility)
+  let resultsCount = document.getElementById('results-count');
+  if (!resultsCount) {
+    resultsCount = resultsCountText; // Use the new element as a fallback
+  }
+
+  // Keep backward compatibility - some may not exist in new design
+  const scopeFileBtn = document.getElementById('scope-file-btn');
   const fileInputWrapper = document.getElementById('file-input-wrapper');
   const fileInput = document.getElementById('file-input');
   const previewActions = document.getElementById('preview-actions');
@@ -93,8 +104,6 @@
   const editorLineNumbers = document.getElementById('editor-line-numbers');
 
   const resultsPanel = document.getElementById('results-panel');
-  const panelResizer = document.getElementById('panel-resizer');
-  const previewToggleBtn = document.getElementById('preview-toggle-btn');
   const previewPanel = document.getElementById('preview-panel');
   const mainContent = document.querySelector('.main-content');
 
@@ -197,20 +206,24 @@
   vscode.postMessage({ type: 'getCurrentDirectory' });
 
   function toggleReplace() {
-    const isVisible = replaceRow.classList.toggle('visible');
-    toggleReplaceBtn.classList.toggle('active', isVisible);
-    if (isVisible) {
-      if (queryInput.value.trim()) {
-        replaceInput.focus();
-      } else {
-        queryInput.focus();
-      }
-    } else {
-      queryInput.focus();
+    const isVisible = replaceRow.classList.contains('visible');
+    replaceRow.classList.toggle('visible');
+    if (!isVisible) {
+      replaceInput.focus();
     }
+    vscode.postMessage({
+      type: 'toggleReplace',
+      state: !isVisible
+    });
   }
 
-  toggleReplaceBtn.addEventListener('click', toggleReplace);
+  // Toggle replace on Cmd/Ctrl+Shift+R is handled in keyboard handler below
+  document.addEventListener('keydown', (e) => {
+    if (e.altKey && e.shiftKey && e.code === 'KeyF') {
+      e.preventDefault();
+      toggleReplace();
+    }
+  });
 
   closeSearchBtn.addEventListener('click', () => {
     queryInput.value = '';
@@ -223,30 +236,14 @@
     vscode.postMessage({ type: 'minimize', state: {} });
   });
 
-  fileMaskBtn.addEventListener('click', (e) => {
+  // Filter toggle button for new UI
+  filterToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    fileMaskDropdown.classList.toggle('visible');
-    if (fileMaskDropdown.classList.contains('visible')) {
-      fileMaskInput.focus();
-    }
+    filtersRow.classList.toggle('visible');
+    filterToggleBtn.classList.toggle('active');
+    const isVisible = filtersRow.classList.contains('visible');
+    filterToggleBtn.setAttribute('aria-pressed', isVisible);
   });
-
-  document.addEventListener('click', (e) => {
-    if (!fileMaskDropdown.contains(e.target) && e.target !== fileMaskBtn) {
-      fileMaskDropdown.classList.remove('visible');
-    }
-  });
-
-  function updateFileMaskLabel() {
-    const value = fileMaskInput.value.trim();
-    if (value) {
-      fileMaskLabel.textContent = value;
-      fileMaskBtn.classList.add('has-value');
-    } else {
-      fileMaskLabel.textContent = 'File mask';
-      fileMaskBtn.classList.remove('has-value');
-    }
-  }
 
   document.addEventListener('keydown', (e) => {
     if (e.altKey && e.shiftKey && e.code === 'KeyF') {
@@ -1000,15 +997,13 @@
     initializePanelHeights();
   });
 
-  panelResizer.addEventListener('mousedown', (e) => {
-    if (previewToggleBtn && (e.target === previewToggleBtn || (e.target && e.target.closest('.panel-resizer-buttons')))) {
-      return;
-    }
+  // Setup drag handle for resizing preview panel
+  dragHandle.addEventListener('mousedown', (e) => {
     isResizing = true;
     startY = e.clientY;
     startResultsHeight = resultsPanel.offsetHeight;
     containerHeightAtDragStart = getContainerHeight();
-    panelResizer.classList.add('dragging');
+    dragHandle.classList.add('dragging');
     document.body.style.cursor = 'ns-resize';
     document.body.style.userSelect = 'none';
     e.preventDefault();
@@ -1031,7 +1026,7 @@
   document.addEventListener('mouseup', () => {
     if (!isResizing) return;
     isResizing = false;
-    panelResizer.classList.remove('dragging');
+    dragHandle.classList.remove('dragging');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     
@@ -1040,37 +1035,18 @@
     scheduleVirtualRender();
   });
 
-  if (previewToggleBtn) {
-    previewToggleBtn.addEventListener('mousedown', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-    });
-    previewToggleBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      if (isPreviewCollapsed()) {
-        if (!lastExpandedHeight || lastExpandedHeight <= PREVIEW_MIN_HEIGHT) {
-          lastExpandedHeight = getDefaultPreviewHeight();
-        }
-        applyPreviewHeight(Math.max(PREVIEW_MIN_HEIGHT, lastExpandedHeight), { updateLastExpanded: false, persist: true });
-      } else {
-        applyPreviewHeight(PREVIEW_MIN_HEIGHT, { updateLastExpanded: false, persist: true });
-      }
-      scheduleVirtualRender();
-    });
-  }
-
   window.addEventListener('resize', () => {
     if (!previewHeight) return;
     applyPreviewHeight(previewHeight, { updateLastExpanded: false, persist: false });
     scheduleVirtualRender();
   });
 
-  scopeTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      scopeTabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      state.currentScope = tab.dataset.scope;
+  // Scope selection - Updated for new button structure
+  scopeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      scopeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.currentScope = btn.dataset.scope;
       updateScopeInputs();
       runSearch();
     });
@@ -1346,10 +1322,16 @@
   });
 
   function updateScopeInputs() {
+    // Hide all scope input groups from the new filters row
+    const scopePathInputs = document.querySelectorAll('.scope-path-input');
+    scopePathInputs.forEach(input => input.classList.remove('visible'));
+    
+    // Backward compatibility: hide old scope-input elements if they exist
     directoryInputWrapper.classList.remove('visible');
     moduleInputWrapper.classList.remove('visible');
     fileInputWrapper.classList.remove('visible');
     
+    // Show the correct scope input based on current scope
     if (state.currentScope === 'directory') {
       directoryInputWrapper.classList.add('visible');
     } else if (state.currentScope === 'module') {
@@ -1370,7 +1352,21 @@
     resultsPlaceholder.style.display = 'none';
   }
 
-  let virtualRenderPending = false;
+  // Helper function to update results count display
+  function updateResultsCountDisplay(results) {
+    if (!results || results.length === 0) {
+      resultsCountText.textContent = 'No results found';
+    } else {
+      const uniqueFiles = new Set(results.map(r => r.uri)).size;
+      const isCapped = state.maxResultsCap && results.length >= state.maxResultsCap;
+      const suffix = isCapped ? '+' : '';
+      resultsCountText.textContent = `${results.length}${suffix} result${results.length !== 1 ? 's' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`;
+    }
+  }
+
+  function clearResultsCountDisplay() {
+    resultsCountText.textContent = 'Type to search...';
+  }
 
   function scheduleVirtualRender() {
     if (virtualRenderPending) return;

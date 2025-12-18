@@ -168,8 +168,7 @@ async function searchInFileAsync(
         const normalizedFilePath = path.normalize(filePath);
         const normalizedFolderPath = path.normalize(folderPath);
         if (normalizedFilePath.startsWith(normalizedFolderPath + path.sep) || normalizedFilePath === normalizedFolderPath) {
-          const pathFromFolder = path.relative(normalizedFolderPath, normalizedFilePath);
-          relativePath = path.join(folderName, pathFromFolder);
+          relativePath = path.relative(normalizedFolderPath, normalizedFilePath);
           break;
         }
       }

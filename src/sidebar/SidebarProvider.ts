@@ -17,6 +17,7 @@ interface SidebarState {
   filePath?: string;
   options?: SearchOptions;
   showReplace?: boolean;
+  showFilters?: boolean;
   results?: SearchResult[];
   activeIndex?: number;
   lastPreview?: {
@@ -316,15 +317,11 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private _sendCurrentDirectory(): void {
-    const editor = vscode.window.activeTextEditor;
     const workspaceFolders = vscode.workspace.workspaceFolders;
     let directory = '';
 
-    if (editor) {
-      // Prefer the directory of the active file when an editor is present
-      directory = path.dirname(editor.document.uri.fsPath);
-    } else if (workspaceFolders && workspaceFolders.length > 0) {
-      // Fallback to the first workspace folder when no editor is active
+    if (workspaceFolders && workspaceFolders.length > 0) {
+      // Default to the first workspace folder (project root)
       directory = workspaceFolders[0].uri.fsPath;
     }
 
@@ -407,10 +404,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       const uri = vscode.Uri.parse(uriString);
       const encoder = new TextEncoder();
       await vscode.workspace.fs.writeFile(uri, encoder.encode(content));
-      
-      // Show confirmation
-      const fileName = uri.path.split('/').pop() || 'File';
-      vscode.window.showInformationMessage(`Saved ${fileName}`);
     } catch (error) {
       const fileName = uriString.split('/').pop() || 'file';
       console.error('Error saving file:', error);

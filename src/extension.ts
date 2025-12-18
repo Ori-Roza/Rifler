@@ -36,10 +36,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; style-src ${webview.cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; style-src ${webview.cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- TODO: Consider bundling highlight.js locally or add SRI -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="${stylesUri}">
 </head>
 <body>
@@ -148,6 +149,7 @@ async function sendFileContent(
       await vscode.workspace.fs.readFile(uri)
     );
     const fileName = uri.path.split('/').pop() || '';
+    const relativePath = vscode.workspace.asRelativePath(uri);
 
     // Find matches in the file
     const regex = new RegExp(
@@ -179,6 +181,7 @@ async function sendFileContent(
       uri: uriString,
       content: fileContent,
       fileName,
+      relativePath,
       matches
     });
   } catch (error) {

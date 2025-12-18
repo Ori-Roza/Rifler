@@ -8,14 +8,14 @@
 <!-- Header -->
 <header class="rifler-header">
   <div class="header-left">
-    <h1 class="header-title">Search</h1>
+    <h1 class="header-title">SEARCH</h1>
   </div>
   <div class="header-right">
-    <button class="header-btn" id="history-btn" title="Search history" aria-label="History">
-      <span class="icon">⏱</span>
+    <button class="header-btn" id="replace-toggle-btn" title="Toggle Replace (Alt+Shift+F)" aria-label="Replace">
+      <span class="material-symbols-outlined">swap_horiz</span>
     </button>
     <button class="header-btn" id="close-search" title="Close (Esc)" aria-label="Close">
-      <span class="icon">✕</span>
+      <span class="material-symbols-outlined">close</span>
     </button>
   </div>
 </header>
@@ -24,29 +24,23 @@
 <section class="search-section">
   <div class="search-box">
     <div class="search-input-group">
-      <span class="search-icon">🔍</span>
+      <span class="material-symbols-outlined search-icon">search</span>
       <input type="text" id="query" class="search-input" placeholder="Search..." autofocus />
       <div id="query-validation-message" class="validation-message"></div>
       <div class="search-options">
-        <button type="button" class="option-btn" id="match-case" title="Match Case (Alt+C)" data-option="case">
-          <span class="icon">Aa</span>
-        </button>
-        <button type="button" class="option-btn" id="whole-word" title="Match Whole Word (Alt+W)" data-option="word">
-          <span class="icon">W</span>
-        </button>
-        <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">
-          <span class="icon">.*</span>
-        </button>
+        <button type="button" class="option-btn" id="match-case" title="Match Case (Alt+C)" data-option="case">TT</button>
+        <button type="button" class="option-btn" id="whole-word" title="Match Whole Word (Alt+W)" data-option="word">ab</button>
+        <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">*</button>
       </div>
     </div>
-    <button class="filter-toggle-btn" id="filter-toggle" title="Toggle filters">
-      <span class="icon">⚙</span>
+    <button class="icon-btn" id="filter-btn" title="Toggle Filters">
+      <span class="material-symbols-outlined">filter_alt</span>
     </button>
   </div>
 
   <!-- Replace Row (hidden by default) -->
   <div class="replace-field-row" id="replace-row">
-    <span class="replace-icon">↔</span>
+    <span class="material-symbols-outlined replace-icon">swap_horiz</span>
     <input type="text" id="replace-input" class="replace-input" placeholder="Replace with..." />
     <div class="replace-actions">
       <button id="replace-btn" title="Replace (Enter)">Replace</button>
@@ -54,49 +48,52 @@
     </div>
   </div>
 
-  <!-- Filters Row -->
-  <div class="filters-row" id="filters-row">
-    <div class="scope-selector">
-      <button class="scope-btn active" data-scope="project" title="Project">📁</button>
-      <button class="scope-btn" data-scope="module" title="Module">📦</button>
-      <button class="scope-btn" data-scope="directory" title="Directory">📂</button>
-      <button class="scope-btn" data-scope="file" id="scope-file-btn" style="display: none;" title="File">📄</button>
-    </div>
-
-    <div class="scope-path-input">
-      <span class="scope-icon">📂</span>
-      <input type="text" id="directory-input" class="path-input" placeholder="Path" />
-      <div class="file-mask-group">
-        <span class="mask-icon">🏷</span>
-        <input type="text" id="file-mask" class="mask-input" placeholder="*.ts, *.js" />
+  <!-- Filters Section (Restructured for Issue #83) -->
+  <div class="filters-container hidden" id="filters-container">
+    <div class="filter-row" id="scope-path-row">
+      <div class="filter-field path-field">
+        <span class="filter-label" id="path-label">Project:</span>
+        <div class="filter-input-wrapper">
+          <input type="text" id="directory-input" class="path-input" placeholder="src/components/" />
+          <select id="module-select" class="path-input" style="display: none;">
+            <option value="">Select module...</option>
+          </select>
+          <input type="text" id="file-input" class="path-input" placeholder="File path..." readonly style="display: none;" />
+        </div>
+      </div>
+      <div class="filter-field scope-field">
+        <span class="filter-label">Module:</span>
+        <select id="scope-select" class="scope-dropdown">
+          <option value="project">Project</option>
+          <option value="module">Module</option>
+          <option value="directory" selected>Directory</option>
+          <option value="file">File</option>
+        </select>
       </div>
     </div>
 
-    <div class="scope-path-input" id="module-input-wrapper">
-      <span class="scope-icon">📦</span>
-      <select id="module-select" class="path-input">
-        <option value="">Select module...</option>
-      </select>
-    </div>
-
-    <div class="scope-path-input" id="file-input-wrapper">
-      <span class="scope-icon">📄</span>
-      <input type="text" id="file-input" class="path-input" placeholder="File path..." readonly />
+    <div class="filter-row" id="file-mask-row">
+      <div class="filter-field">
+        <span class="filter-label">Filter:</span>
+        <input type="text" id="file-mask" class="mask-input" placeholder="*.ts, *.js" />
+      </div>
     </div>
   </div>
   <div id="file-mask-validation-message" class="validation-message"></div>
 </section>
 
-<!-- Results Summary and Actions -->
-<div class="results-summary-bar">
-  <span id="results-count-text" class="results-count-text">Type to search...</span>
-  <button class="collapse-all-btn" id="collapse-all-btn" style="display: none;">
-    Collapse All ▲
-  </button>
-</div>
-
 <!-- Main Content Area -->
 <div class="main-content">
+  <!-- Results Summary and Actions -->
+  <div class="results-summary-bar">
+    <span id="results-count-text" class="results-count-text">Type to search...</span>
+    <div class="summary-actions">
+      <button class="collapse-all-btn" id="collapse-all-btn" style="display: none;">
+        Collapse All <span class="material-symbols-outlined">unfold_less</span>
+      </button>
+    </div>
+  </div>
+
   <!-- Results Panel -->
   <div class="results-panel" id="results-panel">
     <div class="results-list scrollbar-hide" id="results-list">
@@ -115,15 +112,12 @@
     <div class="preview-panel" id="preview-panel">
       <div class="preview-header">
         <div class="preview-title-group">
-          <span class="file-icon">📄</span>
+          <span class="material-symbols-outlined file-icon">description</span>
           <span class="preview-filename" id="preview-filename">Select a result to preview</span>
           <span class="preview-filepath" id="preview-filepath"></span>
         </div>
         <div class="preview-actions" id="preview-actions" style="display: none;">
           <button id="replace-in-file-btn" class="primary" title="Replace in this file (Cmd+Shift+R)">Replace</button>
-          <button id="open-in-editor-btn" title="Open in editor">
-            <span class="icon">⤴</span>
-          </button>
         </div>
       </div>
       
@@ -144,8 +138,12 @@
             <div class="replace-widget-row">
               <span class="replace-widget-label">Find:</span>
               <input type="text" id="local-search-input" placeholder="Search term...">
-              <button id="local-prev-btn" class="nav-btn" title="Previous match (Shift+Enter)">▲</button>
-              <button id="local-next-btn" class="nav-btn" title="Next match (Enter)">▼</button>
+              <button id="local-prev-btn" class="nav-btn" title="Previous match (Shift+Enter)">
+                <span class="material-symbols-outlined">arrow_upward</span>
+              </button>
+              <button id="local-next-btn" class="nav-btn" title="Next match (Enter)">
+                <span class="material-symbols-outlined">arrow_downward</span>
+              </button>
               <span class="replace-match-count" id="local-match-count"></span>
             </div>
             <div class="replace-widget-row">
@@ -155,7 +153,9 @@
             <div class="replace-widget-actions">
               <button id="local-replace-btn" title="Replace next (Enter)">Replace</button>
               <button id="local-replace-all-btn" class="primary" title="Replace All (Cmd+Enter)">Replace All</button>
-              <button id="local-replace-close" title="Close (Esc)">✕</button>
+              <button id="local-replace-close" title="Close (Esc)">
+                <span class="material-symbols-outlined">close</span>
+              </button>
             </div>
           </div>
         </div>

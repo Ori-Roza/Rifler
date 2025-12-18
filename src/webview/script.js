@@ -3,6 +3,23 @@
 
 console.log('[Rifler] Webview script starting...');
 
+// Ensure UI is visible IMMEDIATELY
+(function showUIImmediately() {
+  // Make body visible right away
+  const body = document.body;
+  if (body) {
+    body.style.opacity = '1';
+    body.classList.add('loaded');
+  }
+  
+  // Hide loading overlay immediately
+  const loadingOverlay = document.getElementById('loading-overlay');
+  if (loadingOverlay) {
+    loadingOverlay.classList.add('hidden');
+    console.log('[Rifler] UI shown, loading overlay hidden');
+  }
+})();
+
 (function() {
   console.log('[Rifler] IIFE initialization started');
   

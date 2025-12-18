@@ -1,7 +1,11 @@
 // Rifler Webview Script
 // Extracted from extension.ts as part of Phase 1 refactoring (Issue #46)
 
+console.log('[Rifler] Webview script starting...');
+
 (function() {
+  console.log('[Rifler] IIFE initialization started');
+  
   const state = {
     results: [],
     activeIndex: -1,
@@ -119,9 +123,11 @@
   resultsPlaceholder.className = 'empty-state';
   resultsPlaceholder.style.display = 'none';
 
-  resultsList.innerHTML = '';
-  resultsList.appendChild(virtualContent);
-  resultsList.appendChild(resultsPlaceholder);
+  if (resultsList) {
+    resultsList.innerHTML = '';
+    resultsList.appendChild(virtualContent);
+    resultsList.appendChild(resultsPlaceholder);
+  }
   
   const replaceWidget = document.getElementById('replace-widget');
   const localSearchInput = document.getElementById('local-search-input');
@@ -133,10 +139,13 @@
   const localPrevBtn = document.getElementById('local-prev-btn');
   const localNextBtn = document.getElementById('local-next-btn');
 
-  console.log('DOM Elements loaded:', {
+  console.log('[Rifler] DOM Elements loaded:', {
     queryInput: !!queryInput,
     resultsList: !!resultsList,
-    previewContent: !!previewContent
+    previewContent: !!previewContent,
+    mainContent: !!mainContent,
+    dragHandle: !!dragHandle,
+    filtersRow: !!filtersRow
   });
 
   function getLanguageFromFilename(filename) {
@@ -196,8 +205,10 @@
       
       // Fade in content
       document.body.classList.add('loaded');
-      queryInput.focus();
-      searchBoxFocusedOnStartup = true;
+      if (queryInput) {
+        queryInput.focus();
+        searchBoxFocusedOnStartup = true;
+      }
     });
   });
 
@@ -206,15 +217,17 @@
   vscode.postMessage({ type: 'getCurrentDirectory' });
 
   function toggleReplace() {
-    const isVisible = replaceRow.classList.contains('visible');
-    replaceRow.classList.toggle('visible');
-    if (!isVisible) {
-      replaceInput.focus();
+    if (replaceRow) {
+      const isVisible = replaceRow.classList.contains('visible');
+      replaceRow.classList.toggle('visible');
+      if (!isVisible && replaceInput) {
+        replaceInput.focus();
+      }
+      vscode.postMessage({
+        type: 'toggleReplace',
+        state: !isVisible
+      });
     }
-    vscode.postMessage({
-      type: 'toggleReplace',
-      state: !isVisible
-    });
   }
 
   // Toggle replace on Cmd/Ctrl+Shift+R is handled in keyboard handler below
@@ -225,25 +238,29 @@
     }
   });
 
-  closeSearchBtn.addEventListener('click', () => {
-    queryInput.value = '';
-    state.results = [];
-    state.activeIndex = -1;
-    handleSearchResults([], { skipAutoLoad: true });
-    
-    vscode.postMessage({ type: 'clearState' });
-    
-    vscode.postMessage({ type: 'minimize', state: {} });
-  });
+  if (closeSearchBtn) {
+    closeSearchBtn.addEventListener('click', () => {
+      queryInput.value = '';
+      state.results = [];
+      state.activeIndex = -1;
+      handleSearchResults([], { skipAutoLoad: true });
+      
+      vscode.postMessage({ type: 'clearState' });
+      
+      vscode.postMessage({ type: 'minimize', state: {} });
+    });
+  }
 
   // Filter toggle button for new UI
-  filterToggleBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    filtersRow.classList.toggle('visible');
-    filterToggleBtn.classList.toggle('active');
-    const isVisible = filtersRow.classList.contains('visible');
-    filterToggleBtn.setAttribute('aria-pressed', isVisible);
-  });
+  if (filterToggleBtn && filtersRow) {
+    filterToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      filtersRow.classList.toggle('visible');
+      filterToggleBtn.classList.toggle('active');
+      const isVisible = filtersRow.classList.contains('visible');
+      filterToggleBtn.setAttribute('aria-pressed', isVisible);
+    });
+  }
 
   document.addEventListener('keydown', (e) => {
     if (e.altKey && e.shiftKey && e.code === 'KeyF') {
@@ -252,18 +269,25 @@
     }
   });
 
-  replaceBtn.addEventListener('click', replaceOne);
-  replaceAllBtn.addEventListener('click', replaceAll);
+  if (replaceBtn) {
+    replaceBtn.addEventListener('click', replaceOne);
+  }
+
+  if (replaceAllBtn) {
+    replaceAllBtn.addEventListener('click', replaceAll);
+  }
   
-  replaceInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      if (e.metaKey || e.ctrlKey) {
-        replaceAll();
-      } else {
-        replaceOne();
+  if (replaceInput) {
+    replaceInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (e.metaKey || e.ctrlKey) {
+          replaceAll();
+        } else {
+          replaceOne();
+        }
       }
-    }
-  });
+    });
+  }
 
   function triggerReplaceInFile() {
     if (!state.fileContent) return;
@@ -272,84 +296,102 @@
       enterEditMode();
     }
     
-    localSearchInput.value = state.currentQuery || '';
-    localReplaceInput.value = '';
+    if (localSearchInput) localSearchInput.value = state.currentQuery || '';
+    if (localReplaceInput) localReplaceInput.value = '';
     
-    replaceWidget.classList.add('visible');
-    localSearchInput.focus();
-    localSearchInput.select();
+    if (replaceWidget) replaceWidget.classList.add('visible');
+    if (localSearchInput) {
+      localSearchInput.focus();
+      localSearchInput.select();
+    }
     
     updateLocalMatches();
   }
 
-  replaceInFileBtn.addEventListener('click', triggerReplaceInFile);
+  if (replaceInFileBtn) {
+    replaceInFileBtn.addEventListener('click', triggerReplaceInFile);
+  }
   
-  localReplaceClose.addEventListener('click', () => {
-    replaceWidget.classList.remove('visible');
-    localMatches = [];
-    localMatchIndex = 0;
-    updateHighlights();
-    if (isEditMode) {
-      fileEditor.focus();
-    }
-  });
+  if (localReplaceClose) {
+    localReplaceClose.addEventListener('click', () => {
+      if (replaceWidget) replaceWidget.classList.remove('visible');
+      localMatches = [];
+      localMatchIndex = 0;
+      updateHighlights();
+      if (isEditMode && fileEditor) {
+        fileEditor.focus();
+      }
+    });
+  }
 
-  localSearchInput.addEventListener('input', () => {
-    updateLocalMatches();
-    updateHighlights();
-  });
+  if (localSearchInput) {
+    localSearchInput.addEventListener('input', () => {
+      updateLocalMatches();
+      updateHighlights();
+    });
 
-  localSearchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (e.shiftKey) {
+    localSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          navigateLocalMatch(-1);
+        } else {
+          navigateLocalMatch(1);
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
         navigateLocalMatch(-1);
-      } else {
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
         navigateLocalMatch(1);
+      } else if (e.key === 'Escape') {
+        if (replaceWidget) replaceWidget.classList.remove('visible');
+        localMatches = [];
+        updateHighlights();
+        if (isEditMode && fileEditor) {
+          fileEditor.focus();
+        }
       }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      navigateLocalMatch(-1);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      navigateLocalMatch(1);
-    } else if (e.key === 'Escape') {
-      replaceWidget.classList.remove('visible');
-      localMatches = [];
-      updateHighlights();
-      if (isEditMode) {
-        fileEditor.focus();
-      }
-    }
-  });
+    });
+  }
 
-  localReplaceInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      if (e.metaKey || e.ctrlKey) {
-        triggerLocalReplaceAll();
-      } else {
-        triggerLocalReplace();
+  if (localReplaceInput) {
+    localReplaceInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (e.metaKey || e.ctrlKey) {
+          triggerLocalReplaceAll();
+        } else {
+          triggerLocalReplace();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        navigateLocalMatch(-1);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        navigateLocalMatch(1);
+      } else if (e.key === 'Escape') {
+        if (replaceWidget) replaceWidget.classList.remove('visible');
+        localMatches = [];
+        updateHighlights();
+        if (isEditMode && fileEditor) {
+          fileEditor.focus();
+        }
       }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      navigateLocalMatch(-1);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      navigateLocalMatch(1);
-    } else if (e.key === 'Escape') {
-      replaceWidget.classList.remove('visible');
-      localMatches = [];
-      updateHighlights();
-      if (isEditMode) {
-        fileEditor.focus();
-      }
-    }
-  });
+    });
+  }
 
-  localReplaceBtn.addEventListener('click', triggerLocalReplace);
-  localReplaceAllBtn.addEventListener('click', triggerLocalReplaceAll);
-  localPrevBtn.addEventListener('click', () => navigateLocalMatch(-1));
-  localNextBtn.addEventListener('click', () => navigateLocalMatch(1));
+  if (localReplaceBtn) {
+    localReplaceBtn.addEventListener('click', triggerLocalReplace);
+  }
+  if (localReplaceAllBtn) {
+    localReplaceAllBtn.addEventListener('click', triggerLocalReplaceAll);
+  }
+  if (localPrevBtn) {
+    localPrevBtn.addEventListener('click', () => navigateLocalMatch(-1));
+  }
+  if (localNextBtn) {
+    localNextBtn.addEventListener('click', () => navigateLocalMatch(1));
+  }
 
   function updateLocalMatches() {
     localMatches = [];
@@ -489,11 +531,13 @@
   let isEditMode = false;
   let saveTimeout = null;
 
-  previewContent.addEventListener('click', (e) => {
-    if (e.target.tagName === 'BUTTON') return;
-    
-    enterEditMode();
-  });
+  if (previewContent) {
+    previewContent.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      
+      enterEditMode();
+    });
+  }
 
   function enterEditMode() {
     if (!state.fileContent || isEditMode) return;
@@ -535,41 +579,42 @@
     saveFile();
     
     isEditMode = false;
-    editorContainer.classList.remove('visible');
+    if (editorContainer) editorContainer.classList.remove('visible');
     
     renderFilePreview(state.fileContent);
   }
 
-  fileEditor.addEventListener('input', () => {
-    updateHighlights();
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-      saveFile();
-    }, 1000);
-  });
-
-  fileEditor.addEventListener('blur', (e) => {
-    if (e.relatedTarget && (replaceWidget.contains(e.relatedTarget) || e.relatedTarget === replaceWidget)) {
-      return;
-    }
-    
-    if (saveTimeout) clearTimeout(saveTimeout);
-    exitEditMode();
-  });
-
-  fileEditor.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-      e.preventDefault();
+  if (fileEditor) {
+    fileEditor.addEventListener('input', () => {
+      updateHighlights();
       if (saveTimeout) clearTimeout(saveTimeout);
-      saveFile();
-    } else if (checkReplaceKeybinding(e)) {
-      e.preventDefault();
-      triggerReplaceInFile();
-    } else if (e.key === 'Escape') {
+      saveTimeout = setTimeout(() => {
+        saveFile();
+      }, 1000);
+    });
+
+    fileEditor.addEventListener('blur', (e) => {
+      if (e.relatedTarget && replaceWidget && replaceWidget.contains(e.relatedTarget)) {
+        return;
+      }
+      
       if (saveTimeout) clearTimeout(saveTimeout);
       exitEditMode();
-    }
-  });
+    });
+    fileEditor.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveFile();
+      } else if (checkReplaceKeybinding(e)) {
+        e.preventDefault();
+        triggerReplaceInFile();
+      } else if (e.key === 'Escape') {
+        if (saveTimeout) clearTimeout(saveTimeout);
+        exitEditMode();
+      }
+    });
+  }
   
   function checkReplaceKeybinding(e) {
     const keybinding = state.replaceKeybinding || 'ctrl+shift+r';
@@ -863,50 +908,58 @@
     console.log('Timeout set, id:', state.searchTimeout);
   });
 
-  matchCaseToggle.addEventListener('click', () => {
-    state.options.matchCase = !state.options.matchCase;
-    matchCaseToggle.classList.toggle('active', state.options.matchCase);
-    runSearch();
-  });
-
-  wholeWordToggle.addEventListener('click', () => {
-    state.options.wholeWord = !state.options.wholeWord;
-    wholeWordToggle.classList.toggle('active', state.options.wholeWord);
-    runSearch();
-  });
-
-  useRegexToggle.addEventListener('click', () => {
-    state.options.useRegex = !state.options.useRegex;
-    useRegexToggle.classList.toggle('active', state.options.useRegex);
-    
-    if (state.options.useRegex) {
-      validateRegexPattern();
-    } else {
-      const msgElement = document.getElementById('query-validation-message');
-      if (msgElement) {
-        msgElement.textContent = '';
-        msgElement.className = 'validation-message';
-      }
-    }
-    
-    runSearch();
-  });
-
-  fileMaskInput.addEventListener('input', () => {
-    clearTimeout(state.searchTimeout);
-    
-    updateFileMaskLabel();
-    
-    clearTimeout(validationDebounceTimeout);
-    validationDebounceTimeout = setTimeout(() => {
-      validateFileMaskPattern();
-    }, 150);
-
-    state.searchTimeout = setTimeout(() => {
-      state.options.fileMask = fileMaskInput.value;
+  if (matchCaseToggle) {
+    matchCaseToggle.addEventListener('click', () => {
+      state.options.matchCase = !state.options.matchCase;
+      matchCaseToggle.classList.toggle('active', state.options.matchCase);
       runSearch();
-    }, 300);
-  });
+    });
+  }
+
+  if (wholeWordToggle) {
+    wholeWordToggle.addEventListener('click', () => {
+      state.options.wholeWord = !state.options.wholeWord;
+      wholeWordToggle.classList.toggle('active', state.options.wholeWord);
+      runSearch();
+    });
+  }
+
+  if (useRegexToggle) {
+    useRegexToggle.addEventListener('click', () => {
+      state.options.useRegex = !state.options.useRegex;
+      useRegexToggle.classList.toggle('active', state.options.useRegex);
+      
+      if (state.options.useRegex) {
+        validateRegexPattern();
+      } else {
+        const msgElement = document.getElementById('query-validation-message');
+        if (msgElement) {
+          msgElement.textContent = '';
+          msgElement.className = 'validation-message';
+        }
+      }
+      
+      runSearch();
+    });
+  }
+
+  if (fileMaskInput) {
+    fileMaskInput.addEventListener('input', () => {
+      clearTimeout(state.searchTimeout);
+      
+      updateFileMaskLabel();
+      
+      clearTimeout(validationDebounceTimeout);
+      validationDebounceTimeout = setTimeout(() => {
+        validateFileMaskPattern();
+      }, 150);
+
+      state.searchTimeout = setTimeout(() => {
+        state.options.fileMask = fileMaskInput.value;
+        runSearch();
+      }, 300);
+    });
+  }
 
   let isResizing = false;
   let startY = 0;
@@ -998,16 +1051,18 @@
   });
 
   // Setup drag handle for resizing preview panel
-  dragHandle.addEventListener('mousedown', (e) => {
-    isResizing = true;
-    startY = e.clientY;
-    startResultsHeight = resultsPanel.offsetHeight;
-    containerHeightAtDragStart = getContainerHeight();
-    dragHandle.classList.add('dragging');
-    document.body.style.cursor = 'ns-resize';
-    document.body.style.userSelect = 'none';
-    e.preventDefault();
-  });
+  if (dragHandle) {
+    dragHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startY = e.clientY;
+      startResultsHeight = resultsPanel.offsetHeight;
+      containerHeightAtDragStart = getContainerHeight();
+      dragHandle.classList.add('dragging');
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+  }
 
   document.addEventListener('mousemove', (e) => {
     if (!isResizing) return;
@@ -1026,7 +1081,7 @@
   document.addEventListener('mouseup', () => {
     if (!isResizing) return;
     isResizing = false;
-    dragHandle.classList.remove('dragging');
+    if (dragHandle) dragHandle.classList.remove('dragging');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     

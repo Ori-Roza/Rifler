@@ -1,7 +1,4 @@
 import * as vscode from 'vscode';
-import { PanelManager } from '../services/PanelManager';
-import { ViewManager } from '../views/ViewManager';
-import { RiflerSidebarProvider } from '../sidebar/SidebarProvider';
 import { CommandContext } from './types';
 import { openCommand } from './open';
 import { openReplaceCommand } from './openReplace';

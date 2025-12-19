@@ -258,6 +258,8 @@ export class PanelManager {
         type: 'restoreState',
         state: stateToRestore
       });
+    } else {
+      this.currentPanel.webview.postMessage({ type: 'clearState' });
     }
 
     // Set initial query or focus search box

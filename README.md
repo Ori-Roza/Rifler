@@ -22,10 +22,12 @@
 ## Features
 
 - **Dynamic Search** - Results appear as you type (no Find button needed)
+- **Fresh State** - Automatically clears search results and state when switching workspaces
 - **High Performance**
   - **Virtualized Results** - Smooth scrolling with 10,000+ results
   - **Configurable Limit** - Adjust max results via `rifler.maxResults` setting
   - **Path Tooltips** - Hover truncated paths to see full file path
+  - **Search Duration** - Real-time performance metrics displayed with results
 - **Multiple Scopes**
   - **Project** - Search entire workspace
   - **Module** - Search in detected modules (package.json, tsconfig.json, etc.)
@@ -43,7 +45,7 @@
   - **Undo Support** - Full undo support for all replacements
 - **Full File Preview**
   - View entire file with all matches highlighted
-  - **Syntax Highlighting** - Code highlighting for 50+ languages (powered by highlight.js)
+  - **Syntax Highlighting** - Code highlighting for 50+ languages in both results and preview (powered by highlight.js)
   - **Click to Edit** - Click anywhere in preview to start editing inline
   - **Auto-save** - Changes auto-save as you type
 - **Responsive Sidebar**

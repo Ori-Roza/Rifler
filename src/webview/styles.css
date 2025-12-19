@@ -811,6 +811,11 @@ body.loaded {
   flex: 1;
 }
 
+.result-preview.hljs {
+  background: transparent !important;
+  padding: 0;
+}
+
 .result-item.active .result-preview {
   color: inherit;
 }

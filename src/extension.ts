@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import {
-  SearchOptions
+  SearchOptions,
+  findWorkspaceModules
 } from './utils';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
@@ -74,45 +75,16 @@ function getNonce(): string {
   return text;
 }
 
-// Helper functions
-async function findWorkspaceModules(): Promise<{ name: string; path: string }[]> {
-  const modules: { name: string; path: string }[] = [];
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-
-  if (!workspaceFolders) {
-    return modules;
-  }
-
-  for (const folder of workspaceFolders) {
-    try {
-      const nodeModulesUri = vscode.Uri.joinPath(folder.uri, 'node_modules');
-      const stat = await vscode.workspace.fs.stat(nodeModulesUri);
-
-      if (stat.type === vscode.FileType.Directory) {
-        const entries = await vscode.workspace.fs.readDirectory(nodeModulesUri);
-        for (const [name, type] of entries) {
-          if (type === vscode.FileType.Directory && !name.startsWith('.')) {
-            modules.push({
-              name,
-              path: vscode.Uri.joinPath(nodeModulesUri, name).fsPath
-            });
-          }
-        }
-      }
-    } catch {
-      // If node_modules doesn't exist, continue
-    }
-  }
-
-  return modules;
-}
-
 async function sendModulesList(panel: vscode.WebviewPanel): Promise<void> {
-  const modules = await findWorkspaceModules();
-  panel.webview.postMessage({
-    type: 'modulesList',
-    modules
-  });
+  try {
+    const modules = await findWorkspaceModules();
+    panel.webview.postMessage({
+      type: 'modulesList',
+      modules
+    });
+  } catch (error) {
+    console.error('Error sending modules list:', error);
+  }
 }
 
 function sendCurrentDirectory(panel: vscode.WebviewPanel): void {
@@ -246,12 +218,32 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize StateStore
   stateStore = new StateStore(context);
 
+  // Detect workspace change to clear state if needed for "fresh search" on project change
+  try {
+    const lastWorkspaceFolders = context.globalState.get<string[]>('rifler.lastWorkspaceFolders');
+    const currentWorkspaceFolders = vscode.workspace.workspaceFolders?.map(f => f.uri.toString()) || [];
+    const foldersChanged = JSON.stringify(lastWorkspaceFolders) !== JSON.stringify(currentWorkspaceFolders);
+
+    if (foldersChanged) {
+      context.globalState.update('rifler.lastWorkspaceFolders', currentWorkspaceFolders);
+      // Clear persisted state on workspace change to ensure a fresh start
+      context.workspaceState.update('rifler.sidebarState', undefined);
+      context.workspaceState.update('rifler.persistedSearchState', undefined);
+      if (stateStore) {
+        stateStore.setSavedState(undefined);
+      }
+    }
+  } catch (error) {
+    console.error('Error detecting workspace change on activation:', error);
+  }
+
   // Initialize PanelManager
   panelManager = new PanelManager(context, extensionUri, getWebviewHtml, stateStore);
 
   // Initialize ViewManager
   viewManager = new ViewManager(context);
   viewManager.setStateStore(stateStore);
+  viewManager.setPanelManager(panelManager);
 
   // Register sidebar provider
   const sidebarProvider = new RiflerSidebarProvider(context);
@@ -325,24 +317,38 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  // Clear persisted state when workspace folders change (for workspace-scoped or off)
+  // Clear persisted state when workspace folders change to ensure a fresh search
   vscode.workspace.onDidChangeWorkspaceFolders(() => {
-    const cfg = vscode.workspace.getConfiguration('rifler');
-    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
-    if (scope === 'workspace' || scope === 'off') {
+    try {
+      // Update last workspace folders to keep track of changes
+      const currentWorkspaceFolders = vscode.workspace.workspaceFolders?.map(f => f.uri.toString()) || [];
+      context.globalState.update('rifler.lastWorkspaceFolders', currentWorkspaceFolders);
+
+      // Clear persisted state
       context.workspaceState.update('rifler.sidebarState', undefined);
       context.workspaceState.update('rifler.persistedSearchState', undefined);
-      stateStore.setSavedState(undefined);
+      if (stateStore) {
+        stateStore.setSavedState(undefined);
+      }
+
       // Also clear any visible UI state in sidebar/window
       if (sidebarProvider) {
         sidebarProvider.postMessage({ type: 'clearState' });
         sidebarProvider.postMessage({ type: 'focusSearch' });
+        sidebarProvider.sendCurrentDirectory();
+        sidebarProvider.sendModules();
       }
-      const panel = panelManager.panel;
-      if (panel) {
-        panel.webview.postMessage({ type: 'clearState' });
-        panel.webview.postMessage({ type: 'focusSearch' });
+      if (panelManager) {
+        const panel = panelManager.panel;
+        if (panel) {
+          panel.webview.postMessage({ type: 'clearState' });
+          panel.webview.postMessage({ type: 'focusSearch' });
+          sendCurrentDirectory(panel);
+          sendModulesList(panel);
+        }
       }
+    } catch (error) {
+      console.error('Error handling workspace change:', error);
     }
   }, undefined, context.subscriptions);
 

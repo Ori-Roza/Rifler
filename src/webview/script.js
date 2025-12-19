@@ -1360,6 +1360,9 @@ console.log('[Rifler] Webview script starting...');
         queryInput.value = '';
         state.currentQuery = '';
         replaceInput.value = '';
+        if (directoryInput) directoryInput.value = '';
+        if (moduleSelect) moduleSelect.value = '';
+        if (fileInput) fileInput.value = '';
         state.results = [];
         state.activeIndex = -1;
         state.lastPreview = null;
@@ -1836,18 +1839,21 @@ console.log('[Rifler] Webview script starting...');
     const isActive = itemData.originalIndex === state.activeIndex;
     item.className = 'result-item' + (isActive ? ' active' : '');
     item.dataset.index = String(itemData.originalIndex);
+    item.title = itemData.relativePath || itemData.fileName;
 
+    const language = getLanguageFromFilename(itemData.fileName);
     const previewHtml = highlightMatchSafe(
       itemData.preview,
       itemData.previewMatchRange.start,
-      itemData.previewMatchRange.end
+      itemData.previewMatchRange.end,
+      language
     );
 
     item.innerHTML = 
       '<div class="result-meta">' +
         '<span class="result-line-number">' + (itemData.line + 1) + '</span>' +
       '</div>' +
-      '<div class="result-preview">' + previewHtml + '</div>' +
+      '<div class="result-preview hljs">' + previewHtml + '</div>' +
       '<div class="result-actions">' +
         '<button class="open-in-editor-btn" data-index="' + itemData.originalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
           '<span class="material-symbols-outlined">open_in_new</span>' +
@@ -1904,6 +1910,37 @@ console.log('[Rifler] Webview script starting...');
     
     if (ext === 'js' || ext === 'jsx' || ext === 'ts' || ext === 'tsx' || ext === 'css' || ext === 'md') return '#60a5fa'; // blue-400
     return 'var(--vscode-descriptionForeground)';
+  }
+
+  function getLanguageFromFilename(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    const map = {
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'html': 'xml',
+      'xml': 'xml',
+      'css': 'css',
+      'scss': 'scss',
+      'less': 'less',
+      'json': 'json',
+      'md': 'markdown',
+      'py': 'python',
+      'rb': 'ruby',
+      'go': 'go',
+      'rs': 'rust',
+      'php': 'php',
+      'java': 'java',
+      'cpp': 'cpp',
+      'c': 'c',
+      'cs': 'csharp',
+      'sh': 'bash',
+      'yml': 'yaml',
+      'yaml': 'yaml',
+      'sql': 'sql'
+    };
+    return map[ext] || null;
   }
 
   function ensureActiveVisible() {
@@ -2194,12 +2231,35 @@ console.log('[Rifler] Webview script starting...');
     return html.substring(0, start) + '<span class="match">' + html.substring(start, end) + '</span>' + html.substring(end);
   }
 
-  function highlightMatchSafe(rawText, start, end) {
-    if (start < 0 || end <= start || start >= rawText.length) return escapeHtml(rawText);
+  function highlightMatchSafe(rawText, start, end, language = null) {
+    if (start < 0 || end <= start || start >= rawText.length) {
+      if (language && typeof hljs !== 'undefined') {
+        try {
+          return hljs.highlight(rawText, { language }).value;
+        } catch (e) {
+          return escapeHtml(rawText);
+        }
+      }
+      return escapeHtml(rawText);
+    }
+    
     end = Math.min(end, rawText.length);
-    const before = escapeHtml(rawText.substring(0, start));
-    const match = escapeHtml(rawText.substring(start, end));
-    const after = escapeHtml(rawText.substring(end));
-    return before + '<span class="match">' + match + '</span>' + after;
+    const before = rawText.substring(0, start);
+    const match = rawText.substring(start, end);
+    const after = rawText.substring(end);
+
+    if (language && typeof hljs !== 'undefined') {
+      try {
+        // Highlight parts separately to keep the match span
+        const hBefore = hljs.highlight(before, { language }).value;
+        const hMatch = hljs.highlight(match, { language }).value;
+        const hAfter = hljs.highlight(after, { language }).value;
+        return hBefore + '<span class="match">' + hMatch + '</span>' + hAfter;
+      } catch (e) {
+        // Fallback to basic escaping
+      }
+    }
+
+    return escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>' + escapeHtml(after);
   }
 })();

@@ -8,15 +8,7 @@
 </div>
 
 <div align="center">
-  <strong>Tab Mode</strong>
-  <br/>
-  <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_tab.gif" alt="Rifler Tab Mode Demo" width="100%"/>
-</div>
-
-<div align="center">
-  <strong>Sidebar Mode</strong>
-  <br/>
-  <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_sidebar.gif" alt="Rifler Sidebar Mode Demo" width="100%"/>
+  <video src="https://raw.githubusercontent.com/ori-roza/rifler/master/assets/demo_3_compressed.mp4" width="100%" autoplay loop muted playsinline></video>
 </div>
 
 ## Features
@@ -265,7 +257,7 @@ Tests are configured using `.vscode-test.js` for maximum flexibility and CI/CD c
 
 ### CI/CD Automation
 Tests run automatically on:
-- Every push to main/develop branches
+- Every push to master/develop branches
 - All pull requests
 - Multiple operating systems (Windows, macOS, Linux)
 

@@ -69,8 +69,31 @@ const anotherTest = "more test data";
 const findMe = "unique_search_term_12345";
 `;
 
-    fs.writeFileSync(testFilePath, testContent);
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(testFilePath), Buffer.from(testContent, 'utf8'));
+    // Wait for file system to update
+    await new Promise(resolve => setTimeout(resolve, 1000));
   });
+
+  async function retrySearch(
+    query: string,
+    scope: any,
+    options: any,
+    directoryPath?: string,
+    modulePath?: string,
+    filePath?: string,
+    expectedCount: number = 1,
+    timeout = 5000
+  ) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const results = await performSearch(query, scope, options, directoryPath, modulePath, filePath);
+      if (results.length >= expectedCount) {
+        return results;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    return await performSearch(query, scope, options, directoryPath, modulePath, filePath);
+  }
 
   after(async () => {
     // Clean up test file
@@ -275,15 +298,18 @@ const findMe = "unique_search_term_12345";
     await step('Creating test file for replacement');
     const replaceTestFilePath = path.join(testWorkspaceFolder.uri.fsPath, 'replace-test.ts');
     const originalContent = 'const original = "replace_me_123";';
-    fs.writeFileSync(replaceTestFilePath, originalContent);
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(replaceTestFilePath), Buffer.from(originalContent, 'utf8'));
     log(`   📁 Created: ${replaceTestFilePath}`);
     log(`   📝 Content: ${originalContent}`);
+    
+    // Wait for file system to update and VS Code to see the file
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     try {
       await step('Searching for text to replace');
       log('   🔍 Query: "replace_me_123"');
 
-      const searchResults = await performSearch(
+      const searchResults = await retrySearch(
         'replace_me_123',
         'file',
         { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
@@ -309,10 +335,11 @@ const findMe = "unique_search_term_12345";
       );
 
       // Wait for file system to update
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       await step('Verifying file was modified');
-      const newContent = fs.readFileSync(replaceTestFilePath, 'utf8');
+      const newContentBytes = await vscode.workspace.fs.readFile(vscode.Uri.file(replaceTestFilePath));
+      const newContent = new TextDecoder().decode(newContentBytes);
       log(`   📝 New content: ${newContent}`);
 
       assert.ok(newContent.includes('replaced_text_456'), 'File should contain replaced text');
@@ -323,9 +350,9 @@ const findMe = "unique_search_term_12345";
 
     } finally {
       // Cleanup
-      if (fs.existsSync(replaceTestFilePath)) {
-        fs.unlinkSync(replaceTestFilePath);
-      }
+      try {
+        await vscode.workspace.fs.delete(vscode.Uri.file(replaceTestFilePath), { recursive: false, useTrash: false });
+      } catch (e) {}
     }
   });
 
@@ -337,9 +364,20 @@ const findMe = "unique_search_term_12345";
     const originalContent = `const a = "word_to_replace";
 const b = "word_to_replace";
 const c = "word_to_replace";`;
-    fs.writeFileSync(replaceAllTestFilePath, originalContent);
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(replaceAllTestFilePath), Buffer.from(originalContent, 'utf8'));
     log(`   📁 Created: ${replaceAllTestFilePath}`);
     log(`   📝 Content has 3 occurrences of "word_to_replace"`);
+    
+    // Wait for file system to update and ensure file is searchable
+    await retrySearch(
+      'word_to_replace',
+      'file',
+      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
+      undefined,
+      undefined,
+      replaceAllTestFilePath,
+      3
+    );
 
     let refreshCalled = false;
     const mockRefresh = async () => { refreshCalled = true; };
@@ -360,10 +398,11 @@ const c = "word_to_replace";`;
       );
 
       // Wait for file system to update
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       await step('Verifying all occurrences were replaced');
-      const newContent = fs.readFileSync(replaceAllTestFilePath, 'utf8');
+      const newContentBytes = await vscode.workspace.fs.readFile(vscode.Uri.file(replaceAllTestFilePath));
+      const newContent = new TextDecoder().decode(newContentBytes);
       const newWordCount = (newContent.match(/new_word/g) || []).length;
       const oldWordCount = (newContent.match(/word_to_replace/g) || []).length;
 
@@ -377,9 +416,9 @@ const c = "word_to_replace";`;
 
     } finally {
       // Cleanup
-      if (fs.existsSync(replaceAllTestFilePath)) {
-        fs.unlinkSync(replaceAllTestFilePath);
-      }
+      try {
+        await vscode.workspace.fs.delete(vscode.Uri.file(replaceAllTestFilePath), { recursive: false, useTrash: false });
+      } catch (e) {}
     }
   });
 
@@ -454,7 +493,7 @@ const c = "word_to_replace";`;
     this.timeout(30000);
 
     await step('Searching for "helloWorld" to check result structure');
-    const results = await performSearch(
+    const results = await retrySearch(
       'helloWorld',
       'file',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },

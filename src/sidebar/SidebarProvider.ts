@@ -297,9 +297,12 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _sendModules(): Promise<void> {
+    if (!this._view) {
+      return;
+    }
     try {
       const modules = await findWorkspaceModules();
-      this._view?.webview.postMessage({
+      this._view.webview.postMessage({
         type: 'modulesList',
         modules
       });
@@ -313,6 +316,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private _sendCurrentDirectory(): void {
+    if (!this._view) {
+      return;
+    }
     const workspaceFolders = vscode.workspace.workspaceFolders;
     let directory = '';
 
@@ -321,7 +327,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       directory = workspaceFolders[0].uri.fsPath;
     }
 
-    this._view?.webview.postMessage({
+    this._view.webview.postMessage({
       type: 'currentDirectory',
       directory
     });

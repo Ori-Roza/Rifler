@@ -303,6 +303,32 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   });
 
+  // Safety net: close sidebar if Rifler tab is active or visible
+  // This handles cases like dragging the tab or switching tab groups
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      if (panelManager.panel?.active) {
+        setTimeout(() => {
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+        }, 100);
+      }
+    }),
+    vscode.window.tabGroups.onDidChangeTabs(() => {
+      if (panelManager.panel?.visible) {
+        setTimeout(() => {
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+        }, 100);
+      }
+    }),
+    vscode.window.tabGroups.onDidChangeTabGroups(() => {
+      if (panelManager.panel?.visible) {
+        setTimeout(() => {
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+        }, 100);
+      }
+    })
+  );
+
   // If persistence is disabled, clear any prior leftover state on activation
   {
     const cfg = vscode.workspace.getConfiguration('rifler');
@@ -373,7 +399,8 @@ export function deactivate() {
 // Export test helpers
 export const testHelpers = {
   getPanelManager: () => panelManager,
-  getCurrentPanel: () => panelManager?.panel
+  getCurrentPanel: () => panelManager?.panel,
+  getStateStore: () => stateStore
 };
 
 // Re-export messaging types for backward compatibility with tests

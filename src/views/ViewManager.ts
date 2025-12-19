@@ -130,19 +130,25 @@ export class ViewManager {
       savedState = this._stateStore.getSavedState();
     }
     
-    console.log('ViewManager.switchView: savedState =', savedState);
-    
     // Close current view
     if (currentLocation === 'sidebar') {
+      // Close the sidebar when switching to window mode
       await vscode.commands.executeCommand('workbench.action.closeSidebar');
+      // Small delay to ensure sidebar is closed before opening window
+      await new Promise(resolve => setTimeout(resolve, 200));
     } else {
       await vscode.commands.executeCommand('rifler._closeWindowInternal');
+      // Small delay to ensure window is closed before opening sidebar
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
     
     // Update both settings for backward compatibility
-    await config.update('panelLocation', newLocation, vscode.ConfigurationTarget.Global);
+    // Use undefined target to let VS Code decide (defaults to Workspace if in one)
+    const target = vscode.workspace.workspaceFolders ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+    
+    await config.update('panelLocation', newLocation, target);
     // Also update deprecated viewMode setting
-    await config.update('viewMode', newLocation === 'window' ? 'tab' : 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', newLocation === 'window' ? 'tab' : 'sidebar', target);
     
     // Transfer state to the new view location if we have saved state
     if (savedState) {

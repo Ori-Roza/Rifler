@@ -59,6 +59,7 @@ export function registerCommands(ctx: CommandContext): void {
       openWindowInternalCommand(ctx, options)
     ),
     vscode.commands.registerCommand('rifler._closeWindowInternal', () => closeWindowInternalCommand(ctx)),
-    vscode.commands.registerCommand('__test_ensurePanelOpen', () => testEnsureOpenCommand(ctx))
+    vscode.commands.registerCommand('__test_ensurePanelOpen', () => testEnsureOpenCommand(ctx)),
+    vscode.commands.registerCommand('__test_getSidebarVisible', () => ctx.getSidebarVisible())
   );
 }

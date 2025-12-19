@@ -22,8 +22,6 @@ export async function performSearch(
   filePath?: string,
   maxResults: number = 10000
 ): Promise<SearchResult[]> {
-  console.log('performSearch called:', { query, scope, directoryPath, modulePath, filePath, options });
-
   if (!query.trim() || query.length < 2) {
     return [];
   }
@@ -63,18 +61,14 @@ export async function performSearch(
       if (searchPath) {
         const uri = vscode.Uri.file(searchPath);
         const stat = await vscode.workspace.fs.stat(uri);
-        console.log('Directory search path:', searchPath, 'exists: true');
         if (stat.type === vscode.FileType.Directory) {
           await searchInDirectory(searchPath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
         } else {
-          console.log('Path is a file, searching only in:', searchPath);
           await searchInFileAsync(searchPath, regex, results, effectiveMaxResults, perFileTimeBudgetMs);
         }
-      } else {
-        console.log('Directory path is empty');
       }
     } catch (error) {
-      console.log('Directory does not exist or cannot be accessed:', searchPath);
+      // Directory does not exist or cannot be accessed
     }
   } else if (scope === 'module' && modulePath) {
     try {
@@ -86,18 +80,15 @@ export async function performSearch(
     }
   } else {
     const workspaceFolders = vscode.workspace.workspaceFolders;
-    console.log('Workspace folders:', workspaceFolders ? workspaceFolders.map(f => f.uri.fsPath) : 'None');
     if (workspaceFolders) {
       const tasks = workspaceFolders.map(folder => {
         if (results.length >= effectiveMaxResults) return Promise.resolve();
-        console.log('Searching in folder:', folder.uri.fsPath);
         return searchInDirectory(folder.uri.fsPath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
       });
       await Promise.all(tasks);
     }
   }
 
-  console.log('Search completed, results:', results.length);
   return results;
 }
 
@@ -133,7 +124,16 @@ async function searchInDirectory(
     }
     await Promise.all(tasks);
   } catch (error) {
-    console.error('Error reading directory:', dirPath, error);
+    // Only log if it's not a "not found" error, which can happen during tests
+    // when workspace folders are added/removed rapidly.
+    const isNotFound = (error instanceof vscode.FileSystemError && error.code === 'FileNotFound') ||
+                      (error instanceof Error && (error as any).code === 'ENOENT');
+    
+    if (isNotFound) {
+      // Ignore
+    } else {
+      console.error(`Error reading directory: ${dirPath}`, error);
+    }
   }
 }
 
@@ -146,14 +146,16 @@ async function searchInFileAsync(
 ): Promise<void> {
   try {
     let content: string;
-    const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === filePath);
+    const fileUri = vscode.Uri.file(filePath);
+    const fileUriString = fileUri.toString();
+    const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === fileUriString);
+    
     if (openDoc) {
       content = openDoc.getText();
     } else {
-      const uri = vscode.Uri.file(filePath);
-      const stats = await vscode.workspace.fs.stat(uri);
+      const stats = await vscode.workspace.fs.stat(fileUri);
       if (stats.size > 1024 * 1024) return; // 1MB limit (aligned with tests)
-      const contentBytes = await vscode.workspace.fs.readFile(uri);
+      const contentBytes = await vscode.workspace.fs.readFile(fileUri);
       content = new TextDecoder('utf-8').decode(contentBytes);
     }
 

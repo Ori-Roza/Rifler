@@ -31,4 +31,4 @@ module.exports = defineConfig([
       '--disable-gpu-sandbox',
     ],
   },
-]);
+], { concurrency: 1 });

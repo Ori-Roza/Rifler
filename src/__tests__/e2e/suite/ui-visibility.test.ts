@@ -17,8 +17,10 @@ suite('Rifler UI Visibility & Responsiveness E2E Tests', () => {
 
     // Disable persistence and force window mode for these tests
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('persistSearchState', false, vscode.ConfigurationTarget.Global);
-    await config.update('panelLocation', 'window', vscode.ConfigurationTarget.Global);
+    await config.update('persistSearchState', false, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await config.update('panelLocation', 'window', vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
@@ -33,8 +35,10 @@ suite('Rifler UI Visibility & Responsiveness E2E Tests', () => {
   after(async () => {
     // Restore settings
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('persistSearchState', true, vscode.ConfigurationTarget.Global);
-    await config.update('panelLocation', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('persistSearchState', undefined, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
     try {
       if (fs.existsSync(testFilePath)) {
         fs.unlinkSync(testFilePath);

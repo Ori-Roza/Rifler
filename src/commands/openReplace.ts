@@ -16,7 +16,9 @@ export function openReplaceCommand(ctx: CommandContext): void {
       initialQuery: selectedText
     });
   } else {
-    ctx.panelManager.createOrShowPanel({
+    // Use viewManager to ensure sidebar is closed for "fullscreen" feel
+    ctx.viewManager.openView({
+      forcedLocation: 'window',
       showReplace: true,
       initialQuery: selectedText
     });

@@ -12,16 +12,19 @@ suite('No Persistence (Explicitly Disabled)', () => {
     
     // Explicitly disable persistence for these tests (defaults are now ON)
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('persistSearchState', false, vscode.ConfigurationTarget.Global);
-    await config.update('persistenceScope', 'off', vscode.ConfigurationTarget.Global);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await config.update('persistSearchState', false, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await config.update('persistenceScope', 'off', vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
   after(async () => {
     // Reset to defaults (persistence enabled)
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('persistSearchState', undefined, vscode.ConfigurationTarget.Global);
-    await config.update('persistenceScope', undefined, vscode.ConfigurationTarget.Global);
+    await config.update('persistSearchState', undefined, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await config.update('persistenceScope', undefined, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
     vscode.window.showInformationMessage('No persistence tests done!');
   });
 
@@ -109,8 +112,9 @@ suite('No Persistence (Explicitly Disabled)', () => {
     
     // Enable global persistence (use Workspace target for tests)
     await config.update('persistSearchState', true, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
     await config.update('persistenceScope', 'global', vscode.ConfigurationTarget.Workspace);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Get fresh config to see updates
     const updatedConfig = vscode.workspace.getConfiguration('rifler');
@@ -119,17 +123,19 @@ suite('No Persistence (Explicitly Disabled)', () => {
 
     // Reset to defaults
     await config.update('persistSearchState', undefined, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
     await config.update('persistenceScope', undefined, vscode.ConfigurationTarget.Workspace);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
   test('Should clear state on workspace folder change when scope is workspace or off', async () => {
     const config = vscode.workspace.getConfiguration('rifler');
     
     // Set to workspace scope temporarily
-    await config.update('persistSearchState', true, vscode.ConfigurationTarget.Global);
-    await config.update('persistenceScope', 'workspace', vscode.ConfigurationTarget.Global);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await config.update('persistSearchState', true, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await config.update('persistenceScope', 'workspace', vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Open panel
     await vscode.commands.executeCommand('rifler.open');
@@ -137,12 +143,14 @@ suite('No Persistence (Explicitly Disabled)', () => {
 
     // Simulate workspace change by toggling setting (actual workspace folder change is hard to test)
     // The real test here is that the code path exists and doesn't error
-    await config.update('persistenceScope', 'off', vscode.ConfigurationTarget.Global);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await config.update('persistenceScope', 'off', vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Keep persistence disabled for remaining tests in this suite
-    await config.update('persistSearchState', false, vscode.ConfigurationTarget.Global);
-    await config.update('persistenceScope', 'off', vscode.ConfigurationTarget.Global);
+    await config.update('persistSearchState', false, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await config.update('persistenceScope', 'off', vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     assert.ok(true, 'Workspace change handling exists');
   });

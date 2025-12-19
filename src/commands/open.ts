@@ -37,7 +37,11 @@ export function openCommand(ctx: CommandContext): void {
       ctx.panelManager.restore();
     } else {
       const selectedText = getSelectedText();
-      ctx.panelManager.createOrShowPanel({ initialQuery: selectedText });
+      // Use viewManager to ensure sidebar is closed for "fullscreen" feel
+      ctx.viewManager.openView({
+        forcedLocation: 'window',
+        initialQuery: selectedText
+      });
     }
   }
 }

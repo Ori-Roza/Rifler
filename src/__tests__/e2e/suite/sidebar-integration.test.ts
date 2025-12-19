@@ -50,7 +50,9 @@ const anotherSidebarTest = "more sidebar test data";
 const findMeSidebar = "unique_sidebar_search_term_12345";
 `;
 
-    fs.writeFileSync(testFilePath, testContent);
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(testFilePath), Buffer.from(testContent, 'utf8'));
+    // Wait for file system to update
+    await new Promise(resolve => setTimeout(resolve, 1000));
   });
 
   after(async () => {
@@ -359,7 +361,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Set viewMode to sidebar
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Make sure sidebar is closed first
@@ -380,7 +382,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Set viewMode to sidebar
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Open a test file to get selected text
@@ -418,7 +420,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Set viewMode to sidebar
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Open a test file
@@ -455,7 +457,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Set viewMode to sidebar
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Ensure sidebar is closed
@@ -483,7 +485,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Set viewMode to sidebar
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Open a test file
@@ -520,7 +522,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Set viewMode to sidebar
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Ensure we start with sidebar closed
@@ -566,7 +568,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Set viewMode to sidebar
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Ensure sidebar is open first
@@ -595,12 +597,12 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Set viewMode to tab
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('viewMode', 'tab', vscode.ConfigurationTarget.Global);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await config.update('viewMode', 'tab', vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Execute rifler.open - should open tab panel
     await vscode.commands.executeCommand('rifler.open');
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Check if Rifler tab is open
     const hasRiflerTab = vscode.window.tabGroups.all.some(group =>
@@ -613,7 +615,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     }
 
     // Reset viewMode to sidebar
-    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
 
     assert.ok(hasRiflerTab, 'Tab panel should open when viewMode=tab');
   });
@@ -623,7 +625,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Set viewMode to tab
     const config = vscode.workspace.getConfiguration('rifler');
-    await config.update('viewMode', 'tab', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'tab', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Ensure no Rifler tab exists first
@@ -668,7 +670,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     );
 
     // Reset viewMode to sidebar
-    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
 
     assert.ok(!hasRiflerTabAfter, 'Tab should be closed after toggle');
   });

@@ -25,6 +25,9 @@
       background-color: #f3f0f8;
     }
 
+    /* Ensure the HTML hidden attribute actually hides elements */
+    [hidden] { display: none !important; }
+
     /* ===== Navigation ===== */
     nav {
       background: linear-gradient(135deg, #0a1628 0%, #1a2d4d 100%);
@@ -137,6 +140,46 @@
       margin-bottom: 2rem;
       opacity: 0.95;
     }
+
+    /* ===== Demo Toggle ===== */
+    .demo-toggle {
+      width: 100%;
+      max-width: 720px;
+      margin-top: 1.5rem;
+    }
+    .demo-toggle-buttons {
+      display: inline-flex;
+      gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.12);
+      padding: 0.25rem;
+      border-radius: 999px;
+      backdrop-filter: blur(2px);
+    }
+    .demo-btn {
+      background: transparent;
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .demo-btn:hover { opacity: 0.9; }
+    .demo-btn.active {
+      background: white;
+      color: #0a1628;
+      border-color: white;
+      box-shadow: 0 6px 20px rgba(255, 255, 255, 0.25);
+    }
+    .demo-frame {
+      width: 100%;
+      margin-top: 1rem;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+    .demo-frame img { width: 100%; height: auto; display: block; }
 
     .hero-buttons {
       display: flex;
@@ -482,13 +525,15 @@
         <a href="https://marketplace.visualstudio.com/items?itemName=Ori-Roza.rifler" class="btn btn-primary">Install from Marketplace</a>
         <a href="https://github.com/ori-roza/rifler" class="btn btn-secondary">View on GitHub</a>
       </div>
-      <div style="width: 100%; max-width: 600px; margin-top: 2rem; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);">
-        <h3 style="text-align: center; margin-bottom: 2em; font-size: 0.95rem; color: white;">Tab Mode</h3>
-        <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_tab.gif" alt="Rifler Tab Mode Demo" style="width: 100%; height: auto; display: block;">
-      </div>
-      <div style="width: 100%; max-width: 600px; margin-top: 2rem; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);">
-        <h3 style="text-align: center; margin-bottom: 2rem; font-size: 0.95rem; color: white;">Sidebar Mode</h3>
-        <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_sidebar.gif" alt="Rifler Sidebar Mode Demo" style="width: 100%; height: auto; display: block;">
+      <div class="demo-toggle" aria-label="Rifler demo mode switcher">
+        <div class="demo-toggle-buttons" role="tablist" aria-label="Demo mode">
+          <button class="demo-btn active" role="tab" aria-selected="true" aria-controls="demo-tab" id="btn-tab">Tab Mode</button>
+          <button class="demo-btn" role="tab" aria-selected="false" aria-controls="demo-sidebar" id="btn-sidebar">Sidebar Mode</button>
+        </div>
+        <div class="demo-frame">
+          <img id="demo-tab" src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_tab.gif" alt="Rifler Tab Mode Demo">
+          <img id="demo-sidebar" src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_sidebar.gif" alt="Rifler Sidebar Mode Demo" hidden>
+        </div>
       </div>
     </div>
   </section>
@@ -571,6 +616,9 @@
           <li style="display: flex; align-items: center; gap: 0.5rem;">
             <span style="color: #667eea;">✓</span> <strong>Smart Concurrency Control</strong>
           </li>
+          <li style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="color: #667eea;">✓</span> <strong>Virtualized Results</strong> for smooth scrolling
+          </li>
         </ul>
 
         <div class="performance-stats">
@@ -579,8 +627,8 @@
             <div class="stat-label">Average search time (120k+ files)</div>
           </div>
           <div class="stat">
-            <div class="stat-value">20,000+</div>
-            <div class="stat-label">Maximum results supported</div>
+            <div class="stat-value">10,000+</div>
+            <div class="stat-label">Results with smooth scrolling</div>
           </div>
         </div>
       </div>
@@ -655,5 +703,34 @@
       </div>
     </div>
   </footer>
+  <script>
+    (function() {
+      const btnTab = document.getElementById('btn-tab');
+      const btnSidebar = document.getElementById('btn-sidebar');
+      const imgTab = document.getElementById('demo-tab');
+      const imgSidebar = document.getElementById('demo-sidebar');
+
+      function showTab() {
+        btnTab.classList.add('active');
+        btnSidebar.classList.remove('active');
+        btnTab.setAttribute('aria-selected', 'true');
+        btnSidebar.setAttribute('aria-selected', 'false');
+        imgTab.hidden = false;
+        imgSidebar.hidden = true;
+      }
+
+      function showSidebar() {
+        btnSidebar.classList.add('active');
+        btnTab.classList.remove('active');
+        btnSidebar.setAttribute('aria-selected', 'true');
+        btnTab.setAttribute('aria-selected', 'false');
+        imgSidebar.hidden = false;
+        imgTab.hidden = true;
+      }
+
+      btnTab?.addEventListener('click', showTab);
+      btnSidebar?.addEventListener('click', showSidebar);
+    })();
+  </script>
 </body>
 </html>

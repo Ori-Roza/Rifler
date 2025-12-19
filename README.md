@@ -109,10 +109,6 @@ Rifler can open in two modes:
    - Change setting: `rifler.viewMode` to `"tab"`
    - Use `Cmd+Alt+F` (Mac) / `Ctrl+Alt+F` to toggle open/close
 
-<div align="center">
-  <img src="assets/rifler-sidebar.png" alt="Rifler Sidebar" width="40%" height="auto"/>
-</div>
-
 ### Switching Between Modes
 
 You can switch between sidebar and tab mode:

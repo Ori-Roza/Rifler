@@ -636,7 +636,7 @@ console.log('[Rifler] Webview script starting...');
     state.fileContent.content = newContent;
   }
 
-  function exitEditMode() {
+  function exitEditMode(skipRender = false) {
     if (!isEditMode) return;
     
     saveFile();
@@ -644,7 +644,9 @@ console.log('[Rifler] Webview script starting...');
     isEditMode = false;
     if (editorContainer) editorContainer.classList.remove('visible');
     
-    renderFilePreview(state.fileContent);
+    if (!skipRender) {
+      renderFilePreview(state.fileContent);
+    }
   }
 
   if (fileEditor) {
@@ -805,6 +807,10 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function replaceOne() {
+    if (isEditMode) {
+      exitEditMode(true);
+    }
+    
     if (state.activeIndex < 0 || state.activeIndex >= state.results.length) return;
     const result = state.results[state.activeIndex];
     const replaceText = replaceInput.value;
@@ -866,6 +872,10 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function replaceAll() {
+    if (isEditMode) {
+      exitEditMode(true);
+    }
+    
     vscode.postMessage({
       type: 'replaceAll',
       query: state.currentQuery,
@@ -934,6 +944,10 @@ console.log('[Rifler] Webview script starting...');
   queryInput.addEventListener('input', () => {
     console.log('Input event triggered, value:', queryInput.value);
     clearTimeout(state.searchTimeout);
+    
+    if (isEditMode) {
+      exitEditMode(true);
+    }
     
     if (queryInput.value.trim().length === 0) {
       previewContent.innerHTML = '<div class="empty-state">No results</div>';
@@ -1293,10 +1307,33 @@ console.log('[Rifler] Webview script starting...');
     } else if (e.key === 'Escape') {
       if (isEditMode && !replaceWidget.classList.contains('visible')) {
         exitEditMode();
+        queryInput.focus();
+        queryInput.select();
       } else {
         queryInput.focus();
         queryInput.select();
       }
+    }
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!isEditMode) return;
+    
+    // If clicking outside the editor container and its children, exit edit mode
+    if (editorContainer && !editorContainer.contains(e.target)) {
+      // Don't exit if clicking the "Replace" button in the preview header
+      const previewActions = document.getElementById('preview-actions');
+      if (previewActions && previewActions.contains(e.target)) {
+        return;
+      }
+      
+      // Don't exit if clicking the drag handle
+      const dragHandle = document.getElementById('drag-handle');
+      if (dragHandle && dragHandle.contains(e.target)) {
+        return;
+      }
+      
+      exitEditMode();
     }
   });
 
@@ -1635,6 +1672,10 @@ console.log('[Rifler] Webview script starting...');
 
   function runSearch() {
     try {
+      if (isEditMode) {
+        exitEditMode(true);
+      }
+      
       const query = queryInput.value.trim();
       state.currentQuery = query;
       
@@ -2187,6 +2228,10 @@ console.log('[Rifler] Webview script starting...');
 
   function setActiveIndex(index) {
     if (index < 0 || index >= state.results.length) return;
+
+    if (isEditMode) {
+      exitEditMode(true);
+    }
 
     state.activeIndex = index;
 

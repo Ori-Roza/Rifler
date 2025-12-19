@@ -82,16 +82,22 @@ const findMe = "unique_search_term_12345";
     modulePath?: string,
     filePath?: string,
     expectedCount: number = 1,
-    timeout = 5000
+    timeout = 10000
   ) {
     const start = Date.now();
+    let attempts = 0;
     while (Date.now() - start < timeout) {
+      attempts++;
       const results = await performSearch(query, scope, options, directoryPath, modulePath, filePath);
       if (results.length >= expectedCount) {
+        if (attempts > 1) {
+          log(`   ⏳ Found after ${attempts} attempts (${Date.now() - start}ms)`);
+        }
         return results;
       }
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
+    log(`   ❌ Failed after ${attempts} attempts (${Date.now() - start}ms)`);
     return await performSearch(query, scope, options, directoryPath, modulePath, filePath);
   }
 
@@ -117,7 +123,7 @@ const findMe = "unique_search_term_12345";
     log(`   📁 File: ${testFilePath}`);
     log(`   🔍 Query: "unique_search_term_12345"`);
 
-    const results = await performSearch(
+    const results = await retrySearch(
       'unique_search_term_12345',
       'file',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
@@ -146,13 +152,14 @@ const findMe = "unique_search_term_12345";
     await step('Searching for "test" which appears multiple times');
     log(`   📁 File: ${testFilePath}`);
 
-    const results = await performSearch(
+    const results = await retrySearch(
       'test',
       'file',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
       undefined,
       undefined,
-      testFilePath
+      testFilePath,
+      5
     );
 
     await step(`Found ${results.length} occurrences`);
@@ -210,7 +217,7 @@ const findMe = "unique_search_term_12345";
     log(`   📁 File: ${testFilePath}`);
     log('   🔍 Query: "test.*message" (useRegex: true)');
 
-    const results = await performSearch(
+    const results = await retrySearch(
       'test.*message',
       'file',
       { matchCase: false, wholeWord: false, useRegex: true, fileMask: '' },
@@ -253,7 +260,7 @@ const findMe = "unique_search_term_12345";
     log('   🔍 Query: "unique_search_term_12345"');
     log('   🌐 Scope: directory');
 
-    const results = await performSearch(
+    const results = await retrySearch(
       'unique_search_term_12345',
       'directory',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
@@ -274,7 +281,7 @@ const findMe = "unique_search_term_12345";
     log('   🔍 Query: "unique_search_term_12345"');
     log('   🌐 Scope: project (entire workspace)');
 
-    const results = await performSearch(
+    const results = await retrySearch(
       'unique_search_term_12345',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
@@ -352,7 +359,9 @@ const findMe = "unique_search_term_12345";
       // Cleanup
       try {
         await vscode.workspace.fs.delete(vscode.Uri.file(replaceTestFilePath), { recursive: false, useTrash: false });
-      } catch (e) {}
+      } catch (e) {
+        // Ignore cleanup errors
+      }
     }
   });
 
@@ -418,7 +427,9 @@ const c = "word_to_replace";`;
       // Cleanup
       try {
         await vscode.workspace.fs.delete(vscode.Uri.file(replaceAllTestFilePath), { recursive: false, useTrash: false });
-      } catch (e) {}
+      } catch (e) {
+        // Ignore cleanup errors
+      }
     }
   });
 

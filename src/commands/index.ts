@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { PanelManager } from '../services/PanelManager';
 import { ViewManager } from '../views/ViewManager';
 import { RiflerSidebarProvider } from '../sidebar/SidebarProvider';
+import { CommandContext } from './types';
 import { openCommand } from './open';
 import { openReplaceCommand } from './openReplace';
 import { openSidebarCommand } from './openSidebar';
@@ -13,19 +14,6 @@ import { restoreCommand } from './restore';
 import { openWindowInternalCommand } from './internal/openWindowInternal';
 import { closeWindowInternalCommand } from './internal/closeWindowInternal';
 import { testEnsureOpenCommand } from './internal/testEnsureOpen';
-
-/**
- * Context object passed to all command handlers
- * Provides access to essential services and dependencies
- */
-export interface CommandContext {
-  extensionContext: vscode.ExtensionContext;
-  panelManager: PanelManager;
-  viewManager: ViewManager;
-  sidebarProvider: RiflerSidebarProvider;
-  getSidebarVisible: () => boolean;
-  onSidebarVisibilityChange: (callback: (visible: boolean) => void) => void;
-}
 
 // Re-export command functions for external use
 export { openCommand } from './open';

@@ -1,10 +1,9 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { SearchScope, SearchOptions, SearchResult, buildSearchRegex, findWorkspaceModules } from '../utils';
 import { IncomingMessage } from '../messaging/types';
 import { performSearch } from '../search';
 import { replaceAll } from '../replacer';
-import { getWebviewHtml } from '../extension';
+import { getWebviewHtml } from '../webview/webviewUtils';
 import { MessageHandler } from '../messaging/handler';
 import { registerCommonHandlers } from '../messaging/registerCommonHandlers';
 

@@ -43,7 +43,9 @@ suite('Rifler UI Visibility & Responsiveness E2E Tests', () => {
       if (fs.existsSync(testFilePath)) {
         fs.unlinkSync(testFilePath);
       }
-    } catch (error) {}
+    } catch (error) {
+      // Ignore cleanup errors
+    }
   });
 
   async function getUiStatus(webview: vscode.Webview): Promise<any> {

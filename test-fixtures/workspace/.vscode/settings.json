@@ -10,5 +10,7 @@
     "editor.minimap.enabled": false
   },
   "rifler.viewMode": "sidebar",
-  "rifler.panelLocation": "sidebar"
+  "rifler.panelLocation": "sidebar",
+  "rifler.persistSearchState": false,
+  "rifler.persistenceScope": "off"
 }

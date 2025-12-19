@@ -18,7 +18,7 @@ export interface MinimizeMessage {
     showFilters?: boolean;
     results?: SearchResult[];
     activeIndex?: number;
-    lastPreview?: any;
+    lastPreview?: unknown;
   };
 }
 

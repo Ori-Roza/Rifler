@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommandContext } from './index';
+import { CommandContext } from './types';
 
 /**
  * rifler.open - Toggle search panel based on viewMode configuration

@@ -127,7 +127,7 @@ async function searchInDirectory(
     // Only log if it's not a "not found" error, which can happen during tests
     // when workspace folders are added/removed rapidly.
     const isNotFound = (error instanceof vscode.FileSystemError && error.code === 'FileNotFound') ||
-                      (error instanceof Error && (error as any).code === 'ENOENT');
+                      (error instanceof Error && (error as { code?: string }).code === 'ENOENT');
     
     if (isNotFound) {
       // Ignore
@@ -166,7 +166,6 @@ async function searchInFileAsync(
     if (workspaceFolders) {
       for (const folder of workspaceFolders) {
         const folderPath = folder.uri.fsPath;
-        const folderName = path.basename(folderPath);
         const normalizedFilePath = path.normalize(filePath);
         const normalizedFolderPath = path.normalize(folderPath);
         if (normalizedFilePath.startsWith(normalizedFolderPath + path.sep) || normalizedFilePath === normalizedFolderPath) {

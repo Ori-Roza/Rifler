@@ -1,4 +1,4 @@
-import { CommandContext } from '../index';
+import { CommandContext } from '../types';
 
 /**
  * __test_ensurePanelOpen - Test-only command to ensure panel is open

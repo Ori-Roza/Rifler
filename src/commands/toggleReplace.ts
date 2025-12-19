@@ -1,4 +1,4 @@
-import { CommandContext } from './index';
+import { CommandContext } from './types';
 
 /**
  * rifler.toggleReplace - Toggle replace row in active Rifler view

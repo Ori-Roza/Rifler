@@ -1,4 +1,4 @@
-import { CommandContext } from '../index';
+import { CommandContext } from '../types';
 
 /**
  * rifler._closeWindowInternal - Internal command to close window panel

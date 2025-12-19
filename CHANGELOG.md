@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0](https://github.com/Ori-Roza/Rifler/compare/v1.0.9...v1.1.0) (2025-12-19)
+
+
+### Features
+
+* display search duration in results summary bar ([0f2b54c](https://github.com/Ori-Roza/Rifler/commit/0f2b54cdb43ff213e409701b7ef8081e5c31c3c9))
+* enhance search functionality with fresh state management and improved UI elements ([15db48e](https://github.com/Ori-Roza/Rifler/commit/15db48ef72bf93f01e38e80bc0aed0d14fa627e6))
+* **issue-83:** Redesign search UI with modern interface and improved layout ([800e05b](https://github.com/Ori-Roza/Rifler/commit/800e05bf2f604eaf527e77c45dfe9fdf0770f21e)), closes [#83](https://github.com/Ori-Roza/Rifler/issues/83)
+* UI redesign with Flexbox layout, virtual scrolling, and robust visibility management ([8a77e24](https://github.com/Ori-Roza/Rifler/commit/8a77e245fb2abdbbf155af6c21cf9afa0085c7e7))
+
+
+### Bug Fixes
+
+* add defensive null checks to DOM element access in webview ([2b4c6ac](https://github.com/Ori-Roza/Rifler/commit/2b4c6ac336ff28a92f4a85a956144d0fa24795c8))
+* show UI immediately on page load ([6c61c1c](https://github.com/Ori-Roza/Rifler/commit/6c61c1cfc71104a01603d20c000da0cf7fb4f0d1))
+* update branch name in contributing guide and replace demo images with video ([2db26da](https://github.com/Ori-Roza/Rifler/commit/2db26da775d0391f78ecb61c2c15e6d2a4e8ffb3))
+
 ### [0.1.11](https://github.com/Ori-Roza/Rifler/compare/v0.1.10...v0.1.11) (2025-12-16)
 
 ### [0.1.10](https://github.com/Ori-Roza/Rifler/compare/v0.1.9...v0.1.10) (2025-12-16)

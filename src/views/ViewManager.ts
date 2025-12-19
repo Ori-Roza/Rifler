@@ -2,11 +2,13 @@ import * as vscode from 'vscode';
 import { RiflerSidebarProvider } from '../sidebar/SidebarProvider';
 import { StateStore } from '../state/StateStore';
 import { MinimizeMessage } from '../messaging/types';
+import { PanelManager } from '../services/PanelManager';
 
 export type PanelLocation = 'sidebar' | 'window';
 
 export class ViewManager {
   private _sidebarProvider?: RiflerSidebarProvider;
+  private _panelManager?: PanelManager;
   private _context: vscode.ExtensionContext;
   private _stateStore?: StateStore;
 
@@ -16,6 +18,10 @@ export class ViewManager {
 
   public setStateStore(stateStore: StateStore): void {
     this._stateStore = stateStore;
+  }
+
+  public setPanelManager(panelManager: PanelManager): void {
+    this._panelManager = panelManager;
   }
 
   public registerSidebarProvider(provider: RiflerSidebarProvider): void {
@@ -88,12 +94,16 @@ export class ViewManager {
   public async switchView(): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
     
-    // Read current location (with backward compatibility for viewMode)
-    let currentLocation = config.get<PanelLocation>('panelLocation');
-    if (!currentLocation) {
-      // Fall back to deprecated viewMode setting
-      const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
-      currentLocation = viewMode === 'tab' ? 'window' : 'sidebar';
+    // Determine current location based on actual visibility/existence
+    // This fixes the "second click" issue when config is out of sync with reality
+    let currentLocation: PanelLocation;
+    if (this._sidebarProvider && this._stateStore?.getSidebarVisible()) {
+      currentLocation = 'sidebar';
+    } else if (this._panelManager?.panel) {
+      currentLocation = 'window';
+    } else {
+      // Fallback to config if we can't determine
+      currentLocation = config.get<PanelLocation>('panelLocation') || 'sidebar';
     }
     
     const newLocation: PanelLocation = currentLocation === 'sidebar' ? 'window' : 'sidebar';
@@ -120,19 +130,25 @@ export class ViewManager {
       savedState = this._stateStore.getSavedState();
     }
     
-    console.log('ViewManager.switchView: savedState =', savedState);
-    
     // Close current view
     if (currentLocation === 'sidebar') {
+      // Close the sidebar when switching to window mode
       await vscode.commands.executeCommand('workbench.action.closeSidebar');
+      // Small delay to ensure sidebar is closed before opening window
+      await new Promise(resolve => setTimeout(resolve, 200));
     } else {
       await vscode.commands.executeCommand('rifler._closeWindowInternal');
+      // Small delay to ensure window is closed before opening sidebar
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
     
     // Update both settings for backward compatibility
-    await config.update('panelLocation', newLocation, vscode.ConfigurationTarget.Global);
+    // Use undefined target to let VS Code decide (defaults to Workspace if in one)
+    const target = vscode.workspace.workspaceFolders ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+    
+    await config.update('panelLocation', newLocation, target);
     // Also update deprecated viewMode setting
-    await config.update('viewMode', newLocation === 'window' ? 'tab' : 'sidebar', vscode.ConfigurationTarget.Global);
+    await config.update('viewMode', newLocation === 'window' ? 'tab' : 'sidebar', target);
     
     // Transfer state to the new view location if we have saved state
     if (savedState) {

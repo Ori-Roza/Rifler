@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommandContext } from './index';
+import { CommandContext } from './types';
 
 /**
  * rifler.openReplace - Open search panel in replace mode
@@ -16,7 +16,9 @@ export function openReplaceCommand(ctx: CommandContext): void {
       initialQuery: selectedText
     });
   } else {
-    ctx.panelManager.createOrShowPanel({
+    // Use viewManager to ensure sidebar is closed for "fullscreen" feel
+    ctx.viewManager.openView({
+      forcedLocation: 'window',
       showReplace: true,
       initialQuery: selectedText
     });

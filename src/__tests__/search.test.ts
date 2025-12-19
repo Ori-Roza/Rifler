@@ -302,7 +302,10 @@ describe('Search', () => {
         const openDocContent = 'new test content';
         
         (vscode.workspace as any).textDocuments = [{
-          uri: { fsPath: testFilePath },
+          uri: { 
+            fsPath: testFilePath,
+            toString: () => testFilePath 
+          },
           getText: () => openDocContent
         }];
         

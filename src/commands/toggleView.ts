@@ -1,4 +1,4 @@
-import { CommandContext } from './index';
+import { CommandContext } from './types';
 
 /**
  * rifler.toggleView - Switch between sidebar and window view

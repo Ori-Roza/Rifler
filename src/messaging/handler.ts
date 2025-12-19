@@ -29,7 +29,10 @@ export class MessageHandler {
     const handler = this.handlers.get(message.type);
 
     if (!handler) {
-      console.warn(`No handler registered for message type: ${message.type}`);
+      // Ignore test-specific messages that are only used for E2E test synchronization
+      if (!message.type.startsWith('__test_')) {
+        console.warn(`No handler registered for message type: ${message.type}`);
+      }
       return;
     }
 

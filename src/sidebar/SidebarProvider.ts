@@ -1,10 +1,9 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import { SearchScope, SearchOptions, SearchResult, buildSearchRegex } from '../utils';
+import { SearchScope, SearchOptions, SearchResult, buildSearchRegex, findWorkspaceModules } from '../utils';
 import { IncomingMessage } from '../messaging/types';
 import { performSearch } from '../search';
 import { replaceAll } from '../replacer';
-import { getWebviewHtml } from '../extension';
+import { getWebviewHtml } from '../webview/webviewUtils';
 import { MessageHandler } from '../messaging/handler';
 import { registerCommonHandlers } from '../messaging/registerCommonHandlers';
 
@@ -17,6 +16,7 @@ interface SidebarState {
   filePath?: string;
   options?: SearchOptions;
   showReplace?: boolean;
+  showFilters?: boolean;
   results?: SearchResult[];
   activeIndex?: number;
   lastPreview?: {
@@ -63,6 +63,11 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     };
 
     webviewView.webview.html = getWebviewHtml(webviewView.webview, this.context.extensionUri);
+
+    // Notify initial visibility
+    if (this._onVisibilityChanged) {
+      this._onVisibilityChanged(webviewView.visible);
+    }
 
     // Initialize unified message handler before wiring message listener
     this._messageHandler = new MessageHandler(webviewView);
@@ -115,6 +120,11 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     webviewView.onDidDispose(() => {
       this._view = undefined;
     });
+
+    // Initial state restore if visible
+    if (webviewView.visible) {
+      this._restoreState();
+    }
   }
 
   private async _handleMessage(message: { type: string; [key: string]: unknown }): Promise<void> {
@@ -286,52 +296,44 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _sendModules(): Promise<void> {
-    const modules: Array<{ name: string; path: string }> = [];
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    
-    if (workspaceFolders && workspaceFolders.length > 0) {
-      for (const folder of workspaceFolders) {
-        const folderUri = folder.uri;
-        const folderPath = folderUri.fsPath;
-        try {
-          const items = await vscode.workspace.fs.readDirectory(folderUri);
-          for (const [name, type] of items) {
-            if (type === vscode.FileType.Directory && !name.startsWith('.')) {
-              modules.push({
-                name,
-                path: `${folderPath}/${name}`
-              });
-            }
-          }
-        } catch (error) {
-          // Silently skip folders we can't read
-        }
-      }
+    if (!this._view) {
+      return;
     }
+    try {
+      const modules = await findWorkspaceModules();
+      this._view.webview.postMessage({
+        type: 'modulesList',
+        modules
+      });
+    } catch (error) {
+      console.error('Error sending modules list to sidebar:', error);
+    }
+  }
 
-    this._view?.webview.postMessage({
-      type: 'modulesList',
-      modules
-    });
+  public sendModules(): void {
+    this._sendModules();
   }
 
   private _sendCurrentDirectory(): void {
-    const editor = vscode.window.activeTextEditor;
+    if (!this._view) {
+      return;
+    }
     const workspaceFolders = vscode.workspace.workspaceFolders;
     let directory = '';
 
-    if (editor) {
-      // Prefer the directory of the active file when an editor is present
-      directory = path.dirname(editor.document.uri.fsPath);
-    } else if (workspaceFolders && workspaceFolders.length > 0) {
-      // Fallback to the first workspace folder when no editor is active
+    if (workspaceFolders && workspaceFolders.length > 0) {
+      // Default to the first workspace folder (project root)
       directory = workspaceFolders[0].uri.fsPath;
     }
 
-    this._view?.webview.postMessage({
+    this._view.webview.postMessage({
       type: 'currentDirectory',
       directory
     });
+  }
+
+  public sendCurrentDirectory(): void {
+    this._sendCurrentDirectory();
   }
 
   private async _sendFileContent(uriString: string | undefined, query: string | undefined, options: SearchOptions | undefined, activeIndex?: number): Promise<void> {
@@ -407,10 +409,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       const uri = vscode.Uri.parse(uriString);
       const encoder = new TextEncoder();
       await vscode.workspace.fs.writeFile(uri, encoder.encode(content));
-      
-      // Show confirmation
-      const fileName = uri.path.split('/').pop() || 'File';
-      vscode.window.showInformationMessage(`Saved ${fileName}`);
     } catch (error) {
       const fileName = uriString.split('/').pop() || 'file';
       console.error('Error saving file:', error);
@@ -431,6 +429,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         type: 'restoreState',
         state
       });
+    } else if (this._view) {
+      console.log('SidebarProvider._restoreState: no state to restore, sending clearState');
+      this._view.webview.postMessage({ type: 'clearState' });
     }
   }
 

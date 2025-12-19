@@ -97,8 +97,41 @@ export function matchesFileMask(fileName: string, fileMask: string): boolean {
   return matchesInclude && !matchesExclude; // Excludes always win
 }
 
-/**
- * Set of directories to exclude from search
+/** * Find modules in the workspace (directories in node_modules)
+ */
+export async function findWorkspaceModules(): Promise<{ name: string; path: string }[]> {
+  const modules: { name: string; path: string }[] = [];
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+
+  if (!workspaceFolders) {
+    return modules;
+  }
+
+  for (const folder of workspaceFolders) {
+    try {
+      const nodeModulesUri = vscode.Uri.joinPath(folder.uri, 'node_modules');
+      const stat = await vscode.workspace.fs.stat(nodeModulesUri);
+
+      if (stat.type === vscode.FileType.Directory) {
+        const entries = await vscode.workspace.fs.readDirectory(nodeModulesUri);
+        for (const [name, type] of entries) {
+          if (type === vscode.FileType.Directory && !name.startsWith('.')) {
+            modules.push({
+              name,
+              path: vscode.Uri.joinPath(nodeModulesUri, name).fsPath
+            });
+          }
+        }
+      }
+    } catch {
+      // If node_modules doesn't exist, continue
+    }
+  }
+
+  return modules;
+}
+
+/** * Set of directories to exclude from search
  */
 export const EXCLUDE_DIRS = new Set([
   'node_modules', '.git', 'dist', 'out', '__pycache__', '.venv', 'venv',

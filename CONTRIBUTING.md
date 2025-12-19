@@ -196,7 +196,7 @@ Defined in `package.json` under `contributes.keybindings`:
 1. **Update your branch** with latest changes
    ```bash
    git fetch origin
-   git rebase origin/main
+   git rebase origin/master
    ```
 
 2. **Push your changes**

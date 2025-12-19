@@ -52,6 +52,11 @@ export const window = {
   showInformationMessage: jest.fn(),
   showQuickPick: jest.fn().mockResolvedValue(undefined),
   activeTextEditor: undefined,
+  onDidChangeActiveTextEditor: jest.fn().mockReturnValue({ dispose: jest.fn() }),
+  tabGroups: {
+    onDidChangeTabs: jest.fn().mockReturnValue({ dispose: jest.fn() }),
+    onDidChangeTabGroups: jest.fn().mockReturnValue({ dispose: jest.fn() }),
+  },
   createStatusBarItem: jest.fn().mockReturnValue({
     show: jest.fn(),
     hide: jest.fn(),
@@ -59,6 +64,15 @@ export const window = {
   }),
   registerWebviewViewProvider: jest.fn().mockReturnValue({ dispose: jest.fn() }),
 };
+
+export class FileSystemError extends Error {
+  static FileNotFound() {
+    const err = new FileSystemError('File not found');
+    (err as any).code = 'FileNotFound';
+    return err;
+  }
+  code?: string;
+}
 
 export const extensions = {
   getExtension: jest.fn(),

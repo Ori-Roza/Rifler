@@ -15,6 +15,10 @@ export interface MinimizeMessage {
     filePath: string;
     options: SearchOptions;
     showReplace: boolean;
+    showFilters?: boolean;
+    results?: SearchResult[];
+    activeIndex?: number;
+    lastPreview?: unknown;
   };
 }
 

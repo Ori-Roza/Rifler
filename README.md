@@ -8,24 +8,18 @@
 </div>
 
 <div align="center">
-  <strong>Tab Mode</strong>
-  <br/>
-  <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_tab.gif" alt="Rifler Tab Mode Demo" width="100%"/>
-</div>
-
-<div align="center">
-  <strong>Sidebar Mode</strong>
-  <br/>
-  <img src="https://raw.githubusercontent.com/ori-roza/rifler/pages/assets/demo_sidebar.gif" alt="Rifler Sidebar Mode Demo" width="100%"/>
+  <video src="https://raw.githubusercontent.com/ori-roza/rifler/master/assets/demo_3_compressed.mp4" width="100%" autoplay loop muted playsinline></video>
 </div>
 
 ## Features
 
 - **Dynamic Search** - Results appear as you type (no Find button needed)
+- **Fresh State** - Automatically clears search results and state when switching workspaces
 - **High Performance**
   - **Virtualized Results** - Smooth scrolling with 10,000+ results
   - **Configurable Limit** - Adjust max results via `rifler.maxResults` setting
   - **Path Tooltips** - Hover truncated paths to see full file path
+  - **Search Duration** - Real-time performance metrics displayed with results
 - **Multiple Scopes**
   - **Project** - Search entire workspace
   - **Module** - Search in detected modules (package.json, tsconfig.json, etc.)
@@ -43,7 +37,7 @@
   - **Undo Support** - Full undo support for all replacements
 - **Full File Preview**
   - View entire file with all matches highlighted
-  - **Syntax Highlighting** - Code highlighting for 50+ languages (powered by highlight.js)
+  - **Syntax Highlighting** - Code highlighting for 50+ languages in both results and preview (powered by highlight.js)
   - **Click to Edit** - Click anywhere in preview to start editing inline
   - **Auto-save** - Changes auto-save as you type
 - **Responsive Sidebar**
@@ -106,10 +100,6 @@ Rifler can open in two modes:
 2. **Tab Mode** - Opens as a separate editor tab
    - Change setting: `rifler.viewMode` to `"tab"`
    - Use `Cmd+Alt+F` (Mac) / `Ctrl+Alt+F` to toggle open/close
-
-<div align="center">
-  <img src="assets/rifler-sidebar.png" alt="Rifler Sidebar" width="40%" height="auto"/>
-</div>
 
 ### Switching Between Modes
 
@@ -267,7 +257,7 @@ Tests are configured using `.vscode-test.js` for maximum flexibility and CI/CD c
 
 ### CI/CD Automation
 Tests run automatically on:
-- Every push to main/develop branches
+- Every push to master/develop branches
 - All pull requests
 - Multiple operating systems (Windows, macOS, Linux)
 

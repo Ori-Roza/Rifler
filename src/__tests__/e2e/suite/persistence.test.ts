@@ -12,6 +12,12 @@ suite('Persistent Storage and Toggle Features', () => {
     if (extension && !extension.isActive) {
       await extension.activate();
     }
+
+    // Ensure we start with default configuration
+    const config = vscode.workspace.getConfiguration('rifler');
+    await config.update('persistSearchState', undefined, vscode.ConfigurationTarget.Workspace);
+    await config.update('persistenceScope', undefined, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
   after(() => {

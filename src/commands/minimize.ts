@@ -1,4 +1,4 @@
-import { CommandContext } from './index';
+import { CommandContext } from './types';
 
 /**
  * rifler.minimize - Minimize panel to status bar

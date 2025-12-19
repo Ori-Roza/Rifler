@@ -52,7 +52,7 @@ export class PanelManager {
 
     // If panel already exists, reveal it and send messages as needed
     if (this.currentPanel) {
-      this.currentPanel.reveal(vscode.ViewColumn.Beside);
+      this.currentPanel.reveal(vscode.ViewColumn.Two);
       if (showReplace) {
         this.currentPanel.webview.postMessage({ type: 'showReplace' });
       }
@@ -62,6 +62,8 @@ export class PanelManager {
           query: initialQuery
         });
       }
+      // Ensure sidebar is closed when the panel is revealed
+      vscode.commands.executeCommand('workbench.action.closeSidebar');
       return;
     }
 
@@ -73,8 +75,8 @@ export class PanelManager {
       'rifler',
       'Rifler',
       {
-        viewColumn: vscode.ViewColumn.Beside,
-        preserveFocus: true
+        viewColumn: vscode.ViewColumn.Two,
+        preserveFocus: false
       },
       {
         enableScripts: true,
@@ -87,6 +89,18 @@ export class PanelManager {
       this.currentPanel.webview,
       this.extensionUri
     );
+
+    // Ensure sidebar is closed when the panel is visible
+    this.currentPanel.onDidChangeViewState(e => {
+      if (e.webviewPanel.visible) {
+        setTimeout(() => {
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+        }, 100);
+      }
+    });
+
+    // Also close sidebar immediately after creation
+    vscode.commands.executeCommand('workbench.action.closeSidebar');
 
     // Create unified message handler for the panel and configure common handlers
     this._messageHandler = new MessageHandler(this.currentPanel);
@@ -258,6 +272,8 @@ export class PanelManager {
         type: 'restoreState',
         state: stateToRestore
       });
+    } else {
+      this.currentPanel.webview.postMessage({ type: 'clearState' });
     }
 
     // Set initial query or focus search box

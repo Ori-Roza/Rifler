@@ -1,4 +1,4 @@
-import { CommandContext } from '../index';
+import { CommandContext } from '../types';
 
 /**
  * rifler._openWindowInternal - Internal command to open window panel

@@ -1,9 +1,31 @@
 // Rifler Webview Script
 // Extracted from extension.ts as part of Phase 1 refactoring (Issue #46)
 
+console.log('[Rifler] Webview script starting...');
+
+// Ensure UI is visible IMMEDIATELY
+(function showUIImmediately() {
+  // Make body visible right away
+  const body = document.body;
+  if (body) {
+    body.style.opacity = '1';
+    body.classList.add('loaded');
+  }
+  
+  // Hide loading overlay immediately
+  const loadingOverlay = document.getElementById('loading-overlay');
+  if (loadingOverlay) {
+    loadingOverlay.classList.add('hidden');
+    console.log('[Rifler] UI shown, loading overlay hidden');
+  }
+})();
+
 (function() {
+  console.log('[Rifler] IIFE initialization started');
+  
   const state = {
     results: [],
+    renderItems: [],
     activeIndex: -1,
     currentScope: 'project',
     modules: [],
@@ -12,8 +34,11 @@
     fileContent: null,
     lastPreview: null,
     searchTimeout: null,
+    searchStartTime: 0,
+    lastSearchDuration: 0,
     replaceKeybinding: 'ctrl+shift+r',
     maxResultsCap: 10000,
+    collapsedFiles: new Set(),
     options: {
       matchCase: false,
       wholeWord: false,
@@ -57,34 +82,51 @@
     }
   });
 
-  // DOM Elements
+  // DOM Elements - Updated for Issue #83 redesign
   const queryInput = document.getElementById('query');
   const replaceRow = document.getElementById('replace-row');
+  if (replaceRow) {
+    replaceRow.classList.remove('visible');
+    replaceRow.style.display = 'none';
+  }
   const replaceInput = document.getElementById('replace-input');
   const replaceBtn = document.getElementById('replace-btn');
   const replaceAllBtn = document.getElementById('replace-all-btn');
   const closeSearchBtn = document.getElementById('close-search');
-  const toggleReplaceBtn = document.getElementById('toggle-replace');
   const resultsList = document.getElementById('results-list');
-  const resultsCount = document.getElementById('results-count');
   const previewContent = document.getElementById('preview-content');
   const previewFilename = document.getElementById('preview-filename');
-  const scopeTabs = document.querySelectorAll('.scope-tab');
-  const directoryInputWrapper = document.getElementById('directory-input-wrapper');
-  const moduleInputWrapper = document.getElementById('module-input-wrapper');
+  const previewFilepath = document.getElementById('preview-filepath');
+  
+  // Updated for new layout
   const directoryInput = document.getElementById('directory-input');
   const moduleSelect = document.getElementById('module-select');
+  const fileInput = document.getElementById('file-input');
+  const scopeSelect = document.getElementById('scope-select');
+  const pathLabel = document.getElementById('path-label');
+  
   const matchCaseToggle = document.getElementById('match-case');
   const wholeWordToggle = document.getElementById('whole-word');
   const useRegexToggle = document.getElementById('use-regex');
   const fileMaskInput = document.getElementById('file-mask');
-  const fileMaskBtn = document.getElementById('file-mask-btn');
-  const fileMaskDropdown = document.getElementById('file-mask-dropdown');
-  const fileMaskLabel = document.getElementById('file-mask-label');
 
-  const scopeFileBtn = document.getElementById('scope-file');
-  const fileInputWrapper = document.getElementById('file-input-wrapper');
-  const fileInput = document.getElementById('file-input');
+  // New elements for Issue #83 redesign
+  const filtersContainer = document.getElementById('filters-container');
+  const filterBtn = document.getElementById('filter-btn');
+  const replaceToggleBtn = document.getElementById('replace-toggle-btn');
+  const dragHandle = document.getElementById('drag-handle');
+  const previewPanelContainer = document.getElementById('preview-panel-container');
+  const resultsCountText = document.getElementById('results-count-text');
+  const resultsSummaryBar = document.querySelector('.results-summary-bar');
+  const collapseAllBtn = document.getElementById('collapse-all-btn');
+  
+  // Create a fallback for resultsCount if needed (backward compatibility)
+  let resultsCount = document.getElementById('results-count');
+  if (!resultsCount) {
+    resultsCount = resultsCountText; // Use the new element as a fallback
+  }
+
+  // Keep backward compatibility - some may not exist in new design
   const previewActions = document.getElementById('preview-actions');
   const replaceInFileBtn = document.getElementById('replace-in-file-btn');
   const fileEditor = document.getElementById('file-editor');
@@ -93,12 +135,10 @@
   const editorLineNumbers = document.getElementById('editor-line-numbers');
 
   const resultsPanel = document.getElementById('results-panel');
-  const panelResizer = document.getElementById('panel-resizer');
-  const previewToggleBtn = document.getElementById('preview-toggle-btn');
   const previewPanel = document.getElementById('preview-panel');
   const mainContent = document.querySelector('.main-content');
 
-  let VIRTUAL_ROW_HEIGHT = 46;
+  let VIRTUAL_ROW_HEIGHT = 28;
   const VIRTUAL_OVERSCAN = 8;
   let measuredRowHeight = 0;
   const virtualContent = document.createElement('div');
@@ -110,9 +150,11 @@
   resultsPlaceholder.className = 'empty-state';
   resultsPlaceholder.style.display = 'none';
 
-  resultsList.innerHTML = '';
-  resultsList.appendChild(virtualContent);
-  resultsList.appendChild(resultsPlaceholder);
+  if (resultsList) {
+    resultsList.innerHTML = '';
+    resultsList.appendChild(virtualContent);
+    resultsList.appendChild(resultsPlaceholder);
+  }
   
   const replaceWidget = document.getElementById('replace-widget');
   const localSearchInput = document.getElementById('local-search-input');
@@ -124,10 +166,13 @@
   const localPrevBtn = document.getElementById('local-prev-btn');
   const localNextBtn = document.getElementById('local-next-btn');
 
-  console.log('DOM Elements loaded:', {
+  console.log('[Rifler] DOM Elements loaded:', {
     queryInput: !!queryInput,
     resultsList: !!resultsList,
-    previewContent: !!previewContent
+    previewContent: !!previewContent,
+    mainContent: !!mainContent,
+    dragHandle: !!dragHandle,
+    filtersContainer: !!filtersContainer
   });
 
   function getLanguageFromFilename(filename) {
@@ -187,67 +232,46 @@
       
       // Fade in content
       document.body.classList.add('loaded');
-      queryInput.focus();
-      searchBoxFocusedOnStartup = true;
+      if (queryInput) {
+        queryInput.focus();
+        searchBoxFocusedOnStartup = true;
+      }
     });
   });
 
   vscode.postMessage({ type: 'webviewReady' });
   vscode.postMessage({ type: 'getModules' });
   vscode.postMessage({ type: 'getCurrentDirectory' });
+  
+  // Initialize results count display
+  clearResultsCountDisplay();
 
-  function toggleReplace() {
-    const isVisible = replaceRow.classList.toggle('visible');
-    toggleReplaceBtn.classList.toggle('active', isVisible);
-    if (isVisible) {
-      if (queryInput.value.trim()) {
-        replaceInput.focus();
-      } else {
-        queryInput.focus();
+  function toggleReplace(forceState) {
+    if (replaceRow) {
+      const isVisible = replaceRow.classList.contains('visible');
+      const newState = typeof forceState === 'boolean' ? forceState : !isVisible;
+      
+      console.log('[Rifler] toggleReplace called. forceState:', forceState, 'isVisible:', isVisible, 'newState:', newState);
+
+      replaceRow.classList.toggle('visible', newState);
+      replaceRow.style.display = newState ? 'flex' : 'none';
+      
+      // Update toggle button state
+      if (replaceToggleBtn) {
+        replaceToggleBtn.classList.toggle('active', newState);
       }
-    } else {
-      queryInput.focus();
+
+      if (newState && replaceInput) {
+        replaceInput.focus();
+      }
+      vscode.postMessage({
+        type: 'toggleReplace',
+        state: newState
+      });
     }
   }
 
-  toggleReplaceBtn.addEventListener('click', toggleReplace);
-
-  closeSearchBtn.addEventListener('click', () => {
-    queryInput.value = '';
-    state.results = [];
-    state.activeIndex = -1;
-    handleSearchResults([], { skipAutoLoad: true });
-    
-    vscode.postMessage({ type: 'clearState' });
-    
-    vscode.postMessage({ type: 'minimize', state: {} });
-  });
-
-  fileMaskBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    fileMaskDropdown.classList.toggle('visible');
-    if (fileMaskDropdown.classList.contains('visible')) {
-      fileMaskInput.focus();
-    }
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!fileMaskDropdown.contains(e.target) && e.target !== fileMaskBtn) {
-      fileMaskDropdown.classList.remove('visible');
-    }
-  });
-
-  function updateFileMaskLabel() {
-    const value = fileMaskInput.value.trim();
-    if (value) {
-      fileMaskLabel.textContent = value;
-      fileMaskBtn.classList.add('has-value');
-    } else {
-      fileMaskLabel.textContent = 'File mask';
-      fileMaskBtn.classList.remove('has-value');
-    }
-  }
-
+  // Toggle replace on Cmd/Ctrl+Shift+R is handled in keyboard handler below
   document.addEventListener('keydown', (e) => {
     if (e.altKey && e.shiftKey && e.code === 'KeyF') {
       e.preventDefault();
@@ -255,18 +279,72 @@
     }
   });
 
-  replaceBtn.addEventListener('click', replaceOne);
-  replaceAllBtn.addEventListener('click', replaceAll);
+  if (closeSearchBtn) {
+    closeSearchBtn.addEventListener('click', () => {
+      queryInput.value = '';
+      state.results = [];
+      state.activeIndex = -1;
+      handleSearchResults([], { skipAutoLoad: true });
+      
+      vscode.postMessage({ type: 'clearState' });
+      
+      vscode.postMessage({ type: 'minimize', state: {} });
+    });
+  }
+
+  if (filterBtn && filtersContainer) {
+    filterBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = filtersContainer.classList.toggle('hidden');
+      filterBtn.classList.toggle('active', !isHidden);
+    });
+  }
   
-  replaceInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      if (e.metaKey || e.ctrlKey) {
-        replaceAll();
+  if (replaceToggleBtn) {
+    replaceToggleBtn.addEventListener('click', () => {
+      toggleReplace();
+    });
+  }
+
+  if (replaceBtn) {
+    replaceBtn.addEventListener('click', replaceOne);
+  }
+
+  if (replaceAllBtn) {
+    replaceAllBtn.addEventListener('click', replaceAll);
+  }
+
+  if (collapseAllBtn) {
+    collapseAllBtn.addEventListener('click', () => {
+      if (state.results.length === 0) return;
+      
+      // If everything is already collapsed, expand all. Otherwise, collapse all.
+      const allPaths = new Set();
+      state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
+      
+      const allCollapsed = Array.from(allPaths).every(p => state.collapsedFiles.has(p));
+      
+      if (allCollapsed) {
+        state.collapsedFiles.clear();
       } else {
-        replaceOne();
+        allPaths.forEach(p => state.collapsedFiles.add(p));
       }
-    }
-  });
+      
+      handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
+    });
+  }
+  
+  if (replaceInput) {
+    replaceInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (e.metaKey || e.ctrlKey) {
+          replaceAll();
+        } else {
+          replaceOne();
+        }
+      }
+    });
+  }
 
   function triggerReplaceInFile() {
     if (!state.fileContent) return;
@@ -275,84 +353,107 @@
       enterEditMode();
     }
     
-    localSearchInput.value = state.currentQuery || '';
-    localReplaceInput.value = '';
-    
-    replaceWidget.classList.add('visible');
-    localSearchInput.focus();
-    localSearchInput.select();
-    
-    updateLocalMatches();
+    if (replaceWidget) {
+      const isVisible = replaceWidget.classList.contains('visible');
+      if (isVisible) {
+        replaceWidget.classList.remove('visible');
+      } else {
+        if (localSearchInput) localSearchInput.value = state.currentQuery || '';
+        if (localReplaceInput) localReplaceInput.value = '';
+        replaceWidget.classList.add('visible');
+        if (localSearchInput) {
+          localSearchInput.focus();
+          localSearchInput.select();
+        }
+        updateLocalMatches();
+      }
+    }
   }
 
-  replaceInFileBtn.addEventListener('click', triggerReplaceInFile);
+  if (replaceInFileBtn) {
+    replaceInFileBtn.addEventListener('click', triggerReplaceInFile);
+  }
   
-  localReplaceClose.addEventListener('click', () => {
-    replaceWidget.classList.remove('visible');
-    localMatches = [];
-    localMatchIndex = 0;
-    updateHighlights();
-    if (isEditMode) {
-      fileEditor.focus();
-    }
-  });
+  if (localReplaceClose) {
+    localReplaceClose.addEventListener('click', () => {
+      if (replaceWidget) replaceWidget.classList.remove('visible');
+      localMatches = [];
+      localMatchIndex = 0;
+      updateHighlights();
+      if (isEditMode && fileEditor) {
+        fileEditor.focus();
+      }
+    });
+  }
 
-  localSearchInput.addEventListener('input', () => {
-    updateLocalMatches();
-    updateHighlights();
-  });
+  if (localSearchInput) {
+    localSearchInput.addEventListener('input', () => {
+      updateLocalMatches();
+      updateHighlights();
+    });
 
-  localSearchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (e.shiftKey) {
+    localSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          navigateLocalMatch(-1);
+        } else {
+          navigateLocalMatch(1);
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
         navigateLocalMatch(-1);
-      } else {
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
         navigateLocalMatch(1);
+      } else if (e.key === 'Escape') {
+        if (replaceWidget) replaceWidget.classList.remove('visible');
+        localMatches = [];
+        updateHighlights();
+        if (isEditMode && fileEditor) {
+          fileEditor.focus();
+        }
       }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      navigateLocalMatch(-1);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      navigateLocalMatch(1);
-    } else if (e.key === 'Escape') {
-      replaceWidget.classList.remove('visible');
-      localMatches = [];
-      updateHighlights();
-      if (isEditMode) {
-        fileEditor.focus();
-      }
-    }
-  });
+    });
+  }
 
-  localReplaceInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      if (e.metaKey || e.ctrlKey) {
-        triggerLocalReplaceAll();
-      } else {
-        triggerLocalReplace();
+  if (localReplaceInput) {
+    localReplaceInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (e.metaKey || e.ctrlKey) {
+          triggerLocalReplaceAll();
+        } else {
+          triggerLocalReplace();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        navigateLocalMatch(-1);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        navigateLocalMatch(1);
+      } else if (e.key === 'Escape') {
+        if (replaceWidget) replaceWidget.classList.remove('visible');
+        localMatches = [];
+        updateHighlights();
+        if (isEditMode && fileEditor) {
+          fileEditor.focus();
+        }
       }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      navigateLocalMatch(-1);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      navigateLocalMatch(1);
-    } else if (e.key === 'Escape') {
-      replaceWidget.classList.remove('visible');
-      localMatches = [];
-      updateHighlights();
-      if (isEditMode) {
-        fileEditor.focus();
-      }
-    }
-  });
+    });
+  }
 
-  localReplaceBtn.addEventListener('click', triggerLocalReplace);
-  localReplaceAllBtn.addEventListener('click', triggerLocalReplaceAll);
-  localPrevBtn.addEventListener('click', () => navigateLocalMatch(-1));
-  localNextBtn.addEventListener('click', () => navigateLocalMatch(1));
+  if (localReplaceBtn) {
+    localReplaceBtn.addEventListener('click', triggerLocalReplace);
+  }
+  if (localReplaceAllBtn) {
+    localReplaceAllBtn.addEventListener('click', triggerLocalReplaceAll);
+  }
+  if (localPrevBtn) {
+    localPrevBtn.addEventListener('click', () => navigateLocalMatch(-1));
+  }
+  if (localNextBtn) {
+    localNextBtn.addEventListener('click', () => navigateLocalMatch(1));
+  }
 
   function updateLocalMatches() {
     localMatches = [];
@@ -492,11 +593,13 @@
   let isEditMode = false;
   let saveTimeout = null;
 
-  previewContent.addEventListener('click', (e) => {
-    if (e.target.tagName === 'BUTTON') return;
-    
-    enterEditMode();
-  });
+  if (previewContent) {
+    previewContent.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      
+      enterEditMode();
+    });
+  }
 
   function enterEditMode() {
     if (!state.fileContent || isEditMode) return;
@@ -504,17 +607,18 @@
     const scrollTop = previewContent.scrollTop;
     
     isEditMode = true;
-    editorContainer.classList.add('visible');
-    fileEditor.value = state.fileContent.content;
+    if (editorContainer) editorContainer.classList.add('visible');
+    if (fileEditor) fileEditor.value = state.fileContent.content;
     updateHighlights();
     
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        fileEditor.scrollTop = scrollTop;
+        if (fileEditor) {
+          fileEditor.scrollTop = scrollTop;
+          fileEditor.focus({ preventScroll: true });
+        }
         if (editorBackdrop) editorBackdrop.scrollTop = scrollTop;
         if (editorLineNumbers) editorLineNumbers.scrollTop = scrollTop;
-        
-        fileEditor.focus({ preventScroll: true });
       });
     });
   }
@@ -532,47 +636,47 @@
     state.fileContent.content = newContent;
   }
 
-  function exitEditMode() {
+  function exitEditMode(skipRender = false) {
     if (!isEditMode) return;
     
     saveFile();
     
     isEditMode = false;
-    editorContainer.classList.remove('visible');
+    if (editorContainer) editorContainer.classList.remove('visible');
     
-    renderFilePreview(state.fileContent);
+    if (!skipRender) {
+      renderFilePreview(state.fileContent);
+    }
   }
 
-  fileEditor.addEventListener('input', () => {
-    updateHighlights();
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-      saveFile();
-    }, 1000);
-  });
-
-  fileEditor.addEventListener('blur', (e) => {
-    if (e.relatedTarget && (replaceWidget.contains(e.relatedTarget) || e.relatedTarget === replaceWidget)) {
-      return;
-    }
-    
-    if (saveTimeout) clearTimeout(saveTimeout);
-    exitEditMode();
-  });
-
-  fileEditor.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-      e.preventDefault();
+  if (fileEditor) {
+    fileEditor.addEventListener('input', () => {
+      updateHighlights();
       if (saveTimeout) clearTimeout(saveTimeout);
-      saveFile();
-    } else if (checkReplaceKeybinding(e)) {
-      e.preventDefault();
-      triggerReplaceInFile();
-    } else if (e.key === 'Escape') {
+      saveTimeout = setTimeout(() => {
+        saveFile();
+      }, 1000);
+    });
+
+    fileEditor.addEventListener('blur', (e) => {
       if (saveTimeout) clearTimeout(saveTimeout);
-      exitEditMode();
-    }
-  });
+      // Removed exitEditMode() on blur to prevent flickering and unwanted saves
+      // when switching focus to the replace widget or other UI elements.
+    });
+    fileEditor.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveFile();
+      } else if (checkReplaceKeybinding(e)) {
+        e.preventDefault();
+        triggerReplaceInFile();
+      } else if (e.key === 'Escape') {
+        if (saveTimeout) clearTimeout(saveTimeout);
+        exitEditMode();
+      }
+    });
+  }
   
   function checkReplaceKeybinding(e) {
     const keybinding = state.replaceKeybinding || 'ctrl+shift+r';
@@ -703,6 +807,10 @@
   }
 
   function replaceOne() {
+    if (isEditMode) {
+      exitEditMode(true);
+    }
+    
     if (state.activeIndex < 0 || state.activeIndex >= state.results.length) return;
     const result = state.results[state.activeIndex];
     const replaceText = replaceInput.value;
@@ -733,7 +841,7 @@
       }
     }
 
-    resultsCount.textContent = state.results.length + ' results';
+    updateResultsCountDisplay(state.results);
     
     if (state.results.length === 0) {
       showPlaceholder('No results found');
@@ -764,6 +872,10 @@
   }
 
   function replaceAll() {
+    if (isEditMode) {
+      exitEditMode(true);
+    }
+    
     vscode.postMessage({
       type: 'replaceAll',
       query: state.currentQuery,
@@ -833,16 +945,23 @@
     console.log('Input event triggered, value:', queryInput.value);
     clearTimeout(state.searchTimeout);
     
+    if (isEditMode) {
+      exitEditMode(true);
+    }
+    
     if (queryInput.value.trim().length === 0) {
       previewContent.innerHTML = '<div class="empty-state">No results</div>';
       previewFilename.textContent = '';
       showPlaceholder('Type to search...');
-      resultsCount.textContent = '';
+      clearResultsCountDisplay();
       state.results = [];
       state.activeIndex = -1;
       state.currentQuery = '';
       state.fileContent = null;
       state.lastPreview = null;
+      state.lastSearchDuration = 0;
+      
+      applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
       
       const msgElement = document.getElementById('query-validation-message');
       if (msgElement) {
@@ -866,66 +985,97 @@
     console.log('Timeout set, id:', state.searchTimeout);
   });
 
-  matchCaseToggle.addEventListener('click', () => {
-    state.options.matchCase = !state.options.matchCase;
-    matchCaseToggle.classList.toggle('active', state.options.matchCase);
-    runSearch();
-  });
-
-  wholeWordToggle.addEventListener('click', () => {
-    state.options.wholeWord = !state.options.wholeWord;
-    wholeWordToggle.classList.toggle('active', state.options.wholeWord);
-    runSearch();
-  });
-
-  useRegexToggle.addEventListener('click', () => {
-    state.options.useRegex = !state.options.useRegex;
-    useRegexToggle.classList.toggle('active', state.options.useRegex);
-    
-    if (state.options.useRegex) {
-      validateRegexPattern();
-    } else {
-      const msgElement = document.getElementById('query-validation-message');
-      if (msgElement) {
-        msgElement.textContent = '';
-        msgElement.className = 'validation-message';
-      }
-    }
-    
-    runSearch();
-  });
-
-  fileMaskInput.addEventListener('input', () => {
-    clearTimeout(state.searchTimeout);
-    
-    updateFileMaskLabel();
-    
-    clearTimeout(validationDebounceTimeout);
-    validationDebounceTimeout = setTimeout(() => {
-      validateFileMaskPattern();
-    }, 150);
-
-    state.searchTimeout = setTimeout(() => {
-      state.options.fileMask = fileMaskInput.value;
+  if (matchCaseToggle) {
+    matchCaseToggle.addEventListener('click', () => {
+      state.options.matchCase = !state.options.matchCase;
+      matchCaseToggle.classList.toggle('active', state.options.matchCase);
       runSearch();
-    }, 300);
-  });
+    });
+  }
+
+  if (wholeWordToggle) {
+    wholeWordToggle.addEventListener('click', () => {
+      state.options.wholeWord = !state.options.wholeWord;
+      wholeWordToggle.classList.toggle('active', state.options.wholeWord);
+      runSearch();
+    });
+  }
+
+  if (useRegexToggle) {
+    useRegexToggle.addEventListener('click', () => {
+      state.options.useRegex = !state.options.useRegex;
+      useRegexToggle.classList.toggle('active', state.options.useRegex);
+      
+      if (state.options.useRegex) {
+        validateRegexPattern();
+      } else {
+        const msgElement = document.getElementById('query-validation-message');
+        if (msgElement) {
+          msgElement.textContent = '';
+          msgElement.className = 'validation-message';
+        }
+      }
+      
+      runSearch();
+    });
+  }
+
+  if (fileMaskInput) {
+    fileMaskInput.addEventListener('input', () => {
+      clearTimeout(state.searchTimeout);
+      
+      clearTimeout(validationDebounceTimeout);
+      validationDebounceTimeout = setTimeout(() => {
+        validateFileMaskPattern();
+      }, 150);
+
+      state.searchTimeout = setTimeout(() => {
+        state.options.fileMask = fileMaskInput.value;
+        runSearch();
+      }, 300);
+    });
+  }
 
   let isResizing = false;
   let startY = 0;
   let startResultsHeight = 0;
   let containerHeightAtDragStart = 0;
+  let virtualRenderPending = false;
   const MIN_PANEL_HEIGHT = 80;
   const PREVIEW_MIN_HEIGHT = 80;
   const DEFAULT_PREVIEW_HEIGHT = 240;
   let previewHeight = 0;
   let lastExpandedHeight = 0;
-  const RESIZER_HEIGHT = 22;
+  const RESIZER_HEIGHT = 14;
 
   const savedWebviewState = vscode.getState() || {};
 
+  function saveState() {
+    vscode.postMessage({ 
+      type: 'minimize',
+      state: {
+        query: queryInput.value,
+        replaceText: replaceInput.value,
+        scope: state.currentScope,
+        directoryPath: directoryInput.value,
+        modulePath: moduleSelect.value,
+        filePath: fileInput.value,
+        options: state.options,
+        showReplace: replaceRow.classList.contains('visible'),
+        results: state.results,
+        activeIndex: state.activeIndex,
+        lastPreview: state.lastPreview
+      }
+    });
+  }
+
   function getContainerHeight() {
-    return Math.max(0, mainContent.offsetHeight - RESIZER_HEIGHT);
+    let summaryHeight = resultsSummaryBar ? resultsSummaryBar.offsetHeight : 0;
+    // Fallback if not yet rendered but we know it should be there
+    if (summaryHeight === 0 && resultsSummaryBar) {
+      summaryHeight = 28; 
+    }
+    return Math.max(0, mainContent.offsetHeight - RESIZER_HEIGHT - summaryHeight);
   }
 
   function getDefaultPreviewHeight() {
@@ -936,14 +1086,28 @@
     return Math.min(Math.max(PREVIEW_MIN_HEIGHT, proposed), maxPreview);
   }
 
-  function applyPreviewHeight(height, { updateLastExpanded = true, persist = false } = {}) {
+  function applyPreviewHeight(height, { updateLastExpanded = true, persist = false, visible = true } = {}) {
     const containerHeight = getContainerHeight();
+    if (containerHeight <= 0) return; // Don't apply if we don't know the container height
+
     const maxPreviewHeight = Math.max(PREVIEW_MIN_HEIGHT, containerHeight - MIN_PANEL_HEIGHT);
     const clamped = Math.min(Math.max(PREVIEW_MIN_HEIGHT, height), maxPreviewHeight);
-    const newResultsHeight = containerHeight - clamped;
+    const newResultsHeight = Math.max(MIN_PANEL_HEIGHT, containerHeight - clamped);
     
-    resultsPanel.style.height = newResultsHeight + 'px';
-    previewPanel.style.height = clamped + 'px';
+    if (resultsPanel) {
+      resultsPanel.style.flex = '1';
+      resultsPanel.style.height = 'auto';
+      resultsPanel.style.minHeight = '0';
+    }
+    if (previewPanelContainer) {
+      previewPanelContainer.style.flex = 'none';
+      previewPanelContainer.style.height = (clamped + RESIZER_HEIGHT) + 'px';
+      previewPanelContainer.style.display = visible ? 'flex' : 'none';
+    }
+    if (previewPanel) {
+      previewPanel.style.height = clamped + 'px';
+    }
+    
     previewHeight = clamped;
     
     if (updateLastExpanded && clamped > PREVIEW_MIN_HEIGHT) {
@@ -968,20 +1132,24 @@
   }
 
   function updatePreviewToggleButton() {
-    if (!previewToggleBtn) return;
-    const collapsed = isPreviewCollapsed();
-    previewToggleBtn.textContent = collapsed ? '+' : '-';
-    previewToggleBtn.setAttribute('aria-label', collapsed ? 'Expand preview' : 'Collapse preview');
-    previewToggleBtn.title = collapsed ? 'Expand preview' : 'Collapse preview';
+    // Preview toggle button not used in current UI design
+    // This function is kept for backward compatibility but does nothing
   }
 
   function initializePanelHeights() {
+    const containerHeight = getContainerHeight();
+    
+    // If container height is 0, wait for it to be available
+    if (containerHeight <= 0) {
+      requestAnimationFrame(initializePanelHeights);
+      return;
+    }
+
     let initialPreviewHeight = getDefaultPreviewHeight();
     
     if (typeof savedWebviewState.previewHeight === 'number') {
       initialPreviewHeight = savedWebviewState.previewHeight;
     } else if (typeof savedWebviewState.resultsPanelHeight === 'number') {
-      const containerHeight = getContainerHeight();
       initialPreviewHeight = Math.max(PREVIEW_MIN_HEIGHT, containerHeight - savedWebviewState.resultsPanelHeight);
     }
 
@@ -993,70 +1161,96 @@
       lastExpandedHeight = initialPreviewHeight > PREVIEW_MIN_HEIGHT ? initialPreviewHeight : getDefaultPreviewHeight();
     }
     
-    applyPreviewHeight(initialPreviewHeight, { updateLastExpanded: initialPreviewHeight > PREVIEW_MIN_HEIGHT, persist: false });
+    const isVisible = state.results && state.results.length > 0 && state.activeIndex >= 0;
+    applyPreviewHeight(initialPreviewHeight, { 
+      updateLastExpanded: initialPreviewHeight > PREVIEW_MIN_HEIGHT, 
+      persist: false,
+      visible: isVisible
+    });
   }
 
-  requestAnimationFrame(() => {
-    initializePanelHeights();
-  });
+  // Use ResizeObserver to handle dynamic layout changes
+  if (typeof ResizeObserver !== 'undefined' && mainContent) {
+    const resizeObserver = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        if (entry.contentRect.height > 0 && !previewHeight) {
+          initializePanelHeights();
+        } else if (previewHeight) {
+          const isVisible = state.results && state.results.length > 0 && state.activeIndex >= 0;
+          applyPreviewHeight(previewHeight, { updateLastExpanded: false, persist: false, visible: isVisible });
+        }
+      }
+    });
+    resizeObserver.observe(mainContent);
+  } else {
+    requestAnimationFrame(() => {
+      initializePanelHeights();
+    });
+  }
 
-  panelResizer.addEventListener('mousedown', (e) => {
-    if (previewToggleBtn && (e.target === previewToggleBtn || (e.target && e.target.closest('.panel-resizer-buttons')))) {
-      return;
-    }
+  // Setup drag handle for resizing preview panel (pointer-first with fallbacks)
+  function beginResize(clientY) {
     isResizing = true;
-    startY = e.clientY;
-    startResultsHeight = resultsPanel.offsetHeight;
+    startY = clientY;
+    startResultsHeight = resultsPanel ? resultsPanel.offsetHeight : 0;
     containerHeightAtDragStart = getContainerHeight();
-    panelResizer.classList.add('dragging');
-    document.body.style.cursor = 'ns-resize';
+    if (dragHandle) dragHandle.classList.add('dragging');
+    document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
-    e.preventDefault();
-  });
+  }
 
-  document.addEventListener('mousemove', (e) => {
+  function updateResize(clientY) {
     if (!isResizing) return;
-    
     const containerHeight = containerHeightAtDragStart || getContainerHeight();
-    const deltaY = e.clientY - startY;
+    const deltaY = clientY - startY;
     let newResultsHeight = startResultsHeight + deltaY;
-
     const maxResultsHeight = containerHeight - PREVIEW_MIN_HEIGHT;
     newResultsHeight = Math.max(MIN_PANEL_HEIGHT, Math.min(maxResultsHeight, newResultsHeight));
-    
     const newPreviewHeight = containerHeight - newResultsHeight;
     applyPreviewHeight(newPreviewHeight, { updateLastExpanded: newPreviewHeight > PREVIEW_MIN_HEIGHT, persist: false });
-  });
+  }
 
-  document.addEventListener('mouseup', () => {
+  function endResize(persist = true) {
     if (!isResizing) return;
     isResizing = false;
-    panelResizer.classList.remove('dragging');
+    if (dragHandle) dragHandle.classList.remove('dragging');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-    
-    applyPreviewHeight(previewHeight, { updateLastExpanded: previewHeight > PREVIEW_MIN_HEIGHT, persist: true });
-    
+    applyPreviewHeight(previewHeight, { updateLastExpanded: previewHeight > PREVIEW_MIN_HEIGHT, persist });
     scheduleVirtualRender();
-  });
+  }
 
-  if (previewToggleBtn) {
-    previewToggleBtn.addEventListener('mousedown', (e) => {
-      e.stopPropagation();
+  if (dragHandle) {
+    dragHandle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      beginResize(e.clientY);
+      try {
+        dragHandle.setPointerCapture(e.pointerId);
+      } catch (err) {
+        console.error('Failed to set pointer capture:', err);
+      }
       e.preventDefault();
     });
-    previewToggleBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      if (isPreviewCollapsed()) {
-        if (!lastExpandedHeight || lastExpandedHeight <= PREVIEW_MIN_HEIGHT) {
-          lastExpandedHeight = getDefaultPreviewHeight();
-        }
-        applyPreviewHeight(Math.max(PREVIEW_MIN_HEIGHT, lastExpandedHeight), { updateLastExpanded: false, persist: true });
-      } else {
-        applyPreviewHeight(PREVIEW_MIN_HEIGHT, { updateLastExpanded: false, persist: true });
-      }
-      scheduleVirtualRender();
+
+    dragHandle.addEventListener('pointermove', (e) => {
+      if (!isResizing) return;
+      updateResize(e.clientY);
+    });
+
+    dragHandle.addEventListener('pointerup', (e) => {
+      if (!isResizing) return;
+      try {
+        dragHandle.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+      endResize(true);
+    });
+
+    dragHandle.addEventListener('pointercancel', (e) => {
+      if (!isResizing) return;
+      try {
+        dragHandle.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+      endResize(false);
     });
   }
 
@@ -1066,24 +1260,27 @@
     scheduleVirtualRender();
   });
 
-  scopeTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      scopeTabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      state.currentScope = tab.dataset.scope;
+  // Scope selection - Updated for new dropdown structure
+  if (scopeSelect) {
+    scopeSelect.addEventListener('change', () => {
+      state.currentScope = scopeSelect.value;
       updateScopeInputs();
       runSearch();
     });
-  });
+  }
 
-  directoryInput.addEventListener('input', () => {
-    clearTimeout(state.searchTimeout);
-    state.searchTimeout = setTimeout(() => {
-      runSearch();
-    }, 500);
-  });
+  if (directoryInput) {
+    directoryInput.addEventListener('input', () => {
+      clearTimeout(state.searchTimeout);
+      state.searchTimeout = setTimeout(() => {
+        runSearch();
+      }, 500);
+    });
+  }
 
-  moduleSelect.addEventListener('change', runSearch);
+  if (moduleSelect) {
+    moduleSelect.addEventListener('change', runSearch);
+  }
 
   document.addEventListener('keydown', (e) => {
     var activeEl = document.activeElement;
@@ -1110,10 +1307,33 @@
     } else if (e.key === 'Escape') {
       if (isEditMode && !replaceWidget.classList.contains('visible')) {
         exitEditMode();
+        queryInput.focus();
+        queryInput.select();
       } else {
         queryInput.focus();
         queryInput.select();
       }
+    }
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!isEditMode) return;
+    
+    // If clicking outside the editor container and its children, exit edit mode
+    if (editorContainer && !editorContainer.contains(e.target)) {
+      // Don't exit if clicking the "Replace" button in the preview header
+      const previewActions = document.getElementById('preview-actions');
+      if (previewActions && previewActions.contains(e.target)) {
+        return;
+      }
+      
+      // Don't exit if clicking the drag handle
+      const dragHandle = document.getElementById('drag-handle');
+      if (dragHandle && dragHandle.contains(e.target)) {
+        return;
+      }
+      
+      exitEditMode();
     }
   });
 
@@ -1140,16 +1360,13 @@
         handleFileContent(message);
         break;
       case 'showReplace':
-        if (!replaceRow.classList.contains('visible')) {
-          toggleReplace();
+        toggleReplace(true);
+        if (queryInput.value.trim()) {
+          replaceInput.focus();
+          replaceInput.select();
         } else {
-          if (queryInput.value.trim()) {
-            replaceInput.focus();
-            replaceInput.select();
-          } else {
-            queryInput.focus();
-            queryInput.select();
-          }
+          queryInput.focus();
+          queryInput.select();
         }
         break;
       case 'setSearchQuery':
@@ -1176,6 +1393,20 @@
       case 'focusSearch':
         queryInput.focus();
         break;
+      case 'clearState':
+        queryInput.value = '';
+        state.currentQuery = '';
+        replaceInput.value = '';
+        if (directoryInput) directoryInput.value = '';
+        if (moduleSelect) moduleSelect.value = '';
+        if (fileInput) fileInput.value = '';
+        state.results = [];
+        state.activeIndex = -1;
+        state.lastPreview = null;
+        state.lastSearchDuration = 0;
+        applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
+        handleSearchResults([], { skipAutoLoad: true });
+        break;
       case 'validationResult':
         if (message.field === 'regex') {
           const msgElement = document.getElementById('query-validation-message');
@@ -1188,13 +1419,6 @@
               msgElement.className = 'validation-message';
             }
           }
-          
-          vscode.postMessage({
-            type: 'validationResult',
-            field: 'regex',
-            isValid: message.isValid,
-            error: message.error
-          });
         } else if (message.field === 'fileMask') {
           const msgElement = document.getElementById('file-mask-validation-message');
           if (msgElement) {
@@ -1206,15 +1430,16 @@
               msgElement.className = 'validation-message';
             }
           }
-          
-          vscode.postMessage({
-            type: 'validationResult',
-            field: 'fileMask',
-            isValid: message.isValid,
-            message: message.message,
-            fallbackToAll: message.fallbackToAll
-          });
         }
+        // Echo for E2E tests
+        vscode.postMessage({
+          type: 'validationResult',
+          field: message.field,
+          isValid: message.isValid,
+          error: message.error,
+          message: message.message,
+          fallbackToAll: message.fallbackToAll
+        });
         break;
       case 'restoreState':
         if (message.state) {
@@ -1232,18 +1457,16 @@
           wholeWordToggle.classList.toggle('active', state.options.wholeWord);
           useRegexToggle.classList.toggle('active', state.options.useRegex);
           fileMaskInput.value = state.options.fileMask || '';
-          updateFileMaskLabel();
           
-          scopeTabs.forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.scope === state.currentScope);
-          });
-          if (state.currentScope === 'file') {
-            scopeFileBtn.style.display = 'block';
+          if (scopeSelect) {
+            scopeSelect.value = state.currentScope;
           }
           updateScopeInputs();
           
-          if (s.showReplace && !replaceRow.classList.contains('visible')) {
-            toggleReplace();
+          if (s.showReplace === true) {
+            toggleReplace(true);
+          } else {
+            toggleReplace(false);
           }
           
           if (s.results && s.results.length > 0) {
@@ -1259,22 +1482,7 @@
         }
         break;
       case 'requestStateForMinimize':
-        vscode.postMessage({ 
-          type: 'minimize',
-          state: {
-            query: queryInput.value,
-            replaceText: replaceInput.value,
-            scope: state.currentScope,
-            directoryPath: directoryInput.value,
-            modulePath: moduleSelect.value,
-            filePath: fileInput.value,
-            options: state.options,
-            showReplace: replaceRow.classList.contains('visible'),
-            results: state.results,
-            activeIndex: state.activeIndex,
-            lastPreview: state.lastPreview
-          }
-        });
+        saveState();
         break;
       case '__test_searchCompleted':
         vscode.postMessage({ type: '__test_searchResultsReceived', results: message.results });
@@ -1342,20 +1550,65 @@
           hasCopyRelativeOption: true
         });
         break;
+      case '__test_getUiStatus':
+        vscode.postMessage({
+          type: '__test_uiStatus',
+          summaryBarVisible: resultsSummaryBar ? getComputedStyle(resultsSummaryBar).display !== 'none' : false,
+          filtersVisible: filtersContainer ? !filtersContainer.classList.contains('hidden') : false,
+          replaceVisible: replaceRow ? replaceRow.classList.contains('visible') : false,
+          previewVisible: previewPanelContainer ? getComputedStyle(previewPanelContainer).display !== 'none' : false,
+          resultsCountText: resultsCountText ? resultsCountText.textContent : ''
+        });
+        break;
+      case '__test_toggleFilters':
+        if (filterBtn && filtersContainer) {
+          const isHidden = filtersContainer.classList.toggle('hidden');
+          filterBtn.classList.toggle('active', !isHidden);
+        }
+        break;
+      case '__test_toggleReplace':
+        toggleReplace();
+        break;
     }
   });
 
   function updateScopeInputs() {
-    directoryInputWrapper.classList.remove('visible');
-    moduleInputWrapper.classList.remove('visible');
-    fileInputWrapper.classList.remove('visible');
+    // Hide all scope inputs first
+    if (directoryInput) directoryInput.style.display = 'none';
+    if (moduleSelect) moduleSelect.style.display = 'none';
+    if (fileInput) fileInput.style.display = 'none';
     
-    if (state.currentScope === 'directory') {
-      directoryInputWrapper.classList.add('visible');
+    // Update label and show correct input
+    if (state.currentScope === 'project') {
+      if (pathLabel) pathLabel.textContent = 'Project:';
+      if (directoryInput) {
+        directoryInput.style.display = 'block';
+        directoryInput.placeholder = 'All files';
+        directoryInput.value = '';
+        directoryInput.readOnly = true;
+      }
+    } else if (state.currentScope === 'directory') {
+      if (pathLabel) pathLabel.textContent = 'Directory:';
+      if (directoryInput) {
+        directoryInput.style.display = 'block';
+        directoryInput.placeholder = 'src/components/';
+        directoryInput.readOnly = false;
+        // Ensure directory input is populated with current directory if empty
+        if (!directoryInput.value && state.currentDirectory) {
+          directoryInput.value = state.currentDirectory;
+        }
+      }
     } else if (state.currentScope === 'module') {
-      moduleInputWrapper.classList.add('visible');
+      if (pathLabel) pathLabel.textContent = 'Module:';
+      if (moduleSelect) moduleSelect.style.display = 'block';
     } else if (state.currentScope === 'file') {
-      fileInputWrapper.classList.add('visible');
+      if (pathLabel) pathLabel.textContent = 'File:';
+      if (fileInput) fileInput.style.display = 'block';
+    }
+
+    // Sync dropdown if needed
+    if (scopeSelect && scopeSelect.value !== state.currentScope) {
+      scopeSelect.value = state.currentScope;
     }
   }
 
@@ -1370,7 +1623,40 @@
     resultsPlaceholder.style.display = 'none';
   }
 
-  let virtualRenderPending = false;
+  // Helper function to update results count display
+  function updateResultsCountDisplay(results) {
+    if (!resultsCountText) return;
+    
+    const query = queryInput ? queryInput.value.trim() : '';
+    if (query.length < 2) {
+      resultsCountText.textContent = 'Type to search...';
+      resultsCountText.style.opacity = '1';
+      return;
+    }
+
+    if (!results || results.length === 0) {
+      resultsCountText.textContent = 'No results found';
+    } else {
+      const uniqueFiles = new Set(results.map(r => r.uri)).size;
+      const isCapped = state.maxResultsCap && results.length >= state.maxResultsCap;
+      const suffix = isCapped ? '+' : '';
+      let text = `${results.length}${suffix} result${results.length !== 1 ? 's' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`;
+      
+      if (state.lastSearchDuration > 0) {
+        text += ` (${state.lastSearchDuration.toFixed(2)}s)`;
+      }
+      
+      resultsCountText.textContent = text;
+    }
+    resultsCountText.style.opacity = '1';
+  }
+
+  function clearResultsCountDisplay() {
+    if (resultsCountText) {
+      resultsCountText.textContent = 'Type to search...';
+      resultsCountText.style.opacity = '1';
+    }
+  }
 
   function scheduleVirtualRender() {
     if (virtualRenderPending) return;
@@ -1386,6 +1672,10 @@
 
   function runSearch() {
     try {
+      if (isEditMode) {
+        exitEditMode(true);
+      }
+      
       const query = queryInput.value.trim();
       state.currentQuery = query;
       
@@ -1393,7 +1683,7 @@
       
       if (query.length < 2) {
         showPlaceholder('Type at least 2 characters...');
-        resultsCount.textContent = '';
+        clearResultsCountDisplay();
         return;
       }
 
@@ -1402,13 +1692,14 @@
           new RegExp(query);
         } catch (e) {
           showPlaceholder('Invalid regex pattern');
-          resultsCount.textContent = '';
+          clearResultsCountDisplay();
           return;
         }
       }
 
       showPlaceholder('Searching...');
-      resultsCount.textContent = '';
+      clearResultsCountDisplay();
+      state.searchStartTime = performance.now();
 
       const message = {
         type: 'runSearch',
@@ -1439,7 +1730,51 @@
     state.activeIndex = resolvedActiveIndex;
     resultsList.scrollTop = 0;
 
-    resultsCount.textContent = results.length + (state.maxResultsCap && results.length >= state.maxResultsCap ? '+' : '') + ' results';
+    if (state.searchStartTime > 0) {
+      state.lastSearchDuration = (performance.now() - state.searchStartTime) / 1000;
+      state.searchStartTime = 0; // Reset after use
+    }
+
+    // Group results by file
+    const groups = [];
+    const fileMap = new Map();
+    results.forEach((result, index) => {
+      const path = result.relativePath || result.fileName;
+      if (!fileMap.has(path)) {
+        const group = { path, fileName: path.split(/[\\\/]/).pop(), matches: [] };
+        fileMap.set(path, group);
+        groups.push(group);
+      }
+      fileMap.get(path).matches.push({ ...result, originalIndex: index });
+    });
+
+    state.renderItems = [];
+    groups.forEach(group => {
+      const isCollapsed = state.collapsedFiles.has(group.path);
+      state.renderItems.push({
+        type: 'fileHeader',
+        path: group.path,
+        fileName: group.fileName,
+        matchCount: group.matches.length,
+        isCollapsed: isCollapsed
+      });
+      
+      if (!isCollapsed) {
+        group.matches.forEach(match => {
+          state.renderItems.push({
+            type: 'match',
+            ...match
+          });
+        });
+      }
+    });
+
+    if (results.length > 0) {
+      state.renderItems.push({ type: 'endOfResults' });
+    }
+
+    updateResultsCountDisplay(results);
+    if (collapseAllBtn) collapseAllBtn.style.display = results.length > 0 ? 'flex' : 'none';
 
     vscode.postMessage({ type: '__test_searchCompleted', results: results });
 
@@ -1447,6 +1782,7 @@
       showPlaceholder('No results found');
       previewContent.innerHTML = '<div class="empty-state">No results</div>';
       previewFilename.textContent = '';
+      applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
       return;
     }
 
@@ -1459,9 +1795,9 @@
   }
 
   function renderResultsVirtualized() {
-    if (state.results.length === 0) return;
+    if (state.renderItems.length === 0) return;
 
-    const total = state.results.length;
+    const total = state.renderItems.length;
     const viewportHeight = resultsList.clientHeight || 1;
     const scrollTop = resultsList.scrollTop;
     const start = Math.max(0, Math.floor(scrollTop / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN);
@@ -1471,7 +1807,7 @@
 
     const fragment = document.createDocumentFragment();
     for (let i = start; i < end; i++) {
-      fragment.appendChild(renderResultRow(state.results[i], i));
+      fragment.appendChild(renderResultRow(state.renderItems[i], i));
     }
 
     virtualContent.innerHTML = '';
@@ -1495,51 +1831,91 @@
     }
   }
 
-  function renderResultRow(result, index) {
-    const isActive = index === state.activeIndex;
+  function renderResultRow(itemData, index) {
     const item = document.createElement('div');
-    item.className = 'result-item' + (isActive ? ' active' : '');
-    item.dataset.index = String(index);
     item.style.position = 'absolute';
     item.style.top = (index * VIRTUAL_ROW_HEIGHT) + 'px';
     item.style.left = '0';
     item.style.right = '0';
 
+    if (itemData.type === 'fileHeader') {
+      item.className = 'result-file-header' + (itemData.isCollapsed ? ' collapsed' : '');
+      const icon = getFileIcon(itemData.fileName);
+      const iconColor = getFileIconColor(itemData.fileName);
+      const arrowIcon = itemData.isCollapsed ? 'chevron_right' : 'expand_more';
+      const displayPath = itemData.path.startsWith('/') ? itemData.path.substring(1) : itemData.path;
+      
+      item.innerHTML = 
+        '<span class="material-symbols-outlined arrow-icon">' + arrowIcon + '</span>' +
+        '<span class="material-symbols-outlined file-icon" style="color: ' + iconColor + '">' + icon + '</span>' +
+        '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
+        '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
+        '<span class="match-count">' + itemData.matchCount + '</span>';
+        
+      item.addEventListener('click', () => {
+        if (state.collapsedFiles.has(itemData.path)) {
+          state.collapsedFiles.delete(itemData.path);
+        } else {
+          state.collapsedFiles.add(itemData.path);
+        }
+        handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
+      });
+      
+      return item;
+    }
+
+    if (itemData.type === 'endOfResults') {
+      item.className = 'end-of-results';
+      item.innerHTML = 
+        '<div class="end-of-results-line"></div>' +
+        '<div class="end-of-results-content">' +
+          '<span class="material-symbols-outlined">check_circle</span>' +
+          '<span>END OF RESULTS</span>' +
+        '</div>' +
+        '<div class="end-of-results-line"></div>';
+      return item;
+    }
+
+    // Match row
+    const isActive = itemData.originalIndex === state.activeIndex;
+    item.className = 'result-item' + (isActive ? ' active' : '');
+    item.dataset.index = String(itemData.originalIndex);
+    item.title = itemData.relativePath || itemData.fileName;
+
+    const language = getLanguageFromFilename(itemData.fileName);
     const previewHtml = highlightMatchSafe(
-      result.preview,
-      result.previewMatchRange.start,
-      result.previewMatchRange.end
+      itemData.preview,
+      itemData.previewMatchRange.start,
+      itemData.previewMatchRange.end,
+      language
     );
 
-    const fullPath = result.relativePath || result.fileName;
-    item.innerHTML = '<div class="result-header">' +
-        '<div class="result-file" title="' + escapeAttr(fullPath) + '">' +
-          '<span class="result-filename">' + escapeHtml(fullPath) + '</span>' +
-          '<span class="result-location">:' + (result.line + 1) + '</span>' +
-        '</div>' +
-        '<button class="open-in-editor-btn" data-index="' + index + '" title="Open in Editor (Ctrl+Enter)">' +
-          '&nearr;' +
-        '</button>' +
+    item.innerHTML = 
+      '<div class="result-meta">' +
+        '<span class="result-line-number">' + (itemData.line + 1) + '</span>' +
       '</div>' +
-      '<div class="result-preview">' + previewHtml + '</div>';
+      '<div class="result-preview hljs">' + previewHtml + '</div>' +
+      '<div class="result-actions">' +
+        '<button class="open-in-editor-btn" data-index="' + itemData.originalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
+          '<span class="material-symbols-outlined">open_in_new</span>' +
+        '</button>' +
+      '</div>';
 
     item.addEventListener('click', (e) => {
       const target = e.target;
-      if (target && target.classList && target.classList.contains('open-in-editor-btn')) return;
-      const idx = parseInt(item.dataset.index, 10);
-      setActiveIndex(idx);
+      if (target && (target.closest('.open-in-editor-btn'))) return;
+      setActiveIndex(itemData.originalIndex);
     });
 
     item.addEventListener('dblclick', (e) => {
       const target = e.target;
-      if (target && target.classList && target.classList.contains('open-in-editor-btn')) return;
+      if (target && (target.closest('.open-in-editor-btn'))) return;
       openActiveResult();
     });
 
     item.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      const idx = parseInt(item.dataset.index, 10);
-      showContextMenu(e, idx);
+      showContextMenu(e, itemData.originalIndex);
     });
 
     const openBtn = item.querySelector('.open-in-editor-btn');
@@ -1554,9 +1930,68 @@
     return item;
   }
 
+  function getFileIcon(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    // Follow improved_search_code.html: cargo_config.toml uses description, katerc uses settings
+    if (fileName === 'cargo_config.toml') return 'description';
+    if (fileName === 'katerc') return 'settings';
+    
+    const configExts = ['json', 'toml', 'yaml', 'yml', 'config', 'conf'];
+    if (configExts.includes(ext) || fileName.startsWith('.') || !fileName.includes('.')) {
+      return 'settings';
+    }
+    return 'description';
+  }
+
+  function getFileIconColor(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    // Follow improved_search_code.html: cargo_config.toml is orange, katerc is blue
+    if (fileName === 'cargo_config.toml' || ext === 'toml' || ext === 'yaml' || ext === 'yml') return '#f97316'; // orange-400
+    if (fileName === 'katerc' || fileName.startsWith('.') || !fileName.includes('.')) return '#60a5fa'; // blue-400
+    
+    if (ext === 'js' || ext === 'jsx' || ext === 'ts' || ext === 'tsx' || ext === 'css' || ext === 'md') return '#60a5fa'; // blue-400
+    return 'var(--vscode-descriptionForeground)';
+  }
+
+  function getLanguageFromFilename(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    const map = {
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'html': 'xml',
+      'xml': 'xml',
+      'css': 'css',
+      'scss': 'scss',
+      'less': 'less',
+      'json': 'json',
+      'md': 'markdown',
+      'py': 'python',
+      'rb': 'ruby',
+      'go': 'go',
+      'rs': 'rust',
+      'php': 'php',
+      'java': 'java',
+      'cpp': 'cpp',
+      'c': 'c',
+      'cs': 'csharp',
+      'sh': 'bash',
+      'yml': 'yaml',
+      'yaml': 'yaml',
+      'sql': 'sql'
+    };
+    return map[ext] || null;
+  }
+
   function ensureActiveVisible() {
     if (state.activeIndex < 0) return;
-    const top = state.activeIndex * VIRTUAL_ROW_HEIGHT;
+    
+    // Find the index in renderItems that corresponds to state.activeIndex
+    const renderIndex = state.renderItems.findIndex(item => item.type === 'match' && item.originalIndex === state.activeIndex);
+    if (renderIndex === -1) return;
+
+    const top = renderIndex * VIRTUAL_ROW_HEIGHT;
     const bottom = top + VIRTUAL_ROW_HEIGHT;
     const viewTop = resultsList.scrollTop;
     const viewBottom = viewTop + resultsList.clientHeight;
@@ -1581,17 +2016,40 @@
   }
 
   function handleFileContent(message) {
+    console.log('[Rifler] handleFileContent received:', message.fileName, 'matches:', message.matches?.length);
+    if (!message) return;
+    
     state.fileContent = message;
     state.lastPreview = message;
-    previewFilename.textContent = message.fileName;
+
+    // Ensure preview panel is visible when content is loaded
+    applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: true });
     
-    previewActions.style.display = 'flex';
+    if (previewFilename) {
+      previewFilename.textContent = message.fileName || 'Unknown File';
+    }
+    
+    if (previewFilepath) {
+      const relPath = message.relativePath || '';
+      const displayPath = relPath.startsWith('/') ? relPath.substring(1) : relPath;
+      previewFilepath.textContent = displayPath;
+      previewFilepath.title = displayPath;
+    }
+    
+    if (previewActions) {
+      previewActions.style.display = 'flex';
+    }
     
     if (isEditMode) {
+      console.log('[Rifler] handleFileContent: entering edit mode');
       fileEditor.value = message.content;
       updateLocalMatches();
       updateHighlights();
     } else {
+      console.log('[Rifler] handleFileContent: rendering preview');
+      // Ensure editor is hidden when in preview mode
+      if (editorContainer) editorContainer.classList.remove('visible');
+      if (previewContent) previewContent.style.display = 'block';
       renderFilePreview(message);
     }
   }
@@ -1628,7 +2086,8 @@
         } else if (action === 'copy-path') {
           copyToClipboard(result.uri.replace('file://', ''));
         } else if (action === 'copy-relative') {
-          copyToClipboard(result.relativePath || result.fileName);
+          const displayPath = result.relativePath.startsWith('/') ? result.relativePath.substring(1) : result.relativePath;
+          copyToClipboard(displayPath);
         }
         hideContextMenu();
       });
@@ -1669,20 +2128,36 @@
   }
 
   function renderFilePreview(fileData) {
+    console.log('[Rifler] renderFilePreview starting for:', fileData.fileName, 'content length:', fileData.content?.length);
+    
+    if (!previewContent) {
+      console.error('[Rifler] renderFilePreview: previewContent element not found');
+      return;
+    }
+
+    if (!fileData || typeof fileData.content !== 'string') {
+      console.warn('[Rifler] renderFilePreview: No content to render');
+      previewContent.innerHTML = '<div class="empty-state">No content available</div>';
+      return;
+    }
+
     const lines = fileData.content.split('\n');
     const currentResult = state.results[state.activeIndex];
     const currentLine = currentResult ? currentResult.line : -1;
 
     const language = getLanguageFromFilename(fileData.fileName);
+    console.log('[Rifler] Detected language:', language);
     
     let highlightedContent = '';
     if (typeof hljs !== 'undefined' && language) {
       try {
         highlightedContent = hljs.highlight(fileData.content, { language: language }).value;
       } catch (e) {
+        console.error('[Rifler] Highlight.js error:', e);
         highlightedContent = escapeHtml(fileData.content);
       }
     } else {
+      console.log('[Rifler] hljs not available or language not detected');
       highlightedContent = escapeHtml(fileData.content);
     }
     
@@ -1690,7 +2165,7 @@
 
     let html = '';
     lines.forEach((line, idx) => {
-      const lineMatches = fileData.matches.filter(m => m.line === idx);
+      const lineMatches = fileData.matches ? fileData.matches.filter(m => m.line === idx) : [];
       const hasMatch = lineMatches.length > 0;
       const isCurrentLine = idx === currentLine;
 
@@ -1700,20 +2175,28 @@
 
       let lineContent = highlightedLines[idx] || escapeHtml(line) || ' ';
       
-      if (hasMatch && !lineContent.includes('class="match"')) {
-      }
-
       html += '<div class="' + lineClass + '" data-line="' + idx + '">' +
-        '<span class="line-number">' + (idx + 1) + '</span>' +
-        '<span class="line-content">' + lineContent + '</span>' +
+        '<div class="line-number">' + (idx + 1) + '</div>' +
+        '<div class="line-content">' + lineContent + '</div>' +
       '</div>';
     });
 
+    console.log('[Rifler] Generated HTML length:', html.length, 'lines:', lines.length);
+    
+    // Ensure previewContent is visible and populated
     previewContent.innerHTML = html;
+    previewContent.style.display = 'block';
+    previewContent.style.visibility = 'visible';
+    previewContent.style.opacity = '1';
+    previewContent.style.zIndex = '1';
+    
+    // Force a layout recalculation
+    previewContent.offsetHeight; 
 
     if (currentLine >= 0) {
       const currentLineEl = previewContent.querySelector('[data-line="' + currentLine + '"]');
       if (currentLineEl) {
+        console.log('[Rifler] Scrolling to line:', currentLine);
         currentLineEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
     }
@@ -1745,6 +2228,10 @@
 
   function setActiveIndex(index) {
     if (index < 0 || index >= state.results.length) return;
+
+    if (isEditMode) {
+      exitEditMode(true);
+    }
 
     state.activeIndex = index;
 
@@ -1789,12 +2276,35 @@
     return html.substring(0, start) + '<span class="match">' + html.substring(start, end) + '</span>' + html.substring(end);
   }
 
-  function highlightMatchSafe(rawText, start, end) {
-    if (start < 0 || end <= start || start >= rawText.length) return escapeHtml(rawText);
+  function highlightMatchSafe(rawText, start, end, language = null) {
+    if (start < 0 || end <= start || start >= rawText.length) {
+      if (language && typeof hljs !== 'undefined') {
+        try {
+          return hljs.highlight(rawText, { language }).value;
+        } catch (e) {
+          return escapeHtml(rawText);
+        }
+      }
+      return escapeHtml(rawText);
+    }
+    
     end = Math.min(end, rawText.length);
-    const before = escapeHtml(rawText.substring(0, start));
-    const match = escapeHtml(rawText.substring(start, end));
-    const after = escapeHtml(rawText.substring(end));
-    return before + '<span class="match">' + match + '</span>' + after;
+    const before = rawText.substring(0, start);
+    const match = rawText.substring(start, end);
+    const after = rawText.substring(end);
+
+    if (language && typeof hljs !== 'undefined') {
+      try {
+        // Highlight parts separately to keep the match span
+        const hBefore = hljs.highlight(before, { language }).value;
+        const hMatch = hljs.highlight(match, { language }).value;
+        const hAfter = hljs.highlight(after, { language }).value;
+        return hBefore + '<span class="match">' + hMatch + '</span>' + hAfter;
+      } catch (e) {
+        // Fallback to basic escaping
+      }
+    }
+
+    return escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>' + escapeHtml(after);
   }
 })();

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommandContext } from './index';
+import { CommandContext } from './types';
 
 /**
  * rifler.open - Toggle search panel based on viewMode configuration
@@ -37,7 +37,11 @@ export function openCommand(ctx: CommandContext): void {
       ctx.panelManager.restore();
     } else {
       const selectedText = getSelectedText();
-      ctx.panelManager.createOrShowPanel({ initialQuery: selectedText });
+      // Use viewManager to ensure sidebar is closed for "fullscreen" feel
+      ctx.viewManager.openView({
+        forcedLocation: 'window',
+        initialQuery: selectedText
+      });
     }
   }
 }

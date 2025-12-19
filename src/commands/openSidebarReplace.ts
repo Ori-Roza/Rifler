@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommandContext } from './index';
+import { CommandContext } from './types';
 
 /**
  * rifler.openSidebarReplace - Open search in sidebar with replace mode

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import {
-  SearchOptions
+  SearchOptions,
+  findWorkspaceModules
 } from './utils';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
@@ -14,104 +15,18 @@ import {
   ValidateFileMaskMessage,
   IncomingMessage
 } from './messaging/types';
-
-// Cache for webview HTML template
-let cachedBodyHtml: string | null = null;
-
-// Webview HTML assembly
-export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-  if (!cachedBodyHtml) {
-    throw new Error('Webview HTML template not loaded. Call loadWebviewTemplate() during activation.');
-  }
-  
-  const nonce = getNonce();
-  const stylesUri = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'styles.css')
-  );
-  const scriptUri = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'script.js')
-  );
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; style-src ${webview.cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com;">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- TODO: Consider bundling highlight.js locally or add SRI -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet" crossorigin="anonymous">
-  <link rel="stylesheet" href="${stylesUri}">
-</head>
-<body>
-${cachedBodyHtml}
-<!-- TODO: Add integrity attribute with SRI hash or bundle locally -->
-<script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" crossorigin="anonymous"></script>
-<script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
-}
-
-// Load and cache the webview HTML template
-async function loadWebviewTemplate(extensionUri: vscode.Uri): Promise<void> {
-  try {
-    const indexUri = vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'index.html');
-    const content = await vscode.workspace.fs.readFile(indexUri);
-    cachedBodyHtml = new TextDecoder('utf-8').decode(content);
-  } catch (error) {
-    console.error('Failed to load webview template:', error);
-    // Provide a minimal fallback template
-    cachedBodyHtml = '<div id="root"></div>';
-  }
-}
-
-function getNonce(): string {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
-}
-
-// Helper functions
-async function findWorkspaceModules(): Promise<{ name: string; path: string }[]> {
-  const modules: { name: string; path: string }[] = [];
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-
-  if (!workspaceFolders) {
-    return modules;
-  }
-
-  for (const folder of workspaceFolders) {
-    try {
-      const nodeModulesUri = vscode.Uri.joinPath(folder.uri, 'node_modules');
-      const stat = await vscode.workspace.fs.stat(nodeModulesUri);
-
-      if (stat.type === vscode.FileType.Directory) {
-        const entries = await vscode.workspace.fs.readDirectory(nodeModulesUri);
-        for (const [name, type] of entries) {
-          if (type === vscode.FileType.Directory && !name.startsWith('.')) {
-            modules.push({
-              name,
-              path: vscode.Uri.joinPath(nodeModulesUri, name).fsPath
-            });
-          }
-        }
-      }
-    } catch {
-      // If node_modules doesn't exist, continue
-    }
-  }
-
-  return modules;
-}
+import { getWebviewHtml, loadWebviewTemplate } from './webview/webviewUtils';
 
 async function sendModulesList(panel: vscode.WebviewPanel): Promise<void> {
-  const modules = await findWorkspaceModules();
-  panel.webview.postMessage({
-    type: 'modulesList',
-    modules
-  });
+  try {
+    const modules = await findWorkspaceModules();
+    panel.webview.postMessage({
+      type: 'modulesList',
+      modules
+    });
+  } catch (error) {
+    console.error('Error sending modules list:', error);
+  }
 }
 
 function sendCurrentDirectory(panel: vscode.WebviewPanel): void {
@@ -148,6 +63,7 @@ async function sendFileContent(
       await vscode.workspace.fs.readFile(uri)
     );
     const fileName = uri.path.split('/').pop() || '';
+    const relativePath = vscode.workspace.asRelativePath(uri);
 
     // Find matches in the file
     const regex = new RegExp(
@@ -179,6 +95,7 @@ async function sendFileContent(
       uri: uriString,
       content: fileContent,
       fileName,
+      relativePath,
       matches
     });
   } catch (error) {
@@ -243,12 +160,32 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize StateStore
   stateStore = new StateStore(context);
 
+  // Detect workspace change to clear state if needed for "fresh search" on project change
+  try {
+    const lastWorkspaceFolders = context.globalState.get<string[]>('rifler.lastWorkspaceFolders');
+    const currentWorkspaceFolders = vscode.workspace.workspaceFolders?.map(f => f.uri.toString()) || [];
+    const foldersChanged = JSON.stringify(lastWorkspaceFolders) !== JSON.stringify(currentWorkspaceFolders);
+
+    if (foldersChanged) {
+      context.globalState.update('rifler.lastWorkspaceFolders', currentWorkspaceFolders);
+      // Clear persisted state on workspace change to ensure a fresh start
+      context.workspaceState.update('rifler.sidebarState', undefined);
+      context.workspaceState.update('rifler.persistedSearchState', undefined);
+      if (stateStore) {
+        stateStore.setSavedState(undefined);
+      }
+    }
+  } catch (error) {
+    console.error('Error detecting workspace change on activation:', error);
+  }
+
   // Initialize PanelManager
   panelManager = new PanelManager(context, extensionUri, getWebviewHtml, stateStore);
 
   // Initialize ViewManager
   viewManager = new ViewManager(context);
   viewManager.setStateStore(stateStore);
+  viewManager.setPanelManager(panelManager);
 
   // Register sidebar provider
   const sidebarProvider = new RiflerSidebarProvider(context);
@@ -308,6 +245,32 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   });
 
+  // Safety net: close sidebar if Rifler tab is active or visible
+  // This handles cases like dragging the tab or switching tab groups
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      if (panelManager.panel?.active) {
+        setTimeout(() => {
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+        }, 100);
+      }
+    }),
+    vscode.window.tabGroups.onDidChangeTabs(() => {
+      if (panelManager.panel?.visible) {
+        setTimeout(() => {
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+        }, 100);
+      }
+    }),
+    vscode.window.tabGroups.onDidChangeTabGroups(() => {
+      if (panelManager.panel?.visible) {
+        setTimeout(() => {
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+        }, 100);
+      }
+    })
+  );
+
   // If persistence is disabled, clear any prior leftover state on activation
   {
     const cfg = vscode.workspace.getConfiguration('rifler');
@@ -322,24 +285,38 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  // Clear persisted state when workspace folders change (for workspace-scoped or off)
+  // Clear persisted state when workspace folders change to ensure a fresh search
   vscode.workspace.onDidChangeWorkspaceFolders(() => {
-    const cfg = vscode.workspace.getConfiguration('rifler');
-    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
-    if (scope === 'workspace' || scope === 'off') {
+    try {
+      // Update last workspace folders to keep track of changes
+      const currentWorkspaceFolders = vscode.workspace.workspaceFolders?.map(f => f.uri.toString()) || [];
+      context.globalState.update('rifler.lastWorkspaceFolders', currentWorkspaceFolders);
+
+      // Clear persisted state
       context.workspaceState.update('rifler.sidebarState', undefined);
       context.workspaceState.update('rifler.persistedSearchState', undefined);
-      stateStore.setSavedState(undefined);
+      if (stateStore) {
+        stateStore.setSavedState(undefined);
+      }
+
       // Also clear any visible UI state in sidebar/window
       if (sidebarProvider) {
         sidebarProvider.postMessage({ type: 'clearState' });
         sidebarProvider.postMessage({ type: 'focusSearch' });
+        sidebarProvider.sendCurrentDirectory();
+        sidebarProvider.sendModules();
       }
-      const panel = panelManager.panel;
-      if (panel) {
-        panel.webview.postMessage({ type: 'clearState' });
-        panel.webview.postMessage({ type: 'focusSearch' });
+      if (panelManager) {
+        const panel = panelManager.panel;
+        if (panel) {
+          panel.webview.postMessage({ type: 'clearState' });
+          panel.webview.postMessage({ type: 'focusSearch' });
+          sendCurrentDirectory(panel);
+          sendModulesList(panel);
+        }
       }
+    } catch (error) {
+      console.error('Error handling workspace change:', error);
     }
   }, undefined, context.subscriptions);
 
@@ -364,7 +341,8 @@ export function deactivate() {
 // Export test helpers
 export const testHelpers = {
   getPanelManager: () => panelManager,
-  getCurrentPanel: () => panelManager?.panel
+  getCurrentPanel: () => panelManager?.panel,
+  getStateStore: () => stateStore
 };
 
 // Re-export messaging types for backward compatibility with tests

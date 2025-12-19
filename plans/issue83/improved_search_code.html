@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Find in Files Mobile</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#3B82F6", 
+                        "primary-dim": "rgba(59, 130, 246, 0.15)",
+                        "background-light": "#F3F4F6",
+                        "background-dark": "#09090b", 
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#18181b", 
+                        "surface-darker": "#121215", 
+                        "border-light": "#E5E7EB",
+                        "border-dark": "#27272a", 
+                        "code-bg-dark": "#1E1E1E",
+                        "highlight-bg": "#584c2e", 
+                        "highlight-text": "#E6E6B6", 
+                        "text-secondary": "#A1A1AA",
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"],
+                        mono: ["JetBrains Mono", "monospace"],
+                    },
+                    fontSize: {
+                        'xxs': '0.65rem',
+                    }
+                },
+            },
+        };
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings:
+            'FILL' 0,
+            'wght' 400,
+            'GRAD' 0,
+            'opsz' 20;
+            font-size: 20px;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .code-preview {
+            counter-reset: line;
+        }
+        .code-line::before {
+            counter-increment: line;
+            content: counter(line);
+            display: inline-block;
+            width: 2em;
+            margin-right: 1em;
+            color: #52525b;
+            text-align: right;
+            font-size: 0.75em;
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+<style>
+        body {
+          min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-gray-900 dark:text-gray-200 font-sans antialiased min-h-screen flex flex-col overflow-hidden selection:bg-primary/30 selection:text-white">
+<header class="flex items-center justify-between px-4 py-2 bg-surface-light dark:bg-surface-dark border-b border-border-light dark:border-border-dark shadow-sm z-20 h-12">
+<div class="flex items-center space-x-2">
+<h1 class="font-semibold text-sm uppercase tracking-wider text-gray-500 dark:text-gray-400">Search</h1>
+</div>
+<div class="flex items-center space-x-3 text-gray-500 dark:text-gray-400">
+<button aria-label="History" class="hover:text-gray-900 dark:hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[20px]">history</span>
+</button>
+<button aria-label="Clear" class="hover:text-gray-900 dark:hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+</header>
+<section class="flex-none bg-surface-light dark:bg-surface-dark border-b border-border-light dark:border-border-dark z-10 shadow-sm transition-all duration-300 ease-in-out">
+<div class="p-2 space-y-2">
+<div class="flex items-center gap-2">
+<div class="relative flex-1 group">
+<div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 dark:text-gray-500 text-[18px]">search</span>
+</div>
+<input class="block w-full pl-9 pr-[84px] h-9 rounded-md border border-gray-200 dark:border-border-dark bg-gray-50 dark:bg-black/20 text-gray-900 dark:text-white font-mono text-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm" placeholder="Search" type="text" value="clang"/>
+<div class="absolute inset-y-0 right-1 flex items-center">
+<button class="w-6 h-7 rounded-sm hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-all flex items-center justify-center" title="Match Case">
+<span class="material-symbols-outlined text-[16px]">format_size</span>
+</button>
+<button class="w-6 h-7 rounded-sm hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-all flex items-center justify-center" title="Match Whole Word">
+<span class="material-symbols-outlined text-[16px]">match_word</span>
+</button>
+<button class="w-6 h-7 rounded-sm bg-primary/10 text-primary transition-all flex items-center justify-center" title="Use Regex">
+<span class="material-symbols-outlined text-[14px]">regular_expression</span>
+</button>
+</div>
+</div>
+<button class="flex-none w-9 h-9 rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 flex items-center justify-center transition-all shadow-sm active:scale-95" title="Hide/Open Filters">
+<span class="material-symbols-outlined text-[20px] filled">tune</span>
+</button>
+</div>
+<div class="pt-0.5 space-y-1.5">
+<div class="flex items-center gap-1.5">
+<button class="flex-1 h-7 rounded text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-darker border border-transparent hover:border-gray-200 dark:hover:border-border-dark transition-all">Project</button>
+<button class="flex-1 h-7 rounded text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-darker border border-transparent hover:border-gray-200 dark:hover:border-border-dark transition-all flex items-center justify-center gap-1">
+                        Module <span class="material-symbols-outlined text-[12px] opacity-70">arrow_drop_down</span>
+</button>
+<button class="flex-1 h-7 rounded text-[11px] font-semibold bg-gray-100 dark:bg-surface-darker text-primary border border-gray-200 dark:border-border-dark shadow-sm transition-all">Directory</button>
+</div>
+<div class="flex items-center h-8 rounded border border-gray-200 dark:border-border-dark bg-gray-50 dark:bg-surface-darker overflow-hidden focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all shadow-sm">
+<div class="relative flex-1 flex items-center h-full border-r border-gray-200 dark:border-border-dark/50">
+<div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 dark:text-gray-500 text-[16px]">folder_open</span>
+</div>
+<input class="block w-full pl-8 pr-2 h-full border-none bg-transparent text-xs text-gray-700 dark:text-gray-300 font-mono placeholder-gray-500 focus:ring-0 truncate" placeholder="path/to/folder" value="src/components/"/>
+</div>
+<div class="relative w-[130px] flex-none flex items-center h-full bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors cursor-text group/filter">
+<div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 dark:text-gray-500 text-[14px] group-focus-within/filter:text-primary transition-colors">filter_alt</span>
+</div>
+<input class="block w-full pl-7 pr-6 h-full border-none bg-transparent text-[11px] text-gray-600 dark:text-gray-400 font-mono placeholder-gray-500 focus:ring-0 truncate" placeholder="*.*" value="*.ts, *.js"/>
+<div class="absolute inset-y-0 right-0 pr-1 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 text-[14px]">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="px-4 py-1.5 bg-gray-50 dark:bg-surface-darker border-t border-border-light dark:border-border-dark flex justify-between items-center">
+<span class="text-[11px] text-gray-500 dark:text-gray-400 font-medium tracking-tight">3 results in 2 files</span>
+<button class="flex items-center gap-1 text-[11px] text-primary hover:text-blue-400 transition-colors font-medium uppercase tracking-wide">
+                Collapse All <span class="material-symbols-outlined text-[14px]">unfold_less</span>
+</button>
+</div>
+</section>
+<main class="flex-1 overflow-y-auto scrollbar-hide pb-40 bg-background-light dark:bg-background-dark">
+<div class="group border-b border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark">
+<div class="sticky top-0 z-10 flex items-center px-3 py-1.5 bg-gray-50/95 dark:bg-[#1c1c1f]/95 backdrop-blur-sm cursor-pointer border-l-2 border-transparent hover:border-primary transition-all shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+<span class="material-symbols-outlined text-gray-400 text-[20px] mr-1 transform transition-transform group-open:rotate-90">arrow_right</span>
+<span class="material-symbols-outlined text-orange-400 text-[18px] mr-2 filled">description</span>
+<div class="flex flex-col min-w-0 flex-1">
+<span class="text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate leading-tight">cargo_config.toml</span>
+<span class="text-[10px] text-gray-400 dark:text-gray-500 truncate font-mono leading-tight">.dotfiles/configs/</span>
+</div>
+<span class="ml-2 min-w-[1.25rem] h-5 flex items-center justify-center text-[10px] font-bold bg-gray-200 dark:bg-white/5 text-gray-600 dark:text-gray-400 rounded-full">1</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-start py-1 px-3 hover:bg-primary-dim cursor-pointer group/item border-l-2 border-transparent hover:border-primary transition-colors">
+<span class="font-mono text-[11px] text-gray-400 dark:text-gray-600 w-8 text-right mr-3 mt-0.5 select-none opacity-60">2</span>
+<div class="flex-1 overflow-x-auto scrollbar-hide">
+<code class="font-mono text-[12px] text-gray-600 dark:text-gray-400 whitespace-pre block">linker = "<span class="bg-yellow-200/40 dark:bg-highlight-bg text-gray-900 dark:text-highlight-text rounded-sm px-0.5 border-b border-yellow-500/50 dark:border-transparent font-medium">clang</span>"</code>
+</div>
+</div>
+</div>
+</div>
+<div class="group border-b border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark">
+<div class="sticky top-0 z-10 flex items-center px-3 py-1.5 bg-gray-50/95 dark:bg-[#1c1c1f]/95 backdrop-blur-sm cursor-pointer border-l-2 border-transparent hover:border-primary transition-all shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+<span class="material-symbols-outlined text-gray-400 text-[20px] mr-1">arrow_drop_down</span>
+<span class="material-symbols-outlined text-blue-400 text-[18px] mr-2 filled">settings</span>
+<div class="flex flex-col min-w-0 flex-1">
+<span class="text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate leading-tight">katerc</span>
+<span class="text-[10px] text-gray-400 dark:text-gray-500 truncate font-mono leading-tight">.dotfiles/configs/kde/configs/</span>
+</div>
+<span class="ml-2 min-w-[1.25rem] h-5 flex items-center justify-center text-[10px] font-bold bg-gray-200 dark:bg-white/5 text-gray-600 dark:text-gray-400 rounded-full">2</span>
+</div>
+<div class="flex flex-col relative">
+<div class="absolute left-6 top-0 bottom-0 w-px bg-gray-200 dark:bg-white/5"></div>
+<div class="flex items-start py-1 px-3 bg-primary/5 hover:bg-primary-dim cursor-pointer group/item border-l-2 border-primary transition-colors">
+<span class="font-mono text-[11px] text-gray-400 dark:text-gray-500 w-8 text-right mr-3 mt-0.5 select-none">34</span>
+<div class="flex-1 overflow-x-auto scrollbar-hide">
+<code class="font-mono text-[12px] text-gray-600 dark:text-gray-300 whitespace-pre block">BlockedServerCommandLines=/usr/bin/<span class="bg-yellow-200/40 dark:bg-highlight-bg text-gray-900 dark:text-highlight-text rounded-sm px-0.5 border-b border-yellow-500/50 dark:border-transparent font-medium">clang</span>d -log=error</code>
+</div>
+</div>
+<div class="flex items-start py-1 px-3 hover:bg-primary-dim cursor-pointer group/item border-l-2 border-transparent hover:border-primary transition-colors">
+<span class="font-mono text-[11px] text-gray-400 dark:text-gray-600 w-8 text-right mr-3 mt-0.5 select-none opacity-60">35</span>
+<div class="flex-1 overflow-x-auto scrollbar-hide">
+<code class="font-mono text-[12px] text-gray-600 dark:text-gray-400 whitespace-pre block">...args: ["-header-insertion=iwyu", "-std=c++17", "<span class="bg-yellow-200/40 dark:bg-highlight-bg text-gray-900 dark:text-highlight-text rounded-sm px-0.5 border-b border-yellow-500/50 dark:border-transparent font-medium">clang</span>"]</code>
+</div>
+</div>
+</div>
+</div>
+<div class="py-8 text-center flex flex-col items-center justify-center space-y-2 opacity-50">
+<span class="material-symbols-outlined text-2xl">check_circle</span>
+<p class="text-[10px] uppercase tracking-widest">End of results</p>
+</div>
+</main>
+<div class="border-t border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark shadow-[0_-8px_30px_rgba(0,0,0,0.4)] z-40 fixed bottom-0 left-0 right-0 max-h-[40vh] flex flex-col rounded-t-2xl ring-1 ring-white/5">
+<div class="flex justify-center pt-2 pb-1 cursor-grab active:cursor-grabbing w-full">
+<div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+</div>
+<div class="px-3 py-2 flex justify-between items-center border-b border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark">
+<div class="flex items-center gap-2 overflow-hidden min-w-0">
+<span class="material-symbols-outlined text-[16px] text-blue-400">settings</span>
+<span class="text-xs font-mono text-gray-900 dark:text-gray-200 truncate font-medium">katerc</span>
+<span class="text-[10px] text-gray-500 truncate ml-1 opacity-60 font-mono">.dotfiles/configs/kde...</span>
+</div>
+<div class="flex items-center gap-2 flex-none">
+<button class="text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-white hover:bg-blue-600 transition-colors shadow-sm">Replace</button>
+<button class="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors text-gray-400">
+<span class="material-symbols-outlined text-[18px]">open_in_new</span>
+</button>
+</div>
+</div>
+<div class="flex-1 overflow-auto bg-gray-50 dark:bg-code-bg-dark p-2 font-mono text-[12px] leading-6 text-gray-800 dark:text-gray-300">
+<div class="code-preview px-1">
+<div class="code-line whitespace-pre opacity-40 select-none">...</div>
+<div class="code-line whitespace-pre opacity-40">    [General]</div>
+<div class="code-line whitespace-pre bg-yellow-100/30 dark:bg-[#383323] w-full block -mx-3 px-3 border-l-2 border-primary">    BlockedServerCommandLines=/usr/bin/<span class="text-yellow-700 dark:text-[#E6E6B6] font-bold">clang</span>d -log=error</div>
+<div class="code-line whitespace-pre opacity-40">    ...</div>
+</div>
+</div>
+</div>
+
+</body></html>

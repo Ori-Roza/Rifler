@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.2](https://github.com/Ori-Roza/Rifler/compare/v1.1.0...v1.1.2) (2025-12-20)
+
+
+### Bug Fixes
+
+* update video source path in README and index.html; bump version to 1.1.2 ([4203871](https://github.com/Ori-Roza/Rifler/commit/420387127dce39006125ed5a39be9b710450a228))
+
 ## [1.1.0](https://github.com/Ori-Roza/Rifler/compare/v1.0.10...v1.1.0) (2025-12-19)
 
 ## [1.1.0](https://github.com/Ori-Roza/Rifler/compare/v1.0.10...v1.1.0) (2025-12-19)

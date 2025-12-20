@@ -1,1 +1,0 @@
-export const Component = () => 'mask_target_tsx';

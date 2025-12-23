@@ -1059,52 +1059,86 @@ body.loaded {
   color: var(--vscode-editor-foreground);
   padding: 8px 0;
   z-index: 1;
+  direction: ltr;
 }
 
-.code-line {
+/* ===== Preview Code Rows (Spec: code left, line number far right) ===== */
+.pvLine {
   display: flex;
   width: 100%;
-  white-space: pre;
   min-height: 20px;
+  white-space: pre;
+  direction: ltr;
+  align-items: stretch;
 }
 
-.code-line:hover {
+.pvLine:hover {
   background-color: var(--vscode-editor-lineHighlightBackground);
 }
 
-.code-line.current-match {
-  background-color: var(--vscode-editor-findMatchHighlightBackground);
+/* Soft full-row highlight for hit lines (must cover BOTH columns) */
+.pvLine.isHit {
+  background-color: color-mix(
+    in srgb,
+    var(--vscode-editor-findMatchHighlightBackground, rgba(255, 213, 79, 0.25)) 35%,
+    transparent
+  );
 }
 
-.code-line.has-match {
-  background-color: var(--vscode-editor-wordHighlightBackground);
+/* Active/current line (kept subtle; separate from hit highlight) */
+.pvLine.isActive {
+  outline: 1px solid color-mix(
+    in srgb,
+    var(--vscode-focusBorder, rgba(0, 122, 204, 0.8)) 55%,
+    transparent
+  );
+  outline-offset: -1px;
 }
 
-.line-number {
-  flex-shrink: 0;
-  width: 80px;
-  padding-right: 32px;
-  text-align: right;
-  color: var(--vscode-editorLineNumber-foreground, #858585);
-  font-size: 12px;
-  user-select: none;
-  opacity: 0.8;
-  border-right: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.1));
-}
-
-.line-content {
+.pvCode {
   flex: 1;
-  padding-left: 12px;
-  color: var(--vscode-editor-foreground, #cccccc);
+  padding-left: 10px;
+  padding-right: 10px;
+  color: var(--vscode-editor-foreground);
   overflow: visible;
+  direction: ltr;
+  min-width: 0;
 }
 
+/* Rightmost fixed-width line-number column */
+.pvLineNo {
+  flex: 0 0 56px;
+  width: 56px;
+  padding-right: 12px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  direction: ltr;
+  unicode-bidi: isolate;
+  border-right: 1px solid color-mix(
+    in srgb,
+    var(--vscode-widget-border, rgba(128, 128, 128, 0.22)) 55%,
+    transparent
+  );
+  color: color-mix(
+    in srgb,
+    var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground)) 70%,
+    var(--vscode-foreground) 30%
+  );
+}
+
+/* Stronger token highlight than the row highlight + bold */
+.pvMatch,
 .preview-content .match {
-  background-color: var(--rifler-highlight-bg);
-  color: var(--rifler-highlight-text);
+  background-color: color-mix(
+    in srgb,
+    var(--vscode-editor-findMatchBackground, rgba(255, 213, 79, 0.55)) 70%,
+    transparent
+  );
   border-radius: 2px;
   padding: 0 2px;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 /* ===== Editor Container ===== */
@@ -1118,6 +1152,7 @@ body.loaded {
   background-color: var(--vscode-editor-background);
   display: none;
   flex-direction: column;
+  z-index: 2;
 }
 
 .editor-container.visible {
@@ -1129,11 +1164,12 @@ body.loaded {
   flex: 1;
   overflow: hidden;
   display: flex;
+  direction: ltr;
 }
 
 .editor-line-numbers {
   flex-shrink: 0;
-  width: 80px;
+  width: 56px;
   padding: 8px 0;
   text-align: right;
   font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
@@ -1144,18 +1180,23 @@ body.loaded {
   user-select: none;
   overflow: hidden;
   box-sizing: border-box;
+  order: 1;
+  direction: ltr;
+  unicode-bidi: isolate;
+  border-left: none;
   border-right: 1px solid var(--vscode-widget-border, #333);
 }
 
 .editor-line-numbers div {
   height: 20px;
-  padding-right: 32px;
+  padding-right: 12px;
 }
 
 .editor-content-wrapper {
   position: relative;
   flex: 1;
   overflow: hidden;
+  order: 2;
 }
 
 #file-editor,

@@ -2147,21 +2147,45 @@ console.log('[Rifler] Webview script starting...');
 
     const language = getLanguageFromFilename(fileData.fileName);
     console.log('[Rifler] Detected language:', language);
-    
-    let highlightedContent = '';
-    if (typeof hljs !== 'undefined' && language) {
-      try {
-        highlightedContent = hljs.highlight(fileData.content, { language: language }).value;
-      } catch (e) {
-        console.error('[Rifler] Highlight.js error:', e);
-        highlightedContent = escapeHtml(fileData.content);
+
+    const highlightSegment = (text) => {
+      if (text === '') return '';
+      if (language && typeof hljs !== 'undefined') {
+        try {
+          return hljs.highlight(text, { language }).value;
+        } catch {
+          return escapeHtml(text);
+        }
       }
-    } else {
-      console.log('[Rifler] hljs not available or language not detected');
-      highlightedContent = escapeHtml(fileData.content);
-    }
-    
-    const highlightedLines = highlightedContent.split('\n');
+      return escapeHtml(text);
+    };
+
+    const renderLineWithMatches = (rawLine, ranges) => {
+      const safeRanges = (Array.isArray(ranges) ? ranges : [])
+        .map(r => ({ start: Number(r.start), end: Number(r.end) }))
+        .filter(r => Number.isFinite(r.start) && Number.isFinite(r.end) && r.end > r.start)
+        .sort((a, b) => a.start - b.start);
+
+      if (safeRanges.length === 0) {
+        const highlighted = highlightSegment(rawLine);
+        return highlighted === '' ? ' ' : highlighted;
+      }
+
+      let html = '';
+      let cursor = 0;
+
+      for (const r of safeRanges) {
+        const start = Math.max(0, Math.min(rawLine.length, Math.max(r.start, cursor)));
+        const end = Math.max(start, Math.min(rawLine.length, r.end));
+
+        html += highlightSegment(rawLine.slice(cursor, start));
+        html += '<span class="pvMatch">' + highlightSegment(rawLine.slice(start, end)) + '</span>';
+        cursor = end;
+      }
+
+      html += highlightSegment(rawLine.slice(cursor));
+      return html === '' ? ' ' : html;
+    };
 
     let html = '';
     lines.forEach((line, idx) => {
@@ -2169,15 +2193,15 @@ console.log('[Rifler] Webview script starting...');
       const hasMatch = lineMatches.length > 0;
       const isCurrentLine = idx === currentLine;
 
-      let lineClass = 'code-line';
-      if (isCurrentLine) lineClass += ' current-match';
-      else if (hasMatch) lineClass += ' has-match';
+      let lineClass = 'pvLine';
+      if (hasMatch) lineClass += ' isHit';
+      if (isCurrentLine) lineClass += ' isActive';
 
-      let lineContent = highlightedLines[idx] || escapeHtml(line) || ' ';
-      
+      const lineContent = renderLineWithMatches(line, lineMatches);
+
       html += '<div class="' + lineClass + '" data-line="' + idx + '">' +
-        '<div class="line-number">' + (idx + 1) + '</div>' +
-        '<div class="line-content">' + lineContent + '</div>' +
+        '<div class="pvLineNo">' + (idx + 1) + '</div>' +
+        '<div class="pvCode">' + lineContent + '</div>' +
       '</div>';
     });
 
@@ -2201,7 +2225,7 @@ console.log('[Rifler] Webview script starting...');
       }
     }
 
-    previewContent.querySelectorAll('.code-line').forEach(lineEl => {
+    previewContent.querySelectorAll('.pvLine').forEach(lineEl => {
       lineEl.addEventListener('dblclick', () => {
         const lineNum = parseInt(lineEl.dataset.line, 10);
         if (state.fileContent) {

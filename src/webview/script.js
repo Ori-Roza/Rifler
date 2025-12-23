@@ -660,8 +660,7 @@ console.log('[Rifler] Webview script starting...');
 
     fileEditor.addEventListener('blur', (e) => {
       if (saveTimeout) clearTimeout(saveTimeout);
-      // Removed exitEditMode() on blur to prevent flickering and unwanted saves
-      // when switching focus to the replace widget or other UI elements.
+      exitEditMode();
     });
     fileEditor.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {

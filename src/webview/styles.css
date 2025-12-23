@@ -625,9 +625,15 @@ body.loaded {
 }
 
 .result-file-header .file-icon {
-  font-size: 16px;
+  width: 16px;
+  height: 16px;
   margin-right: 8px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .result-file-header .file-name {
@@ -984,7 +990,13 @@ body.loaded {
 
 .file-icon {
   flex-shrink: 0;
-  font-size: 12px;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .preview-filename {

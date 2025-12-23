@@ -214,7 +214,7 @@ console.log('[Rifler] Webview script starting...');
       'vue': 'xml',
       'svelte': 'xml'
     };
-    return langMap[ext] || null;
+    return langMap[ext] || 'file';
   }
 
   var localMatches = [];
@@ -1773,6 +1773,8 @@ console.log('[Rifler] Webview script starting...');
       state.renderItems.push({ type: 'endOfResults' });
     }
 
+    console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
+    console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
     updateResultsCountDisplay(results);
     if (collapseAllBtn) collapseAllBtn.style.display = results.length > 0 ? 'flex' : 'none';
 
@@ -1847,7 +1849,7 @@ console.log('[Rifler] Webview script starting...');
       
       item.innerHTML = 
         '<span class="material-symbols-outlined arrow-icon">' + arrowIcon + '</span>' +
-        '<span class="material-symbols-outlined file-icon" style="color: ' + iconColor + '">' + icon + '</span>' +
+        '<span class="file-icon">' + icon + '</span>' +
         '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
         '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
         '<span class="match-count">' + itemData.matchCount + '</span>';
@@ -1930,17 +1932,60 @@ console.log('[Rifler] Webview script starting...');
     return item;
   }
 
+  function getLanguageIdFromFilename(fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const langMap = {
+      'js': 'javascript',
+      'jsx': 'javascriptreact',
+      'ts': 'typescript',
+      'tsx': 'typescriptreact',
+      'py': 'python',
+      'java': 'java',
+      'c': 'c',
+      'cpp': 'cpp',
+      'h': 'c',
+      'hpp': 'cpp',
+      'cs': 'csharp',
+      'php': 'php',
+      'rb': 'ruby',
+      'go': 'go',
+      'rs': 'rust',
+      'swift': 'swift',
+      'kt': 'kotlin',
+      'kts': 'kotlin',
+      'scala': 'scala',
+      'html': 'html',
+      'htm': 'html',
+      'xml': 'xml',
+      'css': 'css',
+      'scss': 'scss',
+      'less': 'less',
+      'json': 'json',
+      'yaml': 'yaml',
+      'yml': 'yaml',
+      'md': 'markdown',
+      'sh': 'shellscript',
+      'bash': 'shellscript',
+      'zsh': 'shellscript',
+      'sql': 'sql',
+      'vue': 'vue',
+      'svelte': 'svelte'
+    };
+    return langMap[ext] || 'file';
+  }
+
   function getFileIcon(fileName) {
-    const ext = fileName.split('.').pop().toLowerCase();
-    // Follow improved_search_code.html: cargo_config.toml uses description, katerc uses settings
-    if (fileName === 'cargo_config.toml') return 'description';
-    if (fileName === 'katerc') return 'settings';
-    
-    const configExts = ['json', 'toml', 'yaml', 'yml', 'config', 'conf'];
-    if (configExts.includes(ext) || fileName.startsWith('.') || !fileName.includes('.')) {
-      return 'settings';
-    }
-    return 'description';
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    // Return simple Unicode symbols for different file types
+    const iconMap = {
+      'js': '🟨', 'jsx': '⚛️', 'ts': '🔷', 'tsx': '⚛️',
+      'py': '🐍', 'java': '☕', 'c': '⚙️', 'cpp': '⚙️', 'cs': '🔷',
+      'php': '🐘', 'rb': '💎', 'go': '🐹', 'rs': '🦀', 'swift': '🦉',
+      'html': '🌐', 'css': '🎨', 'json': '📄', 'md': '📝',
+      'xml': '📄', 'yaml': '📄', 'yml': '📄', 'sql': '🗄️',
+      'vue': '💚', 'svelte': '🧡', 'sh': '📜', 'bash': '📜'
+    };
+    return iconMap[ext] || '📄'; // Default file icon
   }
 
   function getFileIconColor(fileName) {
@@ -2034,6 +2079,13 @@ console.log('[Rifler] Webview script starting...');
       const displayPath = relPath.startsWith('/') ? relPath.substring(1) : relPath;
       previewFilepath.textContent = displayPath;
       previewFilepath.title = displayPath;
+    }
+    
+    // Update preview icon
+    const previewIcon = document.querySelector('.preview-title-group .file-icon');
+    if (previewIcon && message.fileName) {
+      previewIcon.textContent = getFileIcon(message.fileName);
+      previewIcon.style.backgroundImage = ''; // Clear background image
     }
     
     if (previewActions) {

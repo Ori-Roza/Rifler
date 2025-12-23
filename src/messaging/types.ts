@@ -168,6 +168,7 @@ export interface FileContentMessage {
   uri: string;
   content: string;
   fileName: string;
+  iconUri: string;
   matches: Array<{ line: number; start: number; end: number }>;
 }
 

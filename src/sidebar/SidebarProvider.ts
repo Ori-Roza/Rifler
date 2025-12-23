@@ -372,11 +372,16 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         }
       }
 
+      // Get language ID for icon
+      const languageId = this.getLanguageIdFromFilename(fileName);
+      const iconUri = `vscode-icon://file_type_${languageId}`;
+
       const payload = {
         type: 'fileContent',
         uri: uriString,
         content: text,
         fileName,
+        iconUri,
         matches
       };
 
@@ -482,4 +487,44 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       }, 500);
     });
   }
-}
+  private getLanguageIdFromFilename(fileName: string): string {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const langMap: { [key: string]: string } = {
+      'js': 'javascript',
+      'jsx': 'javascriptreact',
+      'ts': 'typescript',
+      'tsx': 'typescriptreact',
+      'py': 'python',
+      'java': 'java',
+      'c': 'c',
+      'cpp': 'cpp',
+      'h': 'c',
+      'hpp': 'cpp',
+      'cs': 'csharp',
+      'php': 'php',
+      'rb': 'ruby',
+      'go': 'go',
+      'rs': 'rust',
+      'swift': 'swift',
+      'kt': 'kotlin',
+      'kts': 'kotlin',
+      'scala': 'scala',
+      'html': 'html',
+      'htm': 'html',
+      'xml': 'xml',
+      'css': 'css',
+      'scss': 'scss',
+      'less': 'less',
+      'json': 'json',
+      'yaml': 'yaml',
+      'yml': 'yaml',
+      'md': 'markdown',
+      'sh': 'shellscript',
+      'bash': 'shellscript',
+      'zsh': 'shellscript',
+      'sql': 'sql',
+      'vue': 'vue',
+      'svelte': 'svelte'
+    };
+    return langMap[ext || ''] || 'file';
+  }}

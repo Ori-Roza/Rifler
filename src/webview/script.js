@@ -2252,7 +2252,7 @@ console.log('[Rifler] Webview script starting...');
       const lineContent = renderLineWithMatches(line, lineMatches);
 
       html += '<div class="' + lineClass + '" data-line="' + idx + '">' +
-        '<div class="pvLineNo">' + (idx + 1) + '</div>' +
+        '<div class="pvLineNo' + (hasMatch ? ' has-match' : '') + '">' + (idx + 1) + '</div>' +
         '<div class="pvCode">' + lineContent + '</div>' +
       '</div>';
     });

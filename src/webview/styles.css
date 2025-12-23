@@ -1140,6 +1140,11 @@ body.loaded {
   );
 }
 
+.pvLineNo.has-match {
+  font-weight: bold !important;
+  color: var(--vscode-editorLineNumber-activeForeground, #ff6b35) !important;
+}
+
 /* Stronger token highlight than the row highlight + bold */
 .pvMatch,
 .preview-content .match {

@@ -48,6 +48,27 @@ body.loaded {
   pointer-events: none;
 }
 
+.preview-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--vscode-editor-background, #1e1e1e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.preview-loading-overlay.visible {
+  opacity: 0.8;
+  pointer-events: auto;
+}
+
 .spinner {
   width: 40px;
   height: 40px;
@@ -909,7 +930,7 @@ body.loaded {
   position: relative;
   flex: 1;
   min-height: 60px;
-  display: none;
+  display: flex; /* Start visible by default */
   flex-direction: column;
   min-height: 0;
   border-top: 1px solid var(--vscode-widget-border, #444);
@@ -929,7 +950,8 @@ body.loaded {
   cursor: grab;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  padding: 0 8px;
   transition: all 0.15s ease;
   user-select: none;
   position: relative;
@@ -947,6 +969,31 @@ body.loaded {
   background-color: var(--vscode-list-hoverBackground);
 }
 
+.preview-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.preview-toggle-btn:hover {
+  opacity: 1;
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.preview-toggle-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
 .drag-handle-bar {
   width: 40px;
   height: 4px;
@@ -954,12 +1001,18 @@ body.loaded {
   border-radius: 2px;
   opacity: 0.4;
   transition: opacity 0.15s ease;
+  flex-shrink: 0;
 }
 
 .drag-handle:hover .drag-handle-bar,
 .drag-handle.dragging .drag-handle-bar {
   opacity: 0.9;
 }
+
+/* Preview panel collapsed state - now handled by height instead of display */
+/* .preview-panel-container.collapsed .preview-panel {
+  display: none;
+} */
 
 /* ===== Preview Panel ===== */
 .preview-panel {
@@ -1177,6 +1230,7 @@ body.loaded {
   display: none;
   flex-direction: column;
   z-index: 2;
+  transition: opacity 0.1s ease;
 }
 
 .editor-container.visible {

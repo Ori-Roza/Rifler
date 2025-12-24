@@ -3,6 +3,7 @@ import { MessageHandler } from './handler';
 import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
 import { validateRegex, validateFileMask, SearchOptions, SearchScope } from '../utils';
+import { StateStore } from '../state/StateStore';
 
 export interface CommonHandlerDeps {
   postMessage: (message: Record<string, unknown>) => void;
@@ -11,6 +12,7 @@ export interface CommonHandlerDeps {
   sendCurrentDirectory: () => void;
   sendFileContent: (uri: string, query: string, options: SearchOptions, activeIndex?: number) => Promise<void>;
   saveFile: (uri: string, content: string) => Promise<void>;
+  stateStore?: StateStore;
 }
 
 export function registerCommonHandlers(handler: MessageHandler, deps: CommonHandlerDeps) {
@@ -104,5 +106,12 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
   handler.registerHandler('error', async (message) => {
     const msg = message as { message: string; source?: string; lineno?: number; colno?: number; error?: unknown };
     console.error('Webview error:', msg.message, msg);
+  });
+
+  handler.registerHandler('previewPanelToggled', async (message) => {
+    const msg = message as { collapsed: boolean };
+    if (deps.stateStore) {
+      deps.stateStore.setPreviewPanelCollapsed(msg.collapsed);
+    }
   });
 }

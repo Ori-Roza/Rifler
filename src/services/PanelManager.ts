@@ -285,6 +285,12 @@ export class PanelManager {
     } else {
       this.currentPanel.webview.postMessage({ type: 'focusSearch' });
     }
+
+    // Send preview panel state
+    this.currentPanel.webview.postMessage({
+      type: 'restorePreviewPanelState',
+      collapsed: this.stateStore.getPreviewPanelCollapsed()
+    });
   }
 }
 

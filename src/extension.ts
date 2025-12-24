@@ -274,7 +274,8 @@ export async function activate(context: vscode.ExtensionContext) {
         const panel = panelManager.panel;
         if (!panel) return;
         await saveFile(panel, uri, content);
-      }
+      },
+      stateStore: stateStore
     });
     // No-op handlers for test signals
     handler.registerHandler('__test_searchCompleted', async () => {});

@@ -98,6 +98,9 @@
   <div class="preview-panel-container" id="preview-panel-container">
     <!-- Drag Handle -->
     <div class="drag-handle" id="drag-handle">
+      <button class="preview-toggle-btn" id="preview-toggle-btn" title="Toggle Preview Panel (Ctrl+Shift+P)">
+        <span class="material-symbols-outlined">remove</span>
+      </button>
       <div class="drag-handle-bar"></div>
     </div>
 
@@ -115,6 +118,9 @@
       </div>
       
       <div class="preview-body">
+        <div class="preview-loading-overlay" id="preview-loading-overlay">
+          <div class="spinner"></div>
+        </div>
         <div class="preview-content" id="preview-content">
           <div class="empty-state">Select a result to preview file</div>
         </div>

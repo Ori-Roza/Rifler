@@ -39,12 +39,14 @@ console.log('[Rifler] Webview script starting...');
     replaceKeybinding: 'ctrl+shift+r',
     maxResultsCap: 10000,
     collapsedFiles: new Set(),
+    previewPanelCollapsed: false, // Track preview panel state
     options: {
       matchCase: false,
       wholeWord: false,
       useRegex: false,
       fileMask: ''
-    }
+    },
+    loadingTimeout: null // Track loading overlay timeout
   };
 
   const vscode = acquireVsCodeApi();
@@ -97,6 +99,7 @@ console.log('[Rifler] Webview script starting...');
   const previewContent = document.getElementById('preview-content');
   const previewFilename = document.getElementById('preview-filename');
   const previewFilepath = document.getElementById('preview-filepath');
+  const previewLoadingOverlay = document.getElementById('preview-loading-overlay');
   
   // Updated for new layout
   const directoryInput = document.getElementById('directory-input');
@@ -236,6 +239,8 @@ console.log('[Rifler] Webview script starting...');
         queryInput.focus();
         searchBoxFocusedOnStartup = true;
       }
+
+      // Set up event listeners after DOM is ready
     });
   });
 
@@ -251,8 +256,6 @@ console.log('[Rifler] Webview script starting...');
       const isVisible = replaceRow.classList.contains('visible');
       const newState = typeof forceState === 'boolean' ? forceState : !isVisible;
       
-      console.log('[Rifler] toggleReplace called. forceState:', forceState, 'isVisible:', isVisible, 'newState:', newState);
-
       replaceRow.classList.toggle('visible', newState);
       replaceRow.style.display = newState ? 'flex' : 'none';
       
@@ -264,6 +267,12 @@ console.log('[Rifler] Webview script starting...');
       if (newState && replaceInput) {
         replaceInput.focus();
       }
+      
+      // Update highlights when replace mode changes
+      if (isEditMode) {
+        updateHighlights();
+      }
+      
       vscode.postMessage({
         type: 'toggleReplace',
         state: newState
@@ -276,6 +285,15 @@ console.log('[Rifler] Webview script starting...');
     if (e.altKey && e.shiftKey && e.code === 'KeyF') {
       e.preventDefault();
       toggleReplace();
+    }
+    
+    // Toggle preview panel on Ctrl+Shift+P
+    if (e.ctrlKey && e.shiftKey && e.code === 'KeyP') {
+      e.preventDefault();
+      const previewToggleBtn = document.getElementById('preview-toggle-btn');
+      if (previewToggleBtn) {
+        previewToggleBtn.click();
+      }
     }
   });
 
@@ -303,6 +321,36 @@ console.log('[Rifler] Webview script starting...');
   if (replaceToggleBtn) {
     replaceToggleBtn.addEventListener('click', () => {
       toggleReplace();
+    });
+  }
+
+  // Preview panel toggle functionality
+  const previewToggleBtn = document.getElementById('preview-toggle-btn');
+  if (previewToggleBtn) {
+    previewToggleBtn.addEventListener('click', () => {
+      const previewPanel = document.getElementById('preview-panel-container');
+      if (previewPanel) {
+        state.previewPanelCollapsed = !state.previewPanelCollapsed;
+        
+        if (state.previewPanelCollapsed) {
+          // Collapse to minimum height
+          applyPreviewHeight(PREVIEW_MIN_HEIGHT, { persist: true });
+        } else {
+          // Expand to last expanded height or default
+          const targetHeight = lastExpandedHeight || getDefaultPreviewHeight();
+          applyPreviewHeight(targetHeight, { persist: true });
+        }
+        
+        previewToggleBtn.innerHTML = state.previewPanelCollapsed ? 
+          '<span class="material-symbols-outlined">add</span>' : 
+          '<span class="material-symbols-outlined">remove</span>';
+        
+        // Send message to extension to save preference
+        vscode.postMessage({ 
+          type: 'previewPanelToggled', 
+          collapsed: state.previewPanelCollapsed 
+        });
+      }
     });
   }
 
@@ -543,6 +591,11 @@ console.log('[Rifler] Webview script starting...');
   function triggerLocalReplace() {
     if (localMatches.length === 0) return;
     
+    // Temporarily hide backdrop to prevent flickering during highlight update
+    if (editorBackdrop) {
+      editorBackdrop.style.visibility = 'hidden';
+    }
+    
     var match = localMatches[localMatchIndex];
     var content = fileEditor.value;
     var newContent = content.substring(0, match.start) + localReplaceInput.value + content.substring(match.end);
@@ -555,6 +608,11 @@ console.log('[Rifler] Webview script starting...');
     updateLocalMatches();
     updateHighlights();
     
+    // Show backdrop again after highlights are updated
+    if (editorBackdrop) {
+      editorBackdrop.style.visibility = 'visible';
+    }
+    
     if (localMatches.length > 0) {
       if (localMatchIndex >= localMatches.length) {
         localMatchIndex = 0;
@@ -565,6 +623,11 @@ console.log('[Rifler] Webview script starting...');
 
   function triggerLocalReplaceAll() {
     if (localMatches.length === 0) return;
+    
+    // Temporarily hide backdrop to prevent flickering during highlight update
+    if (editorBackdrop) {
+      editorBackdrop.style.visibility = 'hidden';
+    }
     
     var content = fileEditor.value;
     var searchTerm = localSearchInput.value;
@@ -602,6 +665,11 @@ console.log('[Rifler] Webview script starting...');
       
       updateLocalMatches();
       updateHighlights();
+      
+      // Show backdrop again after highlights are updated
+      if (editorBackdrop) {
+        editorBackdrop.style.visibility = 'visible';
+      }
       
       localMatchCount.textContent = 'Replaced ' + count;
     } catch (e) {
@@ -678,7 +746,19 @@ console.log('[Rifler] Webview script starting...');
 
     fileEditor.addEventListener('blur', (e) => {
       if (saveTimeout) clearTimeout(saveTimeout);
-      exitEditMode();
+      
+      // Check if focus moved to something else in the editor container (like the replace widget)
+      const relatedTarget = e.relatedTarget;
+      if (relatedTarget && editorContainer && editorContainer.contains(relatedTarget)) {
+        return;
+      }
+      
+      // Use a small timeout as fallback for cases where relatedTarget is null but focus is still moving
+      setTimeout(() => {
+        if (isEditMode && editorContainer && !editorContainer.contains(document.activeElement)) {
+          exitEditMode();
+        }
+      }, 150);
     });
     fileEditor.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -833,6 +913,19 @@ console.log('[Rifler] Webview script starting...');
     const replaceText = replaceInput.value;
     const replacedUri = result.uri;
     
+    // Show loading overlay during replace operation
+    if (previewLoadingOverlay) {
+      previewLoadingOverlay.classList.add('visible');
+    }
+    
+    // Fallback: hide loading overlay after 3 seconds if file content doesn't update
+    state.loadingTimeout = setTimeout(() => {
+      if (previewLoadingOverlay) {
+        previewLoadingOverlay.classList.remove('visible');
+      }
+      state.loadingTimeout = null;
+    }, 3000);
+    
     vscode.postMessage({
       type: 'replaceOne',
       uri: result.uri,
@@ -880,7 +973,9 @@ console.log('[Rifler] Webview script starting...');
       hidePlaceholder();
       renderResultsVirtualized();
       ensureActiveVisible();
-      if (state.activeIndex >= 0) {
+      // Only reload file content if the current preview file was modified
+      if (state.activeIndex >= 0 && state.fileContent && state.fileContent.uri === replacedUri) {
+        // Reload immediately since this file is currently being previewed
         loadFileContent(state.results[state.activeIndex]);
       }
     }
@@ -1240,6 +1335,12 @@ console.log('[Rifler] Webview script starting...');
   if (dragHandle) {
     dragHandle.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      
+      // Don't start dragging if clicking on the preview toggle button
+      if (e.target.closest('#preview-toggle-btn')) {
+        return;
+      }
+      
       beginResize(e.clientY);
       try {
         dragHandle.setPointerCapture(e.pointerId);
@@ -1347,6 +1448,16 @@ console.log('[Rifler] Webview script starting...');
       // Don't exit if clicking the drag handle
       const dragHandle = document.getElementById('drag-handle');
       if (dragHandle && dragHandle.contains(e.target)) {
+        return;
+      }
+
+      // Don't exit if clicking the global replace row or its children
+      if (replaceRow && (replaceRow === e.target || replaceRow.contains(e.target))) {
+        return;
+      }
+
+      // Don't exit if clicking the replace toggle button
+      if (replaceToggleBtn && (replaceToggleBtn === e.target || replaceToggleBtn.contains(e.target))) {
         return;
       }
       
@@ -1585,6 +1696,28 @@ console.log('[Rifler] Webview script starting...');
         break;
       case '__test_toggleReplace':
         toggleReplace();
+        break;
+      case 'restorePreviewPanelState':
+        if (typeof message.collapsed === 'boolean') {
+          state.previewPanelCollapsed = message.collapsed;
+          const previewPanel = document.getElementById('preview-panel-container');
+          const previewToggleBtn = document.getElementById('preview-toggle-btn');
+          
+          if (state.previewPanelCollapsed) {
+            // Restore to minimum height
+            applyPreviewHeight(PREVIEW_MIN_HEIGHT, { persist: false });
+          } else {
+            // Restore to last expanded height or default
+            const targetHeight = lastExpandedHeight || getDefaultPreviewHeight();
+            applyPreviewHeight(targetHeight, { persist: false });
+          }
+          
+          if (previewToggleBtn) {
+            previewToggleBtn.innerHTML = state.previewPanelCollapsed ? 
+              '<span class="material-symbols-outlined">add</span>' : 
+              '<span class="material-symbols-outlined">remove</span>';
+          }
+        }
         break;
     }
   });
@@ -2084,8 +2217,20 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function handleFileContent(message) {
-    console.log('[Rifler] handleFileContent received:', message.fileName, 'matches:', message.matches?.length);
     if (!message) return;
+    
+    // Prevent processing the same file content multiple times
+    if (state.fileContent && 
+        state.fileContent.uri === message.uri && 
+        state.fileContent.content === message.content) {
+      return;
+    }
+    
+    // Clear loading timeout if it exists
+    if (state.loadingTimeout) {
+      clearTimeout(state.loadingTimeout);
+      state.loadingTimeout = null;
+    }
     
     state.fileContent = message;
     state.lastPreview = message;
@@ -2126,6 +2271,11 @@ console.log('[Rifler] Webview script starting...');
       if (editorContainer) editorContainer.classList.remove('visible');
       if (previewContent) previewContent.style.display = 'block';
       renderFilePreview(message);
+    }
+    
+    // Hide loading overlay after content is rendered
+    if (previewLoadingOverlay) {
+      previewLoadingOverlay.classList.remove('visible');
     }
   }
 
@@ -2203,13 +2353,17 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function renderFilePreview(fileData) {
-    console.log('[Rifler] renderFilePreview starting for:', fileData.fileName, 'content length:', fileData.content?.length);
-    
     if (!previewContent) {
       console.error('[Rifler] renderFilePreview: previewContent element not found');
       return;
     }
 
+    // Prevent rendering the same content multiple times
+    if (previewContent.dataset.lastRenderedUri === fileData.uri && 
+        previewContent.dataset.lastRenderedContent === fileData.content) {
+      return;
+    }
+    
     if (!fileData || typeof fileData.content !== 'string') {
       console.warn('[Rifler] renderFilePreview: No content to render');
       previewContent.innerHTML = '<div class="empty-state">No content available</div>';
@@ -2288,6 +2442,10 @@ console.log('[Rifler] Webview script starting...');
     previewContent.style.visibility = 'visible';
     previewContent.style.opacity = '1';
     previewContent.style.zIndex = '1';
+    
+    // Update cache markers to prevent duplicate renders
+    previewContent.dataset.lastRenderedUri = fileData.uri;
+    previewContent.dataset.lastRenderedContent = fileData.content;
     
     // Force a layout recalculation
     previewContent.offsetHeight; 

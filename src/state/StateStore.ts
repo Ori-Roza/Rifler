@@ -9,6 +9,7 @@ export class StateStore {
   private sidebarVisible = false;
   private minimized = false;
   private savedState: MinimizeMessage['state'] | undefined;
+  private previewPanelCollapsed = false;
   private visibilityCallbacks: Array<(visible: boolean) => void> = [];
 
   constructor(private readonly context: vscode.ExtensionContext) {
@@ -21,8 +22,13 @@ export class StateStore {
       if (persisted) {
         this.savedState = persisted;
       }
+      
+      // Load preview panel collapsed state - default to expanded (false)
+      const previewCollapsed = store.get<boolean>('rifler.previewPanelCollapsed', false);
+      this.previewPanelCollapsed = previewCollapsed || false; // Ensure it's false if undefined
     } else {
       this.savedState = undefined;
+      this.previewPanelCollapsed = false;
     }
   }
 
@@ -59,6 +65,21 @@ export class StateStore {
     const store = scope === 'global' ? this.context.globalState : this.context.workspaceState;
     if (persist) {
       store.update('rifler.persistedSearchState', state);
+    }
+  }
+
+  getPreviewPanelCollapsed(): boolean {
+    return this.previewPanelCollapsed;
+  }
+
+  setPreviewPanelCollapsed(collapsed: boolean): void {
+    this.previewPanelCollapsed = collapsed;
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
+    const store = scope === 'global' ? this.context.globalState : this.context.workspaceState;
+    if (persist) {
+      store.update('rifler.previewPanelCollapsed', collapsed);
     }
   }
 }

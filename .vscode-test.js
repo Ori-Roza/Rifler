@@ -26,7 +26,7 @@ module.exports = defineConfig([
     },
     launchArgs: [
       '--disable-workspace-trust',
-      '--user-data-dir=/tmp/vscode-test',
+      '--user-data-dir=/tmp/vscode-ggg',
       '--new-window',
       '--disable-gpu-sandbox',
     ],

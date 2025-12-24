@@ -232,6 +232,13 @@ body.loaded {
   margin-left: auto;
 }
 
+.search-controls {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
 .option-btn {
   display: flex;
   align-items: center;

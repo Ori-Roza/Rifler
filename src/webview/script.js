@@ -92,7 +92,7 @@ console.log('[Rifler] Webview script starting...');
   const replaceInput = document.getElementById('replace-input');
   const replaceBtn = document.getElementById('replace-btn');
   const replaceAllBtn = document.getElementById('replace-all-btn');
-  const closeSearchBtn = document.getElementById('close-search');
+  const clearSearchBtn = document.getElementById('clear-search-btn');
   const resultsList = document.getElementById('results-list');
   const previewContent = document.getElementById('preview-content');
   const previewFilename = document.getElementById('preview-filename');
@@ -279,8 +279,8 @@ console.log('[Rifler] Webview script starting...');
     }
   });
 
-  if (closeSearchBtn) {
-    closeSearchBtn.addEventListener('click', () => {
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
       queryInput.value = '';
       state.results = [];
       state.activeIndex = -1;
@@ -314,23 +314,41 @@ console.log('[Rifler] Webview script starting...');
     replaceAllBtn.addEventListener('click', replaceAll);
   }
 
+  // Function to update collapse/expand button text based on current state
+  function updateCollapseButtonText() {
+    if (!collapseAllBtn || state.results.length === 0) return;
+    
+    const allPaths = new Set();
+    state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
+    
+    const allCollapsed = Array.from(allPaths).every(p => state.collapsedFiles.has(p));
+    
+    if (allCollapsed) {
+      collapseAllBtn.innerHTML = 'Expand All <span class="material-symbols-outlined">unfold_more</span>';
+    } else {
+      collapseAllBtn.innerHTML = 'Collapse All <span class="material-symbols-outlined">unfold_less</span>';
+    }
+  }
+
   if (collapseAllBtn) {
     collapseAllBtn.addEventListener('click', () => {
       if (state.results.length === 0) return;
       
-      // If everything is already collapsed, expand all. Otherwise, collapse all.
       const allPaths = new Set();
       state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
       
       const allCollapsed = Array.from(allPaths).every(p => state.collapsedFiles.has(p));
       
       if (allCollapsed) {
+        // All collapsed, so expand all
         state.collapsedFiles.clear();
       } else {
+        // Not all collapsed, so collapse all
         allPaths.forEach(p => state.collapsedFiles.add(p));
       }
       
       handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
+      updateCollapseButtonText();
     });
   }
   
@@ -1775,7 +1793,12 @@ console.log('[Rifler] Webview script starting...');
     console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
     console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
     updateResultsCountDisplay(results);
-    if (collapseAllBtn) collapseAllBtn.style.display = results.length > 0 ? 'flex' : 'none';
+    if (collapseAllBtn) {
+      collapseAllBtn.style.display = results.length > 0 ? 'flex' : 'none';
+      if (results.length > 0) {
+        collapseAllBtn.innerHTML = 'Collapse All <span class="material-symbols-outlined">unfold_less</span>';
+      }
+    }
 
     vscode.postMessage({ type: '__test_searchCompleted', results: results });
 
@@ -1860,6 +1883,7 @@ console.log('[Rifler] Webview script starting...');
           state.collapsedFiles.add(itemData.path);
         }
         handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
+        updateCollapseButtonText();
       });
       
       return item;

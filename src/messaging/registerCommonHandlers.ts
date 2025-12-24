@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { MessageHandler } from './handler';
 import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
@@ -93,6 +94,11 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
 
   handler.registerHandler('__diag_ping', async () => {
     console.log('Received webview diag ping');
+  });
+
+  handler.registerHandler('executeCommand', async (message) => {
+    const msg = message as { command: string; args?: unknown[] };
+    await vscode.commands.executeCommand(msg.command, ...(msg.args || []));
   });
 
   handler.registerHandler('error', async (message) => {

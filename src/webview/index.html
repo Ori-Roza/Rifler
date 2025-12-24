@@ -5,21 +5,6 @@
   <div class="spinner"></div>
 </div>
 
-<!-- Header -->
-<header class="rifler-header">
-  <div class="header-left">
-    <h1 class="header-title">SEARCH</h1>
-  </div>
-  <div class="header-right">
-    <button class="header-btn" id="replace-toggle-btn" title="Toggle Replace (Alt+Shift+F)" aria-label="Replace">
-      <span class="material-symbols-outlined">swap_horiz</span>
-    </button>
-    <button class="header-btn" id="close-search" title="Close (Esc)" aria-label="Close">
-      <span class="material-symbols-outlined">close</span>
-    </button>
-  </div>
-</header>
-
 <!-- Search Input Section -->
 <section class="search-section">
   <div class="search-box">
@@ -33,9 +18,17 @@
         <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">*</button>
       </div>
     </div>
-    <button class="icon-btn" id="filter-btn" title="Toggle Filters">
-      <span class="material-symbols-outlined">filter_alt</span>
-    </button>
+    <div class="search-controls">
+      <button class="icon-btn" id="replace-toggle-btn" title="Toggle Replace (Alt+Shift+F)" aria-label="Replace">
+        <span class="material-symbols-outlined">swap_horiz</span>
+      </button>
+      <button class="icon-btn" id="filter-btn" title="Toggle Filters">
+        <span class="material-symbols-outlined">filter_alt</span>
+      </button>
+      <button class="icon-btn" id="clear-search-btn" title="Clear Search (Ctrl+L)" aria-label="Clear Search">
+        <span class="material-symbols-outlined">clear</span>
+      </button>
+    </div>
   </div>
 
   <!-- Replace Row (hidden by default) -->

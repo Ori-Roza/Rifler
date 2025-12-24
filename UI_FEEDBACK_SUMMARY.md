@@ -8,23 +8,23 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [ ] Implementation not yet complete - missing elements from all 3 parts (filter, results, preview)
 
 ## **Bundle Size Issues**
-- [ ] Size increased dramatically from <2MB to 21MB+ - something was done wrong
+- [x] Size increased dramatically from <2MB to 21MB+ - something was done wrong
 
 ## **Preview Panel Issues**
 - [x] No toggle on preview or hide/show functionality
-- [ ] Drag and drop doesn't feel fluid for usage experience
-- [ ] Need better UX for switching between seeing more results vs seeing preview
-- [ ] Preview panel UI takes too much space and stays on top of content
-- [ ] Should be integrated into UI (like filters) in 1-2 lines rather than 3
+- [x] Drag and drop doesn't feel fluid for usage experience
+- [x] Need better UX for switching between seeing more results vs seeing preview
+- [x] Preview panel UI takes too much space and stays on top of content
+- [x] Should be integrated into UI (like filters) in 1-2 lines rather than 3
 
 ## **File Icons Issues**
-- [ ] File icons not using VSCode's native icons
-- [ ] Current icons lack distinction - only 2 types with basic colors (white, blue, orange)
-- [ ] Should use proper file icons for rapid visual distinction
+- [x] File icons not using VSCode's native icons
+- [x] Current icons lack distinction - only 2 types with basic colors (white, blue, orange)
+- [x] Should use proper file icons for rapid visual distinction
 
 ## **Preview Title Issues**
-- [ ] Preview title missing file path
-- [ ] Path would be useful for projects with many files
+- [x] Preview title missing file path
+- [x] Path would be useful for projects with many files
 
 ## **Results List Issues**
 - [ ] Results should have scrollbar to show list size perspective

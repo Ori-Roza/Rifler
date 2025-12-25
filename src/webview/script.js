@@ -1997,14 +1997,12 @@ console.log('[Rifler] Webview script starting...');
 
     if (itemData.type === 'fileHeader') {
       item.className = 'result-file-header' + (itemData.isCollapsed ? ' collapsed' : '');
-      const icon = getFileIcon(itemData.fileName);
-      const iconColor = getFileIconColor(itemData.fileName);
       const arrowIcon = itemData.isCollapsed ? 'chevron_right' : 'expand_more';
       const displayPath = itemData.path.startsWith('/') ? itemData.path.substring(1) : itemData.path;
       
       item.innerHTML = 
         '<span class="material-symbols-outlined arrow-icon">' + arrowIcon + '</span>' +
-        '<span class="file-icon">' + icon + '</span>' +
+        '<span class="seti-icon ' + getFileIconName(itemData.fileName) + '"></span>' +
         '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
         '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
         '<span class="match-count">' + itemData.matchCount + '</span>';
@@ -2130,18 +2128,37 @@ console.log('[Rifler] Webview script starting...');
     return langMap[ext] || 'file';
   }
 
-  function getFileIcon(fileName) {
+  function getFileIconName(fileName) {
     const ext = fileName.split('.').pop()?.toLowerCase();
-    // Return simple Unicode symbols for different file types
+    // Return Seti UI icon class names for different file types
     const iconMap = {
-      'js': '🟨', 'jsx': '⚛️', 'ts': '🔷', 'tsx': '⚛️',
-      'py': '🐍', 'java': '☕', 'c': '⚙️', 'cpp': '⚙️', 'cs': '🔷',
-      'php': '🐘', 'rb': '💎', 'go': '🐹', 'rs': '🦀', 'swift': '🦉',
-      'html': '🌐', 'css': '🎨', 'json': '📄', 'md': '📝',
-      'xml': '📄', 'yaml': '📄', 'yml': '📄', 'sql': '🗄️',
-      'vue': '💚', 'svelte': '🧡', 'sh': '📜', 'bash': '📜'
+      'js': 'seti-javascript', 'jsx': 'seti-javascript',
+      'ts': 'seti-typescript', 'tsx': 'seti-typescript',
+      'py': 'seti-python',
+      'java': 'seti-java',
+      'c': 'seti-c', 'cpp': 'seti-cpp', 'cc': 'seti-cpp', 'cxx': 'seti-cpp',
+      'cs': 'seti-csharp',
+      'php': 'seti-php',
+      'rb': 'seti-ruby',
+      'go': 'seti-go',
+      'rs': 'seti-rust',
+      'swift': 'seti-swift',
+      'html': 'seti-html',
+      'css': 'seti-css',
+      'scss': 'seti-css', 'sass': 'seti-css',
+      'json': 'seti-json',
+      'xml': 'seti-xml',
+      'yaml': 'seti-yaml', 'yml': 'seti-yaml',
+      'md': 'seti-markdown',
+      'dockerfile': 'seti-dockerfile',
+      'gitignore': 'seti-git', 'gitattributes': 'seti-git', 'gitmodules': 'seti-git',
+      'png': 'seti-image', 'jpg': 'seti-image', 'jpeg': 'seti-image', 'gif': 'seti-image', 'svg': 'seti-image',
+      'mp4': 'seti-video', 'avi': 'seti-video', 'mov': 'seti-video',
+      'mp3': 'seti-audio', 'wav': 'seti-audio', 'flac': 'seti-audio',
+      'zip': 'seti-zip', 'tar': 'seti-zip', 'gz': 'seti-zip', 'rar': 'seti-zip',
+      'pdf': 'seti-pdf'
     };
-    return iconMap[ext] || '📄'; // Default file icon
+    return iconMap[ext] || 'seti-default'; // Default file icon
   }
 
   function getFileIconColor(fileName) {
@@ -2252,7 +2269,8 @@ console.log('[Rifler] Webview script starting...');
     // Update preview icon
     const previewIcon = document.querySelector('.preview-title-group .file-icon');
     if (previewIcon && message.fileName) {
-      previewIcon.textContent = getFileIcon(message.fileName);
+      previewIcon.className = 'seti-icon ' + getFileIconName(message.fileName);
+      previewIcon.textContent = ''; // Clear text content
       previewIcon.style.backgroundImage = ''; // Clear background image
     }
     

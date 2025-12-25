@@ -33,6 +33,10 @@ export interface ValidateFileMaskMessage {
   fileMask: string;
 }
 
+export interface GetWorkspaceInfoMessage {
+  type: 'getWorkspaceInfo';
+}
+
 export interface RunSearchMessage {
   type: 'runSearch';
   query: string;
@@ -120,6 +124,23 @@ export interface TestSetScopeMessage {
   scope: string;
 }
 
+export interface TestScopeInputStatusMessage {
+  type: '__test_scopeInputStatus';
+  currentScope: string;
+  pathLabel: string;
+  directoryInputVisible: boolean;
+  directoryInputReadOnly: boolean;
+  directoryInputPlaceholder: string;
+  directoryInputValue: string;
+  moduleSelectVisible: boolean;
+  fileInputVisible: boolean;
+}
+
+export interface TestSetDirectoryInputMessage {
+  type: '__test_setDirectoryInput';
+  value: string;
+}
+
 export interface TestErrorMessage {
   type: 'error';
   message: string;
@@ -142,6 +163,7 @@ export type IncomingMessage =
   | OpenLocationMessage
   | GetModulesMessage
   | GetCurrentDirectoryMessage
+  | GetWorkspaceInfoMessage
   | GetFileContentMessage
   | ReplaceOneMessage
   | ReplaceAllMessage
@@ -154,6 +176,8 @@ export type IncomingMessage =
   | TestSearchResultsReceivedMessage
   | TestResultsListStatusMessage
   | TestSetScopeMessage
+  | TestScopeInputStatusMessage
+  | TestSetDirectoryInputMessage
   | TestErrorMessage
   | DiagPingMessage;
 
@@ -176,6 +200,12 @@ export interface ModulesListMessage {
 export interface CurrentDirectoryMessage {
   type: 'currentDirectory';
   directory: string;
+}
+
+export interface WorkspaceInfoMessage {
+  type: 'workspaceInfo';
+  name: string;
+  path: string;
 }
 
 export interface FileContentMessage {
@@ -240,6 +270,7 @@ export type OutgoingMessage =
   | SearchResultsMessage
   | ModulesListMessage
   | CurrentDirectoryMessage
+  | WorkspaceInfoMessage
   | FileContentMessage
   | ValidationResultMessage
   | ConfigMessage

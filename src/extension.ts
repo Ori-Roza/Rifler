@@ -51,6 +51,28 @@ function sendCurrentDirectory(panel: vscode.WebviewPanel): void {
   });
 }
 
+function sendWorkspaceInfo(panel: vscode.WebviewPanel): void {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  let name = '';
+  let path = '';
+
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    const workspaceFolder = workspaceFolders[0];
+    name = workspaceFolder.name;
+    path = workspaceFolder.uri.fsPath;
+  } else {
+    // Fallback for single file mode or no workspace
+    name = 'No workspace';
+    path = '';
+  }
+
+  panel.webview.postMessage({
+    type: 'workspaceInfo',
+    name,
+    path
+  });
+}
+
 async function sendFileContent(
   panel: vscode.WebviewPanel,
   uriString: string,
@@ -264,6 +286,11 @@ export async function activate(context: vscode.ExtensionContext) {
         const panel = panelManager.panel;
         if (!panel) return;
         sendCurrentDirectory(panel);
+      },
+      sendWorkspaceInfo: () => {
+        const panel = panelManager.panel;
+        if (!panel) return;
+        sendWorkspaceInfo(panel);
       },
       sendFileContent: async (uri, query, options, _activeIndex) => {
         const panel = panelManager.panel;

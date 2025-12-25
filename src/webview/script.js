@@ -30,6 +30,8 @@ console.log('[Rifler] Webview script starting...');
     currentScope: 'project',
     modules: [],
     currentDirectory: '',
+    workspaceName: '',
+    workspacePath: '',
     currentQuery: '',
     fileContent: null,
     lastPreview: null,
@@ -247,6 +249,7 @@ console.log('[Rifler] Webview script starting...');
   vscode.postMessage({ type: 'webviewReady' });
   vscode.postMessage({ type: 'getModules' });
   vscode.postMessage({ type: 'getCurrentDirectory' });
+  vscode.postMessage({ type: 'getWorkspaceInfo' });
   
   // Initialize results count display
   clearResultsCountDisplay();
@@ -1484,6 +1487,9 @@ console.log('[Rifler] Webview script starting...');
       case 'currentDirectory':
         handleCurrentDirectory(message.directory);
         break;
+      case 'workspaceInfo':
+        handleWorkspaceInfo(message.name, message.path);
+        break;
       case 'fileContent':
         handleFileContent(message);
         break;
@@ -1729,6 +1735,32 @@ console.log('[Rifler] Webview script starting...');
           resultHeadersCount: resultHeaders.length
         });
         break;
+      case '__test_getScopeInputStatus':
+        const directoryInputVisible = directoryInput ? getComputedStyle(directoryInput).display !== 'none' : false;
+        const moduleSelectVisible = moduleSelect ? getComputedStyle(moduleSelect).display !== 'none' : false;
+        const fileInputVisible = fileInput ? getComputedStyle(fileInput).display !== 'none' : false;
+        const directoryInputReadOnly = directoryInput ? directoryInput.readOnly : false;
+        const directoryInputPlaceholder = directoryInput ? directoryInput.placeholder : '';
+        const directoryInputValue = directoryInput ? directoryInput.value : '';
+        const pathLabelText = pathLabel ? pathLabel.textContent : '';
+
+        vscode.postMessage({
+          type: '__test_scopeInputStatus',
+          currentScope: state.currentScope,
+          pathLabel: pathLabelText,
+          directoryInputVisible: directoryInputVisible,
+          directoryInputReadOnly: directoryInputReadOnly,
+          directoryInputPlaceholder: directoryInputPlaceholder,
+          directoryInputValue: directoryInputValue,
+          moduleSelectVisible: moduleSelectVisible,
+          fileInputVisible: fileInputVisible
+        });
+        break;
+      case '__test_setDirectoryInput':
+        if (directoryInput && message.value !== undefined) {
+          directoryInput.value = message.value;
+        }
+        break;
       case '__test_setScope':
         if (message.scope && scopeSelect) {
           state.currentScope = message.scope;
@@ -1772,8 +1804,8 @@ console.log('[Rifler] Webview script starting...');
       if (pathLabel) pathLabel.textContent = 'Project:';
       if (directoryInput) {
         directoryInput.style.display = 'block';
-        directoryInput.placeholder = 'All files';
-        directoryInput.value = '';
+        directoryInput.placeholder = state.workspaceName || 'All files';
+        directoryInput.value = state.workspacePath || '';
         directoryInput.readOnly = true;
       }
     } else if (state.currentScope === 'directory') {
@@ -2270,6 +2302,13 @@ console.log('[Rifler] Webview script starting...');
   function handleCurrentDirectory(directory) {
     state.currentDirectory = directory;
     directoryInput.value = directory;
+  }
+
+  function handleWorkspaceInfo(name, path) {
+    state.workspaceName = name;
+    state.workspacePath = path;
+    // Update scope inputs in case we're in project mode
+    updateScopeInputs();
   }
 
   function handleFileContent(message) {

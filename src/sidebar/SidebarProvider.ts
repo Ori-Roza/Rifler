@@ -76,6 +76,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       openLocation: (uri, line, character) => this._openLocation({ type: 'openLocation', uri, line, character }),
       sendModules: () => this._sendModules(),
       sendCurrentDirectory: () => this._sendCurrentDirectory(),
+      sendWorkspaceInfo: () => this._sendWorkspaceInfo(),
       sendFileContent: (uri, query, options, activeIndex) => this._sendFileContent(uri, query, options, activeIndex),
       saveFile: (uri, content) => this._saveFile(uri, content)
     });
@@ -329,6 +330,31 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     this._view.webview.postMessage({
       type: 'currentDirectory',
       directory
+    });
+  }
+
+  private _sendWorkspaceInfo(): void {
+    if (!this._view) {
+      return;
+    }
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    let name = '';
+    let path = '';
+
+    if (workspaceFolders && workspaceFolders.length > 0) {
+      const workspaceFolder = workspaceFolders[0];
+      name = workspaceFolder.name;
+      path = workspaceFolder.uri.fsPath;
+    } else {
+      // Fallback for single file mode or no workspace
+      name = 'No workspace';
+      path = '';
+    }
+
+    this._view.webview.postMessage({
+      type: 'workspaceInfo',
+      name,
+      path
     });
   }
 

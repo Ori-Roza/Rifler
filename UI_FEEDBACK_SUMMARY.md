@@ -27,22 +27,12 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [x] Path would be useful for projects with many files
 
 ## **Results List Issues**
-- [ ] Results should have scrollbar to show list size perspective
-- [ ] Long file paths should show tooltip when truncated
-- [ ] Wrong width distribution causing horizontal scrollbar when clicking lines
-- [ ] "File" option in scope select seems unnecessary
-
-## **Filter/Scope Issues**
-- [ ] Weird selection borders that shouldn't be there
-- [ ] Collapse All button doesn't change to Expand All after collapsing
-- [ ] Select dropdown has different colors than theme
-- [ ] Clicking prefix word doesn't open select dropdown
-- [ ] Input mask requires "*. " prefix - should be simplified to just "ts,sh,md"
-- [ ] Change prefix to "File Ext(s):" for clarity
+- [x] Results should have scrollbar to show list size perspective
+- [x] Long file paths should show tooltip when truncated
+- [x] Wrong width distribution causing horizontal scrollbar when clicking lines
+- [x] "File" option in scope select seems unnecessary
 
 ## **Project Input Issues**
-- [ ] Project input not editable in Project mode but behaves like it is
-- [ ] Cursor should change and input shouldn't be selectable in Project mode
 - [ ] Weird behavior when changing modes (shows "all files" instead of folder path)
 
 ## **Button/Icon Quality Issues**

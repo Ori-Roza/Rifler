@@ -10,6 +10,7 @@ export interface CommonHandlerDeps {
   openLocation: (uri: string, line: number, character: number) => Promise<void>;
   sendModules: () => Promise<void>;
   sendCurrentDirectory: () => void;
+  sendWorkspaceInfo: () => void;
   sendFileContent: (uri: string, query: string, options: SearchOptions, activeIndex?: number) => Promise<void>;
   saveFile: (uri: string, content: string) => Promise<void>;
   stateStore?: StateStore;
@@ -40,6 +41,10 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
 
   handler.registerHandler('getCurrentDirectory', async () => {
     deps.sendCurrentDirectory();
+  });
+
+  handler.registerHandler('getWorkspaceInfo', async () => {
+    deps.sendWorkspaceInfo();
   });
 
   handler.registerHandler('getFileContent', async (message) => {

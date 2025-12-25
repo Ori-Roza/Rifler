@@ -97,7 +97,7 @@ export function matchesFileMask(fileName: string, fileMask: string): boolean {
   return matchesInclude && !matchesExclude; // Excludes always win
 }
 
-/** * Find modules in the workspace (directories in node_modules)
+/** * Find modules in the workspace (directories with package.json, tsconfig.json, etc.)
  */
 export async function findWorkspaceModules(): Promise<{ name: string; path: string }[]> {
   const modules: { name: string; path: string }[] = [];
@@ -107,28 +107,100 @@ export async function findWorkspaceModules(): Promise<{ name: string; path: stri
     return modules;
   }
 
+  // Module detection patterns - files that indicate a module/project
+  const moduleIndicators = [
+    'package.json',
+    'tsconfig.json',
+    'pyproject.toml',
+    'setup.py',
+    'Cargo.toml',
+    'go.mod',
+    'composer.json',
+    'Gemfile',
+    'requirements.txt',
+    '.git'
+  ];
+
   for (const folder of workspaceFolders) {
     try {
-      const nodeModulesUri = vscode.Uri.joinPath(folder.uri, 'node_modules');
-      const stat = await vscode.workspace.fs.stat(nodeModulesUri);
-
-      if (stat.type === vscode.FileType.Directory) {
-        const entries = await vscode.workspace.fs.readDirectory(nodeModulesUri);
-        for (const [name, type] of entries) {
-          if (type === vscode.FileType.Directory && !name.startsWith('.')) {
-            modules.push({
-              name,
-              path: vscode.Uri.joinPath(nodeModulesUri, name).fsPath
-            });
-          }
-        }
+      // First check if the workspace root itself is a module
+      const hasModuleIndicators = await checkForModuleIndicators(folder.uri, moduleIndicators);
+      if (hasModuleIndicators) {
+        modules.push({
+          name: folder.name,
+          path: folder.uri.fsPath
+        });
       }
-    } catch {
-      // If node_modules doesn't exist, continue
+
+      // Then check subdirectories for modules
+      await findModulesInDirectory(folder.uri, modules, moduleIndicators, 2); // Max depth of 2
+    } catch (error) {
+      console.error('Error finding modules in workspace:', error);
     }
   }
 
   return modules;
+}
+
+/**
+ * Recursively find modules in a directory
+ */
+async function findModulesInDirectory(
+  dirUri: vscode.Uri,
+  modules: { name: string; path: string }[],
+  moduleIndicators: string[],
+  maxDepth: number,
+  currentDepth = 0
+): Promise<void> {
+  if (currentDepth >= maxDepth) {
+    return;
+  }
+
+  try {
+    const entries = await vscode.workspace.fs.readDirectory(dirUri);
+
+    for (const [name, type] of entries) {
+      if (type === vscode.FileType.Directory &&
+          !name.startsWith('.') &&
+          !EXCLUDE_DIRS.has(name)) {
+
+        const subDirUri = vscode.Uri.joinPath(dirUri, name);
+
+        // Check if this subdirectory is a module
+        const hasModuleIndicators = await checkForModuleIndicators(subDirUri, moduleIndicators);
+        if (hasModuleIndicators) {
+          modules.push({
+            name,
+            path: subDirUri.fsPath
+          });
+        } else if (currentDepth < maxDepth - 1) {
+          // Continue searching deeper, but avoid going too deep
+          await findModulesInDirectory(subDirUri, modules, moduleIndicators, maxDepth, currentDepth + 1);
+        }
+      }
+    }
+  } catch (error) {
+    // Directory might not be accessible, skip it
+  }
+}
+
+/**
+ * Check if a directory contains module indicator files
+ */
+async function checkForModuleIndicators(dirUri: vscode.Uri, indicators: string[]): Promise<boolean> {
+  try {
+    const entries = await vscode.workspace.fs.readDirectory(dirUri);
+
+    for (const [name] of entries) {
+      if (indicators.includes(name)) {
+        return true;
+      }
+    }
+  } catch {
+    // Directory not accessible
+  }
+
+  return false;
 }
 
 /** * Set of directories to exclude from search

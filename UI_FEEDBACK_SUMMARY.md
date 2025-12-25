@@ -101,10 +101,6 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 ## **Preview Functionality**
 - [ ] Missing show/hide preview functionality - poor user experience
 
-## **AI/Reliability Issues**
-- [ ] AI not reliable due to lack of usability tests
-- [ ] Previously fixed bugs have regressed
-
 ## **General Feedback**
 - [ ] Extension should be distinct and better than alternatives
 - [ ] Focus on distinction through colors and other visual elements

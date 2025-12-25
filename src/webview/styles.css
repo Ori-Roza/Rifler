@@ -668,7 +668,7 @@ body.loaded {
   color: var(--vscode-foreground);
   margin-right: 8px;
   flex-shrink: 0;
-  max-width: 60%;
+  max-width: 40%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

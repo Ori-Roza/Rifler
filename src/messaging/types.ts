@@ -107,6 +107,19 @@ export interface TestSearchResultsReceivedMessage {
   results: SearchResult[];
 }
 
+export interface TestResultsListStatusMessage {
+  type: '__test_resultsListStatus';
+  scrollbarVisible: boolean;
+  hasHorizontalOverflow: boolean;
+  tooltipsPresent: boolean;
+  resultHeadersCount: number;
+}
+
+export interface TestSetScopeMessage {
+  type: '__test_setScope';
+  scope: string;
+}
+
 export interface TestErrorMessage {
   type: 'error';
   message: string;
@@ -139,6 +152,8 @@ export type IncomingMessage =
   | ValidateFileMaskMessage
   | TestSearchCompletedMessage
   | TestSearchResultsReceivedMessage
+  | TestResultsListStatusMessage
+  | TestSetScopeMessage
   | TestErrorMessage
   | DiagPingMessage;
 

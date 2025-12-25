@@ -1697,6 +1697,45 @@ console.log('[Rifler] Webview script starting...');
       case '__test_toggleReplace':
         toggleReplace();
         break;
+      case '__test_getResultsListStatus':
+        const resultsList = document.getElementById('results-list');
+        const scrollbarVisible = resultsList ? 
+          getComputedStyle(resultsList).overflowY !== 'hidden' && 
+          resultsList.scrollHeight > resultsList.clientHeight : false;
+        
+        // Check for horizontal overflow
+        const hasHorizontalOverflow = resultsList ? 
+          resultsList.scrollWidth > resultsList.clientWidth : false;
+        
+        // Check if tooltips are present on result headers
+        const resultHeaders = document.querySelectorAll('.result-file-header');
+        let tooltipsPresent = true;
+        resultHeaders.forEach(header => {
+          const fileName = header.querySelector('.file-name');
+          const filePath = header.querySelector('.file-path');
+          if (fileName && fileName.scrollWidth > fileName.clientWidth && !fileName.hasAttribute('title')) {
+            tooltipsPresent = false;
+          }
+          if (filePath && filePath.scrollWidth > filePath.clientWidth && !filePath.hasAttribute('title')) {
+            tooltipsPresent = false;
+          }
+        });
+        
+        vscode.postMessage({
+          type: '__test_resultsListStatus',
+          scrollbarVisible: scrollbarVisible,
+          hasHorizontalOverflow: hasHorizontalOverflow,
+          tooltipsPresent: tooltipsPresent,
+          resultHeadersCount: resultHeaders.length
+        });
+        break;
+      case '__test_setScope':
+        if (message.scope && scopeSelect) {
+          state.currentScope = message.scope;
+          scopeSelect.value = message.scope;
+          updateScopeInputs();
+        }
+        break;
       case 'restorePreviewPanelState':
         if (typeof message.collapsed === 'boolean') {
           state.previewPanelCollapsed = message.collapsed;

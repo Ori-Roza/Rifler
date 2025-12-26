@@ -1,5 +1,5 @@
-// Sample TypeScript file for testing
-export class TestClass {
+// Sample TypeScript file for updateding
+export class updatedClass {
   constructor(private name: string) {}
 
   greet(): string {
@@ -7,12 +7,12 @@ export class TestClass {
   }
 
   searchMe(): void {
-    console.log('This is a test function');
+    console.log('This is a updated function');
   }
 }
 
 // Another function to search for
 function anotherFunction() {
-  const test = 'search test';
-  return test;
+  const updated = 'search updated';
+  return updated;
 }

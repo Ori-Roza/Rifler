@@ -28,11 +28,10 @@ export async function replaceAll(
   options: SearchOptions,
   directoryPath: string | undefined,
   modulePath: string | undefined,
-  filePath: string | undefined,
   onRefresh: () => Promise<void>
 ): Promise<void> {
   try {
-    const results = await performSearch(query, scope, options, directoryPath, modulePath, filePath);
+    const results = await performSearch(query, scope, options, directoryPath, modulePath);
     if (results.length === 0) {
       vscode.window.showInformationMessage('No occurrences found to replace.');
       return;

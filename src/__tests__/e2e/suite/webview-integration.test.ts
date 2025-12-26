@@ -88,7 +88,7 @@ const findMe = "unique_search_term_12345";
     let attempts = 0;
     while (Date.now() - start < timeout) {
       attempts++;
-      const results = await performSearch(query, scope, options, directoryPath, modulePath, filePath);
+      const results = await performSearch(query, scope, options, directoryPath, modulePath);
       if (results.length >= expectedCount) {
         if (attempts > 1) {
           log(`   ⏳ Found after ${attempts} attempts (${Date.now() - start}ms)`);
@@ -98,7 +98,7 @@ const findMe = "unique_search_term_12345";
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     log(`   ❌ Failed after ${attempts} attempts (${Date.now() - start}ms)`);
-    return await performSearch(query, scope, options, directoryPath, modulePath, filePath);
+    return await performSearch(query, scope, options, directoryPath, modulePath);
   }
 
   after(async () => {
@@ -179,11 +179,8 @@ const findMe = "unique_search_term_12345";
 
     const caseSensitiveResults = await performSearch(
       'TestClass',
-      'file',
-      { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Found ${caseSensitiveResults.length} result(s)`);
@@ -193,11 +190,8 @@ const findMe = "unique_search_term_12345";
 
     const wrongCaseResults = await performSearch(
       'testclass',
-      'file',
-      { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Found ${wrongCaseResults.length} result(s)`);
@@ -240,11 +234,8 @@ const findMe = "unique_search_term_12345";
 
     const results = await performSearch(
       'this_text_definitely_does_not_exist_xyz789',
-      'file',
-      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Found ${results.length} result(s)`);
@@ -398,11 +389,10 @@ const c = "word_to_replace";`;
       await replaceAll(
         'word_to_replace',
         'new_word',
-        'file',
+        'project',
         { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
         undefined,
         undefined,
-        replaceAllTestFilePath,
         mockRefresh
       );
 
@@ -564,11 +554,8 @@ const c = "word_to_replace";`;
 
     const results = await performSearch(
       '',
-      'file',
-      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Results: ${results.length}`);
@@ -584,11 +571,8 @@ const c = "word_to_replace";`;
 
     const results = await performSearch(
       'a',
-      'file',
-      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Results: ${results.length}`);
@@ -604,11 +588,8 @@ const c = "word_to_replace";`;
 
     const results = await performSearch(
       '[invalid(regex',
-      'file',
-      { matchCase: false, wholeWord: false, useRegex: true, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: true, fileMask: '' }
     );
 
     log(`   📊 Results: ${results.length}`);

@@ -419,6 +419,7 @@ body.loaded {
   flex: 1;
   display: flex;
   min-width: 0;
+  position: relative;
 }
 
 .path-input, .mask-input {
@@ -434,6 +435,14 @@ body.loaded {
 
 .path-input:focus, .mask-input:focus {
   outline: none;
+}
+
+.filter-field.error {
+  border-color: var(--vscode-inputValidation-errorBorder, #f48771) !important;
+}
+
+.path-input.error {
+  /* Handled by parent .filter-field.error */
 }
 
 .scope-field {

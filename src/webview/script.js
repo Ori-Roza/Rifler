@@ -106,7 +106,6 @@ console.log('[Rifler] Webview script starting...');
   // Updated for new layout
   const directoryInput = document.getElementById('directory-input');
   const moduleSelect = document.getElementById('module-select');
-  const fileInput = document.getElementById('file-input');
   const scopeSelect = document.getElementById('scope-select');
   const pathLabel = document.getElementById('path-label');
   
@@ -998,8 +997,7 @@ console.log('[Rifler] Webview script starting...');
       scope: state.currentScope,
       options: state.options,
       directoryPath: state.currentScope === 'directory' ? directoryInput.value.trim() : undefined,
-      modulePath: state.currentScope === 'module' ? moduleSelect.value : undefined,
-      filePath: state.currentScope === 'file' ? fileInput.value.trim() : undefined
+      modulePath: state.currentScope === 'module' ? moduleSelect.value : undefined
     });
   }
 
@@ -1009,6 +1007,8 @@ console.log('[Rifler] Webview script starting...');
     const messageElement = document.getElementById(messageElementId);
     if (!messageElement) return;
 
+    console.log('[Rifler] Updating validation message:', { fieldId, messageElementId, message, type });
+
     if (message) {
       messageElement.textContent = message;
       messageElement.className = 'validation-message visible ' + type;
@@ -1016,6 +1016,29 @@ console.log('[Rifler] Webview script starting...');
       messageElement.className = 'validation-message';
       messageElement.textContent = '';
     }
+  }
+
+  function validateDirectory() {
+    if (state.currentScope !== 'directory') return;
+    
+    const directoryPath = directoryInput.value.trim();
+    const container = directoryInput.closest('.filter-field');
+    
+    console.log('[Rifler] Validating directory:', directoryPath);
+
+    if (!directoryPath) {
+      updateValidationMessage('directory-input', 'directory-validation-message', '', 'error');
+      directoryInput.classList.remove('error');
+      if (container) container.classList.remove('error');
+      return;
+    }
+
+    // Send message to extension to check if directory exists
+    console.log('[Rifler] Sending validateDirectory message:', directoryPath);
+    vscode.postMessage({
+      type: 'validateDirectory',
+      directoryPath: directoryPath
+    });
   }
 
   function updateSearchButtonState() {
@@ -1174,7 +1197,6 @@ console.log('[Rifler] Webview script starting...');
         scope: state.currentScope,
         directoryPath: directoryInput.value,
         modulePath: moduleSelect.value,
-        filePath: fileInput.value,
         options: state.options,
         showReplace: replaceRow.classList.contains('visible'),
         results: state.results,
@@ -1394,6 +1416,7 @@ console.log('[Rifler] Webview script starting...');
     directoryInput.addEventListener('input', () => {
       clearTimeout(state.searchTimeout);
       state.searchTimeout = setTimeout(() => {
+        validateDirectory();
         runSearch();
       }, 500);
     });
@@ -1493,6 +1516,10 @@ console.log('[Rifler] Webview script starting...');
       case 'fileContent':
         handleFileContent(message);
         break;
+      case 'directoryValidationResult':
+        console.log('[Rifler] Received directoryValidationResult:', message.exists);
+        handleDirectoryValidation(message.exists);
+        break;
       case 'showReplace':
         toggleReplace(true);
         if (queryInput.value.trim()) {
@@ -1533,7 +1560,6 @@ console.log('[Rifler] Webview script starting...');
         replaceInput.value = '';
         if (directoryInput) directoryInput.value = '';
         if (moduleSelect) moduleSelect.value = '';
-        if (fileInput) fileInput.value = '';
         state.results = [];
         state.activeIndex = -1;
         state.lastPreview = null;
@@ -1584,7 +1610,6 @@ console.log('[Rifler] Webview script starting...');
           state.currentScope = s.scope || 'project';
           directoryInput.value = s.directoryPath || '';
           moduleSelect.value = s.modulePath || '';
-          fileInput.value = s.filePath || '';
           state.options = s.options || { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' };
           
           matchCaseToggle.classList.toggle('active', state.options.matchCase);
@@ -1738,7 +1763,6 @@ console.log('[Rifler] Webview script starting...');
       case '__test_getScopeInputStatus':
         const directoryInputVisible = directoryInput ? getComputedStyle(directoryInput).display !== 'none' : false;
         const moduleSelectVisible = moduleSelect ? getComputedStyle(moduleSelect).display !== 'none' : false;
-        const fileInputVisible = fileInput ? getComputedStyle(fileInput).display !== 'none' : false;
         const directoryInputReadOnly = directoryInput ? directoryInput.readOnly : false;
         const directoryInputPlaceholder = directoryInput ? directoryInput.placeholder : '';
         const directoryInputValue = directoryInput ? directoryInput.value : '';
@@ -1752,14 +1776,28 @@ console.log('[Rifler] Webview script starting...');
           directoryInputReadOnly: directoryInputReadOnly,
           directoryInputPlaceholder: directoryInputPlaceholder,
           directoryInputValue: directoryInputValue,
-          moduleSelectVisible: moduleSelectVisible,
-          fileInputVisible: fileInputVisible
+          moduleSelectVisible: moduleSelectVisible
         });
         break;
       case '__test_setDirectoryInput':
         if (directoryInput && message.value !== undefined) {
           directoryInput.value = message.value;
+          // Trigger validation after setting the value
+          validateDirectory();
         }
+        break;
+      case '__test_getValidationStatus':
+        const validationMessageEl = document.getElementById('directory-validation-message');
+        const hasErrorClass = directoryInput ? directoryInput.classList.contains('error') : false;
+        const isVisible = validationMessageEl ? validationMessageEl.classList.contains('visible') : false;
+        const messageText = validationMessageEl ? validationMessageEl.textContent.trim() : '';
+
+        vscode.postMessage({
+          type: '__test_validationStatus',
+          directoryValidationError: hasErrorClass,
+          directoryValidationMessage: messageText,
+          validationMessageVisible: isVisible
+        });
         break;
       case '__test_setScope':
         if (message.scope && scopeSelect) {
@@ -1797,7 +1835,14 @@ console.log('[Rifler] Webview script starting...');
     // Hide all scope inputs first
     if (directoryInput) directoryInput.style.display = 'none';
     if (moduleSelect) moduleSelect.style.display = 'none';
-    if (fileInput) fileInput.style.display = 'none';
+    
+    // Clear directory validation when not in directory mode
+    if (state.currentScope !== 'directory') {
+      updateValidationMessage('directory-input', 'directory-validation-message', '', 'error');
+      directoryInput.classList.remove('error');
+      const container = directoryInput.closest('.filter-field');
+      if (container) container.classList.remove('error');
+    }
     
     // Update label and show correct input
     if (state.currentScope === 'project') {
@@ -1818,13 +1863,14 @@ console.log('[Rifler] Webview script starting...');
         if (!directoryInput.value && state.currentDirectory) {
           directoryInput.value = state.currentDirectory;
         }
+        // Validate directory when switching to directory mode (only if there's a value)
+        if (directoryInput.value.trim()) {
+          validateDirectory();
+        }
       }
     } else if (state.currentScope === 'module') {
       if (pathLabel) pathLabel.textContent = 'Module:';
       if (moduleSelect) moduleSelect.style.display = 'block';
-    } else if (state.currentScope === 'file') {
-      if (pathLabel) pathLabel.textContent = 'File:';
-      if (fileInput) fileInput.style.display = 'block';
     }
 
     // Sync dropdown if needed
@@ -1934,8 +1980,6 @@ console.log('[Rifler] Webview script starting...');
         console.log('Sending directory search:', message.directoryPath);
       } else if (state.currentScope === 'module') {
         message.modulePath = moduleSelect.value;
-      } else if (state.currentScope === 'file') {
-        message.filePath = fileInput.value.trim();
       }
 
       console.log('Sending search message:', message);
@@ -2372,6 +2416,24 @@ console.log('[Rifler] Webview script starting...');
     // Hide loading overlay after content is rendered
     if (previewLoadingOverlay) {
       previewLoadingOverlay.classList.remove('visible');
+    }
+  }
+
+  function handleDirectoryValidation(exists) {
+    console.log('[Rifler] Directory validation result:', exists);
+    if (state.currentScope !== 'directory') return;
+    
+    const container = directoryInput.closest('.filter-field');
+
+    if (exists) {
+      updateValidationMessage('directory-input', 'directory-validation-message', '', 'error');
+      directoryInput.classList.remove('error');
+      if (container) container.classList.remove('error');
+    } else {
+      console.log('[Rifler] Showing directory error');
+      updateValidationMessage('directory-input', 'directory-validation-message', 'Directory is not found', 'error');
+      directoryInput.classList.add('error');
+      if (container) container.classList.add('error');
     }
   }
 

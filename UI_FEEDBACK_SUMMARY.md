@@ -63,21 +63,9 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [ ] UI should not follow VSCode current theme but use its own custom theme
 - [ ] This would allow using all design details properly
 
-## **Input Mask Clarity Issues**
-- [ ] No clear distinction in current icons for file types
-- [ ] Make input mask options and usage more clear
-
 ## **Module/Project Mode Issues**
 - [ ] Module: Project mode not editable
 - [ ] Directory mode is editable - unclear why there are two similar modes
-
-## **Initial Load Issues**
-- [ ] First extension seen with initial load behavior
-- [ ] What exactly is being deferred during load?
-- [ ] Responsiveness is important - deferring affects user experience
-
-## **Close Button Issues**
-- [ ] Close button clears search input instead of closing extension tab
 
 ## **Switch Sidebar Issues**
 - [ ] Pressing switch between sidebar multiple times shows weird implementation results
@@ -88,11 +76,7 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 ## **Results List Bug**
 - [ ] Scrolling bug: when many file results in collapse all mode, scrolling below viewport sends scroll to top
 
-## **Preview Functionality**
-- [ ] Missing show/hide preview functionality - poor user experience
-
 ## **General Feedback**
 - [ ] Extension should be distinct and better than alternatives
 - [ ] Focus on distinction through colors and other visual elements
-- [ ] Need proper usability testing to catch implementation issues</content>
-<parameter name="filePath">/Users/ori.roza/Desktop/projects/rifler/UI_FEEDBACK_SUMMARY.md
+- [ ] Need proper usability testing to catch implementation issues

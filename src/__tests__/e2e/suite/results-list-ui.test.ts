@@ -205,23 +205,4 @@ export const fifthFunction = () => {
     // Tooltips should be present on truncated elements
     assert.strictEqual(status.tooltipsPresent, true, 'Tooltips should be present on truncated file names and paths');
   });
-
-  test('File scope option should be available in scope dropdown', async function() {
-    this.timeout(10000);
-
-    const panel = testHelpers.getCurrentPanel();
-    assert.ok(panel, 'Panel should be open');
-
-    // Get UI status to check if file scope is available
-    const status = await getResultsListStatus(panel.webview);
-    assert.ok(status, 'Should receive results list status');
-
-    // The file scope option should exist in the HTML (we can't easily test the dropdown options from here,
-    // but we can verify the functionality works by checking if the scope can be set)
-    panel.webview.postMessage({ type: '__test_setScope', scope: 'file' });
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // If no error was thrown, the scope change was accepted
-    assert.ok(true, 'File scope option should be functional');
-  });
 });

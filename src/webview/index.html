@@ -48,10 +48,10 @@
         <span class="filter-label" id="path-label">Project:</span>
         <div class="filter-input-wrapper">
           <input type="text" id="directory-input" class="path-input" placeholder="src/components/" />
+          <div id="directory-validation-message" class="validation-message"></div>
           <select id="module-select" class="path-input" style="display: none;">
             <option value="">Select module...</option>
           </select>
-          <input type="text" id="file-input" class="path-input" placeholder="File path..." readonly style="display: none;" />
         </div>
       </div>
       <div class="filter-field scope-field">
@@ -60,7 +60,6 @@
           <option value="project">Project</option>
           <option value="module">Module</option>
           <option value="directory" selected>Directory</option>
-          <option value="file">File</option>
         </select>
       </div>
     </div>

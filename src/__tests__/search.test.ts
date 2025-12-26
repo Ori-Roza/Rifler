@@ -44,28 +44,6 @@ describe('Search', () => {
       });
     });
 
-    describe('file scope', () => {
-      test('should search in specific file when scope is file', async () => {
-        const testFilePath = '/test/file.ts';
-        const fileContent = 'const test = "hello";\nconst test2 = "world";';
-        
-        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
-        mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
-
-        const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
-
-        expect(results.length).toBe(2);
-        expect(results[0].fileName).toBe('file.ts');
-        expect(results[0].line).toBe(0);
-        expect(results[1].line).toBe(1);
-      });
-
-      test('should return empty for file scope without filePath', async () => {
-        const results = await performSearch('test', 'file', defaultOptions);
-        expect(results).toEqual([]);
-      });
-    });
-
     describe('directory scope', () => {
       test('should search in directory when scope is directory', async () => {
         const testDir = '/test/dir';
@@ -246,11 +224,20 @@ describe('Search', () => {
       });
 
       test('should skip large files (> 1MB)', async () => {
-        const testFilePath = '/test/large.ts';
+        const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+        (vscode.workspace as any).workspaceFolders = [workspaceFolder];
         
-        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 2 * 1024 * 1024, ctime: 0, mtime: 0 }); // 2MB
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['large.ts', vscode.FileType.File]
+        ]);
+        mockWorkspaceFs.stat.mockImplementation((uri) => {
+          if (uri.fsPath === '/workspace/large.ts') {
+            return Promise.resolve({ type: vscode.FileType.File, size: 2 * 1024 * 1024, ctime: 0, mtime: 0 }); // 2MB
+          }
+          return Promise.resolve({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
+        });
 
-        const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
+        const results = await performSearch('test', 'project', defaultOptions);
 
         expect(mockWorkspaceFs.readFile).not.toHaveBeenCalled();
         expect(results).toEqual([]);
@@ -297,7 +284,10 @@ describe('Search', () => {
 
     describe('open documents', () => {
       test('should use content from open documents instead of disk', async () => {
-        const testFilePath = '/test/file.ts';
+        const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+        (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+        
+        const testFilePath = '/workspace/file.ts';
         const diskContent = 'old content';
         const openDocContent = 'new test content';
         
@@ -309,9 +299,13 @@ describe('Search', () => {
           getText: () => openDocContent
         }];
         
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['file.ts', vscode.FileType.File]
+        ]);
+        mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
         mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(diskContent));
 
-        const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
+        const results = await performSearch('test', 'project', defaultOptions);
 
         expect(results.length).toBe(1);
         expect(results[0].preview).toContain('test');
@@ -320,15 +314,20 @@ describe('Search', () => {
 
     describe('result limits', () => {
       test('should respect maxResults limit', async () => {
-        const testFilePath = '/test/file.ts';
+        const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+        (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+        
         // Create content with many matches
         const lines = Array(100).fill('test test test test test');
         const fileContent = lines.join('\n');
         
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['file.ts', vscode.FileType.File]
+        ]);
         mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
         mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
-        const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
+        const results = await performSearch('test', 'project', defaultOptions);
 
         // Should have many results but not exceed reasonable limits
         expect(results.length).toBeGreaterThan(0);
@@ -338,13 +337,18 @@ describe('Search', () => {
 
     describe('search result format', () => {
       test('should return correctly formatted results', async () => {
-        const testFilePath = '/test/dir/file.ts';
+        const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+        (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+        
         const fileContent = '  const test = "hello";';
         
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['file.ts', vscode.FileType.File]
+        ]);
         mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
         mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
-        const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
+        const results = await performSearch('test', 'project', defaultOptions);
 
         expect(results.length).toBe(1);
         expect(results[0]).toMatchObject({
@@ -360,13 +364,18 @@ describe('Search', () => {
       });
 
       test('should handle multiple matches on same line', async () => {
-        const testFilePath = '/test/file.ts';
+        const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+        (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+        
         const fileContent = 'test test test';
         
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['file.ts', vscode.FileType.File]
+        ]);
         mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
         mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(fileContent));
 
-        const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
+        const results = await performSearch('test', 'project', defaultOptions);
 
         expect(results.length).toBe(3);
         expect(results[0].character).toBe(0);
@@ -392,12 +401,16 @@ describe('Search', () => {
       });
 
       test('should handle file read errors gracefully', async () => {
-        const testFilePath = '/test/file.ts';
+        const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+        (vscode.workspace as any).workspaceFolders = [workspaceFolder];
 
+        mockWorkspaceFs.readDirectory.mockResolvedValue([
+          ['file.ts', vscode.FileType.File]
+        ]);
         mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
         mockWorkspaceFs.readFile.mockRejectedValue(new Error('Permission denied'));
 
-        const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
+        const results = await performSearch('test', 'project', defaultOptions);
 
         // Should not throw, just return empty results
         expect(results).toEqual([]);
@@ -408,54 +421,74 @@ describe('Search', () => {
 
   describe('maxResults parameter', () => {
     test('should limit results to maxResults value', async () => {
-      const testFilePath = '/test/file.ts';
+      const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+      (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+      
       // Create content with many matches
       const lines = Array.from({ length: 100 }, (_, i) => `const test${i} = "test value";`);
       const content = lines.join('\n');
 
+      mockWorkspaceFs.readDirectory.mockResolvedValue([
+        ['file.ts', vscode.FileType.File]
+      ]);
       mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: content.length, ctime: 0, mtime: 0 });
       mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(content));
 
-      const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath, 10);
+      const results = await performSearch('test', 'project', defaultOptions, undefined, undefined, 10);
 
       expect(results.length).toBe(10);
     });
 
     test('should return all results when under maxResults limit', async () => {
-      const testFilePath = '/test/file.ts';
+      const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+      (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+      
       const content = 'const test1 = "value";\nconst test2 = "value";';
 
+      mockWorkspaceFs.readDirectory.mockResolvedValue([
+        ['file.ts', vscode.FileType.File]
+      ]);
       mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: content.length, ctime: 0, mtime: 0 });
       mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(content));
 
-      const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath, 1000);
+      const results = await performSearch('test', 'project', defaultOptions, undefined, undefined, 1000);
 
       expect(results.length).toBe(2);
     });
 
     test('should use default maxResults of 10000 when not specified', async () => {
-      const testFilePath = '/test/file.ts';
+      const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+      (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+      
       const content = 'const test = "value";';
 
+      mockWorkspaceFs.readDirectory.mockResolvedValue([
+        ['file.ts', vscode.FileType.File]
+      ]);
       mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: content.length, ctime: 0, mtime: 0 });
       mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(content));
 
       // Just verify it doesn't throw and returns results
-      const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath);
+      const results = await performSearch('test', 'project', defaultOptions);
 
       expect(results.length).toBe(1);
     });
 
     test('should handle maxResults of 0 or negative by using default', async () => {
-      const testFilePath = '/test/file.ts';
+      const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+      (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+      
       const lines = Array.from({ length: 10 }, (_, i) => `const test${i} = "value";`);
       const content = lines.join('\n');
 
+      mockWorkspaceFs.readDirectory.mockResolvedValue([
+        ['file.ts', vscode.FileType.File]
+      ]);
       mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: content.length, ctime: 0, mtime: 0 });
       mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode(content));
 
       // With maxResults = 0, should still return results (uses default)
-      const results = await performSearch('test', 'file', defaultOptions, undefined, undefined, testFilePath, 0);
+      const results = await performSearch('test', 'project', defaultOptions, undefined, undefined, 0);
 
       expect(results.length).toBe(10);
     });

@@ -19,7 +19,6 @@ export async function performSearch(
   options: SearchOptions,
   directoryPath?: string,
   modulePath?: string,
-  filePath?: string,
   maxResults: number = 10000
 ): Promise<SearchResult[]> {
   if (!query.trim() || query.length < 2) {
@@ -53,9 +52,7 @@ export async function performSearch(
   const limiter = new Limiter(100);
   const perFileTimeBudgetMs = 2500;
 
-  if (scope === 'file' && filePath) {
-    await searchInFileAsync(filePath, regex, results, effectiveMaxResults, perFileTimeBudgetMs);
-  } else if (scope === 'directory') {
+  if (scope === 'directory') {
     const searchPath = (directoryPath || '').trim();
     try {
       if (searchPath) {

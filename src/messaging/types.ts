@@ -133,7 +133,6 @@ export interface TestScopeInputStatusMessage {
   directoryInputPlaceholder: string;
   directoryInputValue: string;
   moduleSelectVisible: boolean;
-  fileInputVisible: boolean;
 }
 
 export interface TestSetDirectoryInputMessage {

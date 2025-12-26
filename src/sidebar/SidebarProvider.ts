@@ -141,6 +141,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       'saveFile',
       'validateRegex',
       'validateFileMask',
+      'validateDirectory',
       '__diag_ping',
       '__test_searchCompleted',
       '__test_searchResultsReceived',
@@ -154,7 +155,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     switch (message.type) {
       case 'runSearch': {
         // Handle search locally to persist state after each search
-        const searchMessage = message as unknown as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string; activeIndex?: number };
+        const searchMessage = message as unknown as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number };
         await this._runSearch(searchMessage);
         break;
       }
@@ -217,7 +218,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async _runSearch(message: { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string; activeIndex?: number }): Promise<void> {
+  private async _runSearch(message: { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number }): Promise<void> {
     if (!message.query || !message.scope || !message.options) {
       return;
     }
@@ -227,8 +228,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       message.scope as SearchScope,
       message.options,
       message.directoryPath,
-      message.modulePath,
-      message.filePath
+      message.modulePath
     );
 
     const activeIndex = message.activeIndex ?? (results.length > 0 ? 0 : -1);
@@ -251,7 +251,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       options: message.options,
       directoryPath: message.directoryPath,
       modulePath: message.modulePath,
-      filePath: message.filePath,
       results: results,
       activeIndex
       });
@@ -276,7 +275,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
   }
 
-  private async _replaceAll(message: { query: string; replaceText: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; filePath?: string }): Promise<void> {
+  private async _replaceAll(message: { query: string; replaceText: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string }): Promise<void> {
     if (!message.query || message.replaceText === undefined || !message.scope || !message.options) {
       return;
     }
@@ -288,7 +287,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       message.options,
       message.directoryPath,
       message.modulePath,
-      message.filePath,
       async () => {
         // Refresh search after replace
         await this._runSearch(message);

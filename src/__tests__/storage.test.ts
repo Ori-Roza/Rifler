@@ -41,10 +41,9 @@ describe('Storage Utility Tests', () => {
       // Verify shape
       assert.strictEqual(typeof mockState.query, 'string');
       assert.strictEqual(typeof mockState.replaceText, 'string');
-      assert.ok(['project', 'module', 'directory', 'file'].includes(mockState.scope));
+      assert.ok(['project', 'module', 'directory'].includes(mockState.scope));
       assert.strictEqual(typeof mockState.directoryPath, 'string');
       assert.strictEqual(typeof mockState.modulePath, 'string');
-      assert.strictEqual(typeof mockState.filePath, 'string');
       assert.strictEqual(typeof mockState.options, 'object');
       assert.strictEqual(typeof mockState.showReplace, 'boolean');
     });
@@ -85,7 +84,7 @@ describe('Storage Utility Tests', () => {
     });
 
     test('state should handle various scope values', () => {
-      const scopes = ['project', 'module', 'directory', 'file'] as const;
+      const scopes = ['project', 'module', 'directory'] as const;
 
       scopes.forEach(scope => {
         const state = {

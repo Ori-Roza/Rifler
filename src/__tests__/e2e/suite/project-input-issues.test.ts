@@ -95,7 +95,6 @@ suite('Rifler Project Input Issues E2E Tests', () => {
     assert.strictEqual(status.directoryInputPlaceholder, expectedWorkspaceName, `Directory input should have workspace name "${expectedWorkspaceName}" as placeholder`);
     assert.strictEqual(status.directoryInputValue, testWorkspaceFolder.uri.fsPath, `Directory input should have workspace path as value`);
     assert.strictEqual(status.moduleSelectVisible, false, 'Module select should be hidden');
-    assert.strictEqual(status.fileInputVisible, false, 'File input should be hidden');
   });
 
   test('Directory mode should show editable input with proper placeholder', async function() {
@@ -119,7 +118,6 @@ suite('Rifler Project Input Issues E2E Tests', () => {
     assert.strictEqual(status.directoryInputReadOnly, false, 'Directory input should be editable');
     assert.strictEqual(status.directoryInputPlaceholder, 'src/components/', 'Directory input should have proper placeholder');
     assert.strictEqual(status.moduleSelectVisible, false, 'Module select should be hidden');
-    assert.strictEqual(status.fileInputVisible, false, 'File input should be hidden');
   });
 
   test('Module mode should show module select dropdown', async function() {
@@ -141,29 +139,6 @@ suite('Rifler Project Input Issues E2E Tests', () => {
     assert.strictEqual(status.pathLabel, 'Module:', 'Path label should be "Module:"');
     assert.strictEqual(status.directoryInputVisible, false, 'Directory input should be hidden');
     assert.strictEqual(status.moduleSelectVisible, true, 'Module select should be visible');
-    assert.strictEqual(status.fileInputVisible, false, 'File input should be hidden');
-  });
-
-  test('File mode should show file input field', async function() {
-    this.timeout(15000);
-
-    const panel = testHelpers.getCurrentPanel();
-    assert.ok(panel, 'Panel should be open');
-
-    // Set scope to file
-    panel.webview.postMessage({ type: '__test_setScope', scope: 'file' });
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Check scope input status
-    const status = await getScopeInputStatus(panel.webview);
-    assert.ok(status, 'Should receive scope input status');
-
-    // File mode should show file input
-    assert.strictEqual(status.currentScope, 'file', 'Should be in file scope');
-    assert.strictEqual(status.pathLabel, 'File:', 'Path label should be "File:"');
-    assert.strictEqual(status.directoryInputVisible, false, 'Directory input should be hidden');
-    assert.strictEqual(status.moduleSelectVisible, false, 'Module select should be hidden');
-    assert.strictEqual(status.fileInputVisible, true, 'File input should be visible');
   });
 
   test('Switching between modes should properly update input visibility and state', async function() {
@@ -239,4 +214,105 @@ suite('Rifler Project Input Issues E2E Tests', () => {
     assert.strictEqual(status.directoryInputValue, testWorkspaceFolder.uri.fsPath, `Directory input should have workspace path as value`);
     assert.strictEqual(status.directoryInputReadOnly, true, 'Directory input should be read-only in project mode');
   });
-});
+
+  test('Directory validation should show error for non-existent directory', async function() {
+    this.timeout(15000);
+
+    await vscode.commands.executeCommand('rifler._openWindowInternal');
+    // Wait for webview to load
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const panel = testHelpers.getCurrentPanel();
+    assert.ok(panel, 'Panel should be open');
+
+    // Set scope to directory
+    panel.webview.postMessage({ type: '__test_setScope', scope: 'directory' });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Set directory input to a non-existent path
+    const nonExistentPath = path.join(testWorkspaceFolder.uri.fsPath, 'non-existent-directory');
+    panel.webview.postMessage({ type: '__test_setDirectoryInput', value: nonExistentPath });
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for validation
+
+    // Check that validation error is shown
+    const validationStatus = await getValidationStatus(panel.webview);
+    assert.ok(validationStatus, 'Should receive validation status');
+    assert.strictEqual(validationStatus.directoryValidationError, true, 'Should show directory validation error');
+    assert.strictEqual(validationStatus.directoryValidationMessage, 'Directory is not found', 'Should show correct error message');
+  });
+
+  test('Directory validation should clear error for valid directory', async function() {
+    this.timeout(15000);
+
+    await vscode.commands.executeCommand('rifler._openWindowInternal');
+    // Wait for webview to load
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const panel = testHelpers.getCurrentPanel();
+    assert.ok(panel, 'Panel should be open');
+
+    // Set scope to directory
+    panel.webview.postMessage({ type: '__test_setScope', scope: 'directory' });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // First set to invalid directory
+    const nonExistentPath = path.join(testWorkspaceFolder.uri.fsPath, 'non-existent-directory');
+    panel.webview.postMessage({ type: '__test_setDirectoryInput', value: nonExistentPath });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    let validationStatus = await getValidationStatus(panel.webview);
+    assert.strictEqual(validationStatus.directoryValidationError, true, 'Should show error for invalid directory');
+
+    // Then set to valid directory (the workspace root)
+    panel.webview.postMessage({ type: '__test_setDirectoryInput', value: testWorkspaceFolder.uri.fsPath });
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Check that validation error is cleared
+    validationStatus = await getValidationStatus(panel.webview);
+    assert.ok(validationStatus, 'Should receive validation status');
+    assert.strictEqual(validationStatus.directoryValidationError, false, 'Should clear directory validation error for valid directory');
+  });
+
+  test('Directory validation should work when switching to directory mode with invalid path', async function() {
+    this.timeout(15000);
+
+    await vscode.commands.executeCommand('rifler._openWindowInternal');
+    // Wait for webview to load
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const panel = testHelpers.getCurrentPanel();
+    assert.ok(panel, 'Panel should be open');
+
+    // Set directory input to invalid path while in project mode
+    const nonExistentPath = path.join(testWorkspaceFolder.uri.fsPath, 'another-non-existent-directory');
+    panel.webview.postMessage({ type: '__test_setDirectoryInput', value: nonExistentPath });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Switch to directory mode
+    panel.webview.postMessage({ type: '__test_setScope', scope: 'directory' });
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for validation
+
+    // Check that validation error is shown
+    const validationStatus = await getValidationStatus(panel.webview);
+    assert.ok(validationStatus, 'Should receive validation status');
+    assert.strictEqual(validationStatus.directoryValidationError, true, 'Should show directory validation error when switching to directory mode');
+    assert.strictEqual(validationStatus.directoryValidationMessage, 'Directory is not found', 'Should show correct error message');
+  });
+
+  async function getValidationStatus(webview: vscode.Webview): Promise<any> {
+    return new Promise((resolve) => {
+      const disposable = webview.onDidReceiveMessage((message) => {
+        if (message.type === '__test_validationStatus') {
+          disposable.dispose();
+          resolve(message);
+        }
+      });
+      webview.postMessage({ type: '__test_getValidationStatus' });
+
+      // Timeout after 2 seconds
+      setTimeout(() => {
+        disposable.dispose();
+        resolve(null);
+      }, 2000);
+    });
+  }});

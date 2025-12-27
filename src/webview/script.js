@@ -647,16 +647,43 @@ console.log('[Rifler] Webview script starting...');
     previewContent.addEventListener('click', (e) => {
       if (e.target.tagName === 'BUTTON') return;
       
-      enterEditMode();
+      // Find the clicked line
+      const pvLine = e.target.closest('.pvLine');
+      if (pvLine) {
+        const lineNumber = parseInt(pvLine.getAttribute('data-line'), 10);
+        const pvCode = pvLine.querySelector('.pvCode');
+        
+        if (pvCode) {
+          // Calculate column position within the code area
+          const rect = pvCode.getBoundingClientRect();
+          const relativeX = Math.max(0, e.clientX - rect.left);
+          
+          // Get the text content
+          const textContent = pvCode.textContent || '';
+          
+          // Use a more accurate character width for monospace fonts
+          // Most monospace fonts at 13px are ~8px per character
+          const charWidth = 8;
+          const column = Math.floor(relativeX / charWidth);
+          const actualColumn = Math.min(Math.max(0, column), textContent.length);
+          
+          enterEditMode(lineNumber, actualColumn);
+        } else {
+          enterEditMode(lineNumber);
+        }
+      } else {
+        enterEditMode();
+      }
     });
   }
 
-  function enterEditMode() {
+  function enterEditMode(clickedLineNumber, clickedColumn = 0) {
     if (!state.fileContent || isEditMode) return;
     
     const scrollTop = previewContent.scrollTop;
     
     isEditMode = true;
+    if (previewContent) previewContent.style.display = 'none'; // Hide preview immediately to prevent flicker
     if (editorContainer) editorContainer.classList.add('visible');
     if (fileEditor) fileEditor.value = state.fileContent.content;
     updateHighlights();
@@ -665,6 +692,19 @@ console.log('[Rifler] Webview script starting...');
       requestAnimationFrame(() => {
         if (fileEditor) {
           fileEditor.scrollTop = scrollTop;
+          
+          // Set cursor position if a line was clicked
+          if (typeof clickedLineNumber === 'number' && clickedLineNumber >= 0) {
+            const lines = state.fileContent.content.split('\n');
+            let charPosition = 0;
+            for (let i = 0; i < clickedLineNumber && i < lines.length; i++) {
+              charPosition += lines[i].length + 1; // +1 for newline
+            }
+            // Add column offset within the line
+            charPosition += Math.min(clickedColumn, lines[clickedLineNumber]?.length || 0);
+            fileEditor.setSelectionRange(charPosition, charPosition);
+          }
+          
           fileEditor.focus({ preventScroll: true });
         }
         if (editorBackdrop) editorBackdrop.scrollTop = scrollTop;

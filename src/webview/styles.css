@@ -412,6 +412,17 @@ body.loaded {
   border-color: #2563eb;
 }
 
+.replace-actions button.secondary {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--rifler-primary);
+  border-color: rgba(59, 130, 246, 0.1);
+}
+
+.replace-actions button.secondary:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
 /* ===== Filters Section (Restructured for Issue #83) ===== */
 .filters-container {
   display: flex;
@@ -703,16 +714,16 @@ body.loaded {
   flex-shrink: 0;
 }
 
-.result-file-header .file-icon {
+.result-file-header .seti-icon {
   width: 16px;
   height: 16px;
-  margin-right: 8px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
+  opacity: 0.8;
 }
 
 .result-file-header .file-info {
@@ -722,6 +733,12 @@ body.loaded {
   flex: 1;
   line-height: 1.2;
   gap: 2px;
+}
+
+.result-file-header .file-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .result-file-header .file-name {
@@ -1111,16 +1128,19 @@ body.loaded {
   flex: 1;
 }
 
-.file-icon {
+.seti-icon {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.8;
 }
+
 
 .preview-filename {
   color: var(--vscode-textLink-foreground);
@@ -1490,6 +1510,17 @@ body.loaded {
 
 .replace-widget button.primary:hover {
   background: var(--vscode-button-hoverBackground);
+}
+
+.replace-widget button.secondary {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--rifler-primary);
+  border-color: rgba(59, 130, 246, 0.1);
+}
+
+.replace-widget button.secondary:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.2);
 }
 
 /* Context Menu */

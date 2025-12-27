@@ -146,7 +146,7 @@ console.log('[Rifler] Webview script starting...');
   const previewPanel = document.getElementById('preview-panel');
   const mainContent = document.querySelector('.main-content');
 
-  let VIRTUAL_ROW_HEIGHT = 28;
+  let VIRTUAL_ROW_HEIGHT = 40;
   const VIRTUAL_OVERSCAN = 8;
   let measuredRowHeight = 0;
   const virtualContent = document.createElement('div');
@@ -182,48 +182,6 @@ console.log('[Rifler] Webview script starting...');
     dragHandle: !!dragHandle,
     filtersContainer: !!filtersContainer
   });
-
-  function getLanguageFromFilename_OLD(filename) {
-    const ext = (filename || '').split('.').pop().toLowerCase();
-    const langMap = {
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'py': 'python',
-      'java': 'java',
-      'c': 'c',
-      'cpp': 'cpp',
-      'h': 'c',
-      'hpp': 'cpp',
-      'cs': 'csharp',
-      'php': 'php',
-      'rb': 'ruby',
-      'go': 'go',
-      'rs': 'rust',
-      'swift': 'swift',
-      'kt': 'kotlin',
-      'kts': 'kotlin',
-      'scala': 'scala',
-      'html': 'xml',
-      'htm': 'xml',
-      'xml': 'xml',
-      'css': 'css',
-      'scss': 'scss',
-      'less': 'less',
-      'json': 'json',
-      'yaml': 'yaml',
-      'yml': 'yaml',
-      'md': 'markdown',
-      'sh': 'bash',
-      'bash': 'bash',
-      'zsh': 'bash',
-      'sql': 'sql',
-      'vue': 'xml',
-      'svelte': 'xml'
-    };
-    return langMap[ext] || 'file';
-  }
 
   var localMatches = [];
   var localMatchIndex = 0;
@@ -799,15 +757,17 @@ console.log('[Rifler] Webview script starting...');
     return ctrlMatch && shiftMatch && altMatch && metaMatch && keyMatch;
   }
   
-  fileEditor.addEventListener('scroll', () => {
-    if (editorBackdrop) {
-      editorBackdrop.scrollTop = fileEditor.scrollTop;
-      editorBackdrop.scrollLeft = fileEditor.scrollLeft;
-    }
-    if (editorLineNumbers) {
-      editorLineNumbers.scrollTop = fileEditor.scrollTop;
-    }
-  });
+  if (fileEditor) {
+    fileEditor.addEventListener('scroll', () => {
+      if (editorBackdrop) {
+        editorBackdrop.scrollTop = fileEditor.scrollTop;
+        editorBackdrop.scrollLeft = fileEditor.scrollLeft;
+      }
+      if (editorLineNumbers) {
+        editorLineNumbers.scrollTop = fileEditor.scrollTop;
+      }
+    });
+  }
   
   function updateHighlights() {
     if (!editorBackdrop || !fileEditor) return;
@@ -1240,11 +1200,11 @@ console.log('[Rifler] Webview script starting...');
       previewPanelContainer.style.display = visible ? 'flex' : 'none';
     }
     
-    if (containerHeight <= 0) return; // Don't apply height if we don't know the container height
-    
-    const maxPreviewHeight = Math.max(PREVIEW_MIN_HEIGHT, containerHeight - MIN_PANEL_HEIGHT);
-    const clamped = Math.min(Math.max(PREVIEW_MIN_HEIGHT, height), maxPreviewHeight);
-    const newResultsHeight = Math.max(MIN_PANEL_HEIGHT, containerHeight - clamped);
+    // If we can't determine container height yet, use a reasonable default
+    const effectiveContainerHeight = containerHeight > 0 ? containerHeight : 600; // Assume 600px default
+    const maxPreviewHeight = Math.max(PREVIEW_MIN_HEIGHT, effectiveContainerHeight - MIN_PANEL_HEIGHT);
+    const clamped = Math.min(Math.max(PREVIEW_MIN_HEIGHT, height || getDefaultPreviewHeight()), maxPreviewHeight);
+    const newResultsHeight = Math.max(MIN_PANEL_HEIGHT, effectiveContainerHeight - clamped);
     
     if (resultsPanel) {
       resultsPanel.style.flex = '1';
@@ -2158,9 +2118,11 @@ console.log('[Rifler] Webview script starting...');
       
       item.innerHTML = 
         '<span class="material-symbols-outlined arrow-icon">' + arrowIcon + '</span>' +
-        '<span class="seti-icon ' + getFileIconName(itemData.fileName) + '"></span>' +
         '<div class="file-info">' +
-          '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
+          '<div class="file-name-row">' +
+            '<span class="seti-icon ' + getFileIconName(itemData.fileName) + '"></span>' +
+            '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
+          '</div>' +
           '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
         '</div>' +
         '<span class="match-count">' + itemData.matchCount + '</span>';
@@ -2287,45 +2249,158 @@ console.log('[Rifler] Webview script starting...');
 
   function getFileIconName(fileName) {
     const ext = fileName.split('.').pop()?.toLowerCase();
-    // Return Seti UI icon class names for different file types
+    // Official VS Code Seti UI icon mappings
     const iconMap = {
+      // Programming Languages
       'js': 'seti-javascript', 'jsx': 'seti-javascript',
       'ts': 'seti-typescript', 'tsx': 'seti-typescript',
       'py': 'seti-python',
       'java': 'seti-java',
-      'c': 'seti-c', 'cpp': 'seti-cpp', 'cc': 'seti-cpp', 'cxx': 'seti-cpp',
-      'cs': 'seti-csharp',
+      'c': 'seti-c',
+      'cpp': 'seti-cpp', 'cc': 'seti-cpp', 'cxx': 'seti-cpp', 'c++': 'seti-cpp',
+      'cs': 'seti-c-sharp',
       'php': 'seti-php',
       'rb': 'seti-ruby',
       'go': 'seti-go',
       'rs': 'seti-rust',
       'swift': 'seti-swift',
-      'html': 'seti-html',
-      'css': 'seti-css',
-      'scss': 'seti-css', 'sass': 'seti-css',
-      'json': 'seti-json',
-      'xml': 'seti-xml',
-      'yaml': 'seti-yaml', 'yml': 'seti-yaml',
-      'md': 'seti-markdown',
-      'dockerfile': 'seti-dockerfile',
-      'gitignore': 'seti-git', 'gitattributes': 'seti-git', 'gitmodules': 'seti-git',
-      'png': 'seti-image', 'jpg': 'seti-image', 'jpeg': 'seti-image', 'gif': 'seti-image', 'svg': 'seti-image',
-      'mp4': 'seti-video', 'avi': 'seti-video', 'mov': 'seti-video',
-      'mp3': 'seti-audio', 'wav': 'seti-audio', 'flac': 'seti-audio',
-      'zip': 'seti-zip', 'tar': 'seti-zip', 'gz': 'seti-zip', 'rar': 'seti-zip',
-      'pdf': 'seti-pdf'
-    };
-    return iconMap[ext] || 'seti-default'; // Default file icon
-  }
+      'kt': 'seti-kotlin', 'kts': 'seti-kotlin',
+      'scala': 'seti-scala',
+      'clj': 'seti-clojure', 'cljs': 'seti-clojure', 'cljc': 'seti-clojure', 'edn': 'seti-clojure',
+      'coffee': 'seti-coffee', 'litcoffee': 'seti-coffee',
+      'dart': 'seti-dart',
+      'hs': 'seti-haskell', 'lhs': 'seti-haskell',
+      'ml': 'seti-ocaml', 'mli': 'seti-ocaml', 'cmx': 'seti-ocaml', 'cmxa': 'seti-ocaml',
+      'fs': 'seti-f-sharp', 'fsx': 'seti-f-sharp',
+      'elm': 'seti-elm',
+      'ex': 'seti-elixir', 'exs': 'seti-elixir',
+      'lua': 'seti-lua',
+      'pl': 'seti-perl', 'pm': 'seti-perl', 't': 'seti-perl',
+      'r': 'seti-R', 'rmd': 'seti-R',
+      'jl': 'seti-julia',
+      'nim': 'seti-nim', 'nims': 'seti-nim',
+      'hx': 'seti-haxe', 'hxs': 'seti-haxe', 'hxp': 'seti-haxe', 'hxml': 'seti-haxe',
+      'vala': 'seti-vala', 'vapi': 'seti-vala',
+      'cr': 'seti-crystal', 'ecr': 'seti-crystal',
+      'zig': 'seti-zig',
+      'd': 'seti-d',
+      'vb': 'seti-default', // No specific VB icon
 
-  function getFileIconColor(fileName) {
-    const ext = fileName.split('.').pop().toLowerCase();
-    // Follow improved_search_code.html: cargo_config.toml is orange, katerc is blue
-    if (fileName === 'cargo_config.toml' || ext === 'toml' || ext === 'yaml' || ext === 'yml') return '#f97316'; // orange-400
-    if (fileName === 'katerc' || fileName.startsWith('.') || !fileName.includes('.')) return '#60a5fa'; // blue-400
-    
-    if (ext === 'js' || ext === 'jsx' || ext === 'ts' || ext === 'tsx' || ext === 'css' || ext === 'md') return '#60a5fa'; // blue-400
-    return 'var(--vscode-descriptionForeground)';
+      // Web Technologies
+      'html': 'seti-html', 'htm': 'seti-html',
+      'vue': 'seti-vue',
+      'svelte': 'seti-svelte',
+      'astro': 'seti-default', // No specific Astro icon
+      'css': 'seti-css',
+      'scss': 'seti-sass', 'sass': 'seti-sass',
+      'less': 'seti-less',
+      'styl': 'seti-stylus',
+      'postcss': 'seti-css', // Uses CSS icon
+      'json': 'seti-json', 'jsonc': 'seti-json',
+      'xml': 'seti-xml', 'xsd': 'seti-xml', 'xsl': 'seti-xml',
+      'yaml': 'seti-yml', 'yml': 'seti-yml',
+      'toml': 'seti-config',
+      'ini': 'seti-config', 'cfg': 'seti-config', 'conf': 'seti-config',
+      'env': 'seti-config', 'properties': 'seti-config',
+
+      // Frameworks & Libraries
+      'jsx': 'seti-react', 'tsx': 'seti-react',
+      'ejs': 'seti-ejs',
+      'hbs': 'seti-mustache', 'handlebars': 'seti-mustache',
+      'jade': 'seti-jade', 'pug': 'seti-pug',
+      'haml': 'seti-haml',
+      'slim': 'seti-slim',
+      'twig': 'seti-twig',
+      'liquid': 'seti-liquid',
+      'jinja': 'seti-jinja', 'jinja2': 'seti-jinja',
+      'nunjucks': 'seti-nunjucks', 'njk': 'seti-nunjucks',
+      'mustache': 'seti-mustache', 'stache': 'seti-mustache',
+      'erb': 'seti-html', 'html.erb': 'seti-html',
+
+      // Build Tools & Package Managers
+      'package.json': 'seti-npm',
+      'yarn.lock': 'seti-yarn',
+      'pnpm-lock.yaml': 'seti-default', // No specific pnpm icon
+      'webpack.config.js': 'seti-webpack',
+      'rollup.config.js': 'seti-rollup',
+      'vite.config.js': 'seti-vite',
+      'gulpfile.js': 'seti-gulp',
+      'gruntfile.js': 'seti-grunt',
+      'makefile': 'seti-makefile',
+      'dockerfile': 'seti-docker',
+      'docker-compose.yml': 'seti-docker',
+      'jenkinsfile': 'seti-jenkins',
+      'bitbucket-pipelines.yml': 'seti-default', // No specific Bitbucket icon
+      'azure-pipelines.yml': 'seti-default', // No specific Azure icon
+      'github': 'seti-github',
+      'gitlab-ci.yml': 'seti-gitlab',
+
+      // Testing
+      'spec.js': 'seti-javascript', 'test.js': 'seti-javascript',
+      'spec.ts': 'seti-typescript', 'test.ts': 'seti-typescript',
+      'spec.jsx': 'seti-react', 'test.jsx': 'seti-react',
+      'spec.tsx': 'seti-react', 'test.tsx': 'seti-react',
+      'karma.conf.js': 'seti-karma',
+
+      // Documentation
+      'md': 'seti-markdown', 'markdown': 'seti-markdown',
+      'readme': 'seti-info', 'readme.md': 'seti-info', 'readme.txt': 'seti-info',
+      'changelog': 'seti-clock', 'changelog.md': 'seti-clock',
+      'license': 'seti-license', 'licence': 'seti-license',
+      'contributing': 'seti-license', 'contributing.md': 'seti-license',
+
+      // Configuration Files
+      'tsconfig.json': 'seti-tsconfig',
+      'jsconfig.json': 'seti-json',
+      'babel.config.js': 'seti-babel', 'babelrc': 'seti-babel', 'babelrc.js': 'seti-babel',
+      'eslint.config.js': 'seti-eslint', 'eslintrc': 'seti-eslint', 'eslintrc.js': 'seti-eslint',
+      'prettier.config.js': 'seti-default', // No specific Prettier icon
+      'stylelint.config.js': 'seti-stylelint',
+      'editorconfig': 'seti-config',
+
+      // Version Control
+      'gitignore': 'seti-git', 'gitattributes': 'seti-git', 'gitmodules': 'seti-git',
+      'gitkeep': 'seti-git',
+      'hgignore': 'seti-default', // No specific Mercurial icon
+      'svnignore': 'seti-default', // No specific SVN icon
+
+      // Databases
+      'sql': 'seti-db',
+      'prisma': 'seti-prisma',
+
+      // Images & Media
+      'png': 'seti-image', 'jpg': 'seti-image', 'jpeg': 'seti-image', 'gif': 'seti-image',
+      'svg': 'seti-svg', 'ico': 'seti-favicon', 'webp': 'seti-image',
+      'mp4': 'seti-video', 'avi': 'seti-video', 'mov': 'seti-video', 'mkv': 'seti-video',
+      'mp3': 'seti-audio', 'wav': 'seti-audio', 'flac': 'seti-audio', 'aac': 'seti-audio',
+      'pdf': 'seti-pdf',
+      'psd': 'seti-photoshop', 'ai': 'seti-illustrator',
+
+      // Archives
+      'zip': 'seti-zip', 'rar': 'seti-zip', '7z': 'seti-zip', 'tar': 'seti-zip',
+      'gz': 'seti-zip', 'bz2': 'seti-zip', 'xz': 'seti-zip',
+      'jar': 'seti-zip', 'war': 'seti-zip', 'ear': 'seti-zip',
+
+      // Fonts
+      'ttf': 'seti-font', 'otf': 'seti-font', 'woff': 'seti-font', 'woff2': 'seti-font', 'eot': 'seti-font',
+
+      // Shell Scripts
+      'sh': 'seti-shell', 'bash': 'seti-shell', 'zsh': 'seti-shell', 'fish': 'seti-shell',
+      'ps1': 'seti-powershell', 'bat': 'seti-windows', 'cmd': 'seti-windows',
+
+      // Other
+      'log': 'seti-default', 'tmp': 'seti-clock', 'lock': 'seti-lock', 'DS_Store': 'seti-ignored'
+    };
+
+    // Special handling for test files
+    if (fileName.toLowerCase().includes('test') || fileName.toLowerCase().includes('spec')) {
+      const baseExt = ext;
+      if (['js', 'ts', 'jsx', 'tsx'].includes(baseExt)) {
+        return 'seti-javascript'; // Test files use regular JS/TS icon
+      }
+    }
+
+    return iconMap[ext] || 'seti-default';
   }
 
   function getLanguageFromFilename(fileName) {
@@ -2432,9 +2507,10 @@ console.log('[Rifler] Webview script starting...');
     }
     
     // Update preview icon
-    const previewIcon = document.querySelector('.preview-title-group .seti-icon');
+    const previewIcon = document.getElementById('file-icon');
     if (previewIcon && message.fileName) {
-      previewIcon.className = 'seti-icon ' + getFileIconName(message.fileName);
+      const iconName = getFileIconName(message.fileName);
+      previewIcon.className = 'seti-icon ' + iconName;
       previewIcon.textContent = ''; // Clear text content
       previewIcon.style.backgroundImage = ''; // Clear background image
     }

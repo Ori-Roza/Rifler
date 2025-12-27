@@ -36,10 +36,10 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [x] Weird behavior when changing modes (shows "all files" instead of folder path)
 
 ## **Button/Icon Quality Issues**
-- [ ] Search widget has bad quality icons
-- [ ] Results buttons are different from design, lower quality
-- [ ] Replace button quality issues
-- [ ] No select borders on various elements
+- [x] Search widget has bad quality icons
+- [x] Results buttons are different from design, lower quality
+- [x] Replace button quality issues
+- [x] No select borders on various elements
 
 ## **Border/Selection Issues**
 - [ ] Weird selection borders throughout UI
@@ -77,6 +77,4 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [ ] Scrolling bug: when many file results in collapse all mode, scrolling below viewport sends scroll to top
 
 ## **General Feedback**
-- [ ] Extension should be distinct and better than alternatives
-- [ ] Focus on distinction through colors and other visual elements
 - [ ] Need proper usability testing to catch implementation issues

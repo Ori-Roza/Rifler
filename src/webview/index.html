@@ -13,9 +13,15 @@
       <input type="text" id="query" class="search-input" placeholder="Search..." autofocus />
       <div id="query-validation-message" class="validation-message"></div>
       <div class="search-options">
-        <button type="button" class="option-btn" id="match-case" title="Match Case (Alt+C)" data-option="case">TT</button>
-        <button type="button" class="option-btn" id="whole-word" title="Match Whole Word (Alt+W)" data-option="word">ab</button>
-        <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">*</button>
+        <button type="button" class="option-btn" id="match-case" title="Match Case (Alt+C)" data-option="case">
+          <span class="material-symbols-outlined">format_size</span>
+        </button>
+        <button type="button" class="option-btn" id="whole-word" title="Match Whole Word (Alt+W)" data-option="word">
+          <span class="material-symbols-outlined">match_word</span>
+        </button>
+        <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">
+          <span class="material-symbols-outlined">regular_expression</span>
+        </button>
       </div>
     </div>
     <div class="search-controls">
@@ -23,7 +29,7 @@
         <span class="material-symbols-outlined">swap_horiz</span>
       </button>
       <button class="icon-btn" id="filter-btn" title="Toggle Filters">
-        <span class="material-symbols-outlined">filter_alt</span>
+        <span class="material-symbols-outlined filled">tune</span>
       </button>
       <button class="icon-btn" id="clear-search-btn" title="Clear Search (Ctrl+L)" aria-label="Clear Search">
         <span class="material-symbols-outlined">clear</span>
@@ -45,7 +51,7 @@
   <div class="filters-container hidden" id="filters-container">
     <div class="filter-row" id="scope-path-row">
       <div class="filter-field path-field">
-        <span class="filter-label" id="path-label">Project:</span>
+        <span class="material-symbols-outlined filter-icon">folder_open</span>
         <div class="filter-input-wrapper">
           <input type="text" id="directory-input" class="path-input" placeholder="src/components/" />
           <div id="directory-validation-message" class="validation-message"></div>
@@ -55,7 +61,7 @@
         </div>
       </div>
       <div class="filter-field scope-field">
-        <span class="filter-label">Module:</span>
+        <span class="filter-label" id="path-label">Directory:</span>
         <select id="scope-select" class="scope-dropdown">
           <option value="project">Project</option>
           <option value="module">Module</option>
@@ -66,7 +72,7 @@
 
     <div class="filter-row" id="file-mask-row">
       <div class="filter-field">
-        <span class="filter-label">Filter:</span>
+        <span class="material-symbols-outlined filter-icon">filter_alt</span>
         <input type="text" id="file-mask" class="mask-input" placeholder="*.ts, *.js" />
       </div>
     </div>

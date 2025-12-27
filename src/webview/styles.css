@@ -115,10 +115,14 @@ body.loaded {
     'wght' 400,
     'GRAD' 0,
     'opsz' 20;
-  font-size: 18px;
+  font-size: 20px;
   display: inline-block;
   vertical-align: middle;
   line-height: 1;
+}
+
+.material-symbols-outlined.filled {
+  font-variation-settings: 'FILL' 1;
 }
 
 .header-title {
@@ -131,21 +135,35 @@ body.loaded {
 }
 
 .header-btn .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 20px;
 }
 
-.search-icon, .replace-icon, .scope-icon, .mask-icon {
+.search-icon, .replace-icon, .scope-icon, .mask-icon, .filter-icon {
   color: var(--vscode-input-placeholderForeground);
   margin-right: 4px;
-  font-size: 18px;
+  font-size: 16px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.path-field .filter-icon {
+  font-size: 16px;
+}
+
+.filter-row:last-child .filter-icon {
+  font-size: 14px;
 }
 
 .option-btn .material-symbols-outlined {
   font-size: 16px;
 }
 
+#use-regex .material-symbols-outlined {
+  font-size: 14px;
+}
+
 .filter-toggle-btn .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .header-left,
@@ -163,7 +181,7 @@ body.loaded {
   height: 28px;
   background: transparent;
   border: none;
-  border-radius: 3px;
+  border-radius: 6px;
   cursor: pointer;
   color: var(--vscode-descriptionForeground);
   font-size: 14px;
@@ -223,7 +241,7 @@ body.loaded {
 }
 
 .search-icon {
-  font-size: 14px;
+  font-size: 18px;
   color: var(--vscode-descriptionForeground);
   flex-shrink: 0;
   opacity: 0.6;
@@ -264,35 +282,55 @@ body.loaded {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  height: 20px;
-  padding: 0 4px;
+  width: 24px;
+  height: 28px;
+  padding: 0;
   font-size: 10px;
   font-weight: 600;
   font-family: var(--vscode-editor-font-family, monospace);
-  color: var(--vscode-descriptionForeground);
+  color: #9ca3af; /* text-gray-400 */
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 2px;
+  border-radius: 2px; /* rounded-sm */
   cursor: pointer;
   transition: all 0.1s;
   user-select: none;
 }
 
 .option-btn:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
-  color: var(--vscode-foreground);
+  background-color: #e5e7eb; /* hover:bg-gray-200 */
+  color: #374151; /* hover:text-gray-700 */
+}
+
+@media (prefers-color-scheme: dark) {
+  .option-btn {
+    color: #6b7280; /* dark:text-gray-500 */
+  }
+  
+  .option-btn:hover {
+    background-color: #374151; /* dark:hover:bg-gray-700 */
+    color: #d1d5db; /* dark:hover:text-gray-300 */
+  }
 }
 
 .option-btn.active {
-  background-color: var(--rifler-primary);
-  color: #ffffff;
-  border-color: var(--rifler-primary);
+  background-color: rgba(59, 130, 246, 0.1); /* bg-primary/10 */
+  color: #3b82f6; /* text-primary */
 }
 
 #filter-btn.active {
-  color: var(--vscode-textLink-foreground);
-  background-color: var(--vscode-toolbar-hoverBackground);
+  background-color: rgba(59, 130, 246, 0.1); /* bg-primary/10 */
+  color: #3b82f6; /* text-primary */
+  border: 1px solid rgba(59, 130, 246, 0.2); /* border-primary/20 */
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+}
+
+#filter-btn.active:hover {
+  background-color: rgba(59, 130, 246, 0.2); /* hover:bg-primary/20 */
+}
+
+#filter-btn:active {
+  transform: scale(0.95); /* active:scale-95 */
 }
 
 /* ===== Replace Row ===== */
@@ -346,12 +384,13 @@ body.loaded {
 }
 
 .replace-actions button {
-  padding: 4px 8px;
+  padding: 6px 12px;
   font-size: 11px;
+  font-weight: 500;
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
   border: 1px solid var(--vscode-widget-border);
-  border-radius: 2px;
+  border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.12s;
@@ -362,13 +401,14 @@ body.loaded {
 }
 
 .replace-actions button.primary {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  border-color: var(--vscode-button-background);
+  background: var(--rifler-primary);
+  color: white;
+  border-color: var(--rifler-primary);
 }
 
 .replace-actions button.primary:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: #2563eb;
+  border-color: #2563eb;
 }
 
 /* ===== Filters Section (Restructured for Issue #83) ===== */
@@ -398,7 +438,7 @@ body.loaded {
   min-width: 0;
   background-color: var(--vscode-input-background);
   border: 1px solid var(--vscode-input-border, #444);
-  border-radius: 2px;
+  border-radius: 6px;
   padding: 0 6px;
   height: 100%;
 }
@@ -467,13 +507,13 @@ body.loaded {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 36px;
+  height: 36px;
   background: transparent;
   border: none;
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 6px;
   transition: all 0.1s;
 }
 
@@ -482,9 +522,9 @@ body.loaded {
   color: var(--vscode-foreground);
 }
 
-.icon-btn:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
-  color: var(--vscode-foreground);
+.icon-btn.active {
+  background-color: var(--rifler-primary-dim);
+  color: var(--rifler-primary);
 }
 
 .summary-actions {
@@ -833,7 +873,7 @@ body.loaded {
 }
 
 .end-of-results-content .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 24px;
   min-width: 24px;
   text-align: right;
 }
@@ -880,7 +920,7 @@ body.loaded {
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
   padding: 2px;
-  border-radius: 3px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1102,7 +1142,7 @@ body.loaded {
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
   border: 1px solid var(--vscode-widget-border);
-  border-radius: 2px;
+  border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.12s;
@@ -1407,7 +1447,7 @@ body.loaded {
   border: 1px solid var(--vscode-widget-border);
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 2px;
+  border-radius: 6px;
   font-size: 11px;
   transition: all 0.12s;
   white-space: nowrap;

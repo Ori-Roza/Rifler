@@ -2389,7 +2389,7 @@ console.log('[Rifler] Webview script starting...');
     }
     
     // Update preview icon
-    const previewIcon = document.querySelector('.preview-title-group .file-icon');
+    const previewIcon = document.querySelector('.preview-title-group .seti-icon');
     if (previewIcon && message.fileName) {
       previewIcon.className = 'seti-icon ' + getFileIconName(message.fileName);
       previewIcon.textContent = ''; // Clear text content

@@ -6,6 +6,7 @@ import {
   SearchScope,
   buildSearchRegex,
   matchesFileMask,
+  searchInContent,
   EXCLUDE_DIRS,
   BINARY_EXTENSIONS,
   Limiter,
@@ -172,33 +173,8 @@ async function searchInFileAsync(
       }
     }
 
-    const startTime = Date.now();
-    for (let lineIndex = 0; lineIndex < lines.length && results.length < maxResults; lineIndex++) {
-      if (Date.now() - startTime > perFileTimeBudgetMs) break;
-      const line = lines[lineIndex];
-      let match: RegExpExecArray | null;
-      regex.lastIndex = 0;
-      while ((match = regex.exec(line)) !== null) {
-        if (results.length >= maxResults) break;
-        const leadingWhitespace = line.length - line.trimStart().length;
-        const adjustedStart = match.index - leadingWhitespace;
-        const adjustedEnd = match.index + match[0].length - leadingWhitespace;
-        results.push({
-          uri: vscode.Uri.file(filePath).toString(),
-          fileName,
-          relativePath,
-          line: lineIndex,
-          character: match.index,
-          length: match[0].length,
-          preview: line.trim(),
-          previewMatchRange: {
-            start: Math.max(0, adjustedStart),
-            end: Math.max(0, adjustedEnd)
-          }
-        });
-        if (match[0].length === 0) regex.lastIndex++;
-      }
-    }
+    const fileResults = searchInContent(content, regex, filePath, maxResults - results.length, relativePath);
+    results.push(...fileResults);
   } catch {
     // Skip files that can't be read
   }

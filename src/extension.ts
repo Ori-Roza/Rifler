@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import {
   SearchOptions,
-  findWorkspaceModules
+  findWorkspaceModules,
+  buildSearchRegex
 } from './utils';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
@@ -91,28 +92,27 @@ async function sendFileContent(
     const languageId = getLanguageIdFromFilename(fileName);
     const iconUri = `vscode-icon://file_type_${languageId}`;
 
-    // Find matches in the file
-    const regex = new RegExp(
-      options.useRegex
-        ? query
-        : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-      `g${options.matchCase ? '' : 'i'}`
-    );
+    // Find matches in the file using buildSearchRegex from utils
+    const regex = buildSearchRegex(query, options);
 
     const matches: Array<{ line: number; start: number; end: number }> = [];
     const lines = fileContent.split('\n');
 
-    for (let lineNo = 0; lineNo < lines.length; lineNo++) {
-      const line = lines[lineNo];
-      let match;
-      regex.lastIndex = 0;
+    if (regex) {
+      for (let lineNo = 0; lineNo < lines.length; lineNo++) {
+        const line = lines[lineNo];
+        let match;
+        regex.lastIndex = 0;
 
-      while ((match = regex.exec(line)) !== null) {
-        matches.push({
-          line: lineNo,
-          start: match.index,
-          end: match.index + match[0].length
-        });
+        while ((match = regex.exec(line)) !== null) {
+          matches.push({
+            line: lineNo,
+            start: match.index,
+            end: match.index + match[0].length
+          });
+          // Prevent infinite loop for zero-length matches
+          if (match[0].length === 0) regex.lastIndex++;
+        }
       }
     }
 

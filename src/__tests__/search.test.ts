@@ -377,10 +377,8 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'project', defaultOptions);
 
-        expect(results.length).toBe(3);
-        expect(results[0].character).toBe(0);
-        expect(results[1].character).toBe(5);
-        expect(results[2].character).toBe(10);
+        expect(results.length).toBe(1);
+        expect(results[0].previewMatchRanges).toHaveLength(3);
       });
     });
 

@@ -63,7 +63,7 @@
       <div class="filter-field scope-field">
         <span class="filter-label" id="path-label">Directory:</span>
         <select id="scope-select" class="scope-dropdown">
-          <option value="project">Project</option>
+          <option value="project">In Project</option>
           <option value="module">Module</option>
           <option value="directory" selected>Directory</option>
         </select>
@@ -128,7 +128,7 @@
         <div class="preview-loading-overlay" id="preview-loading-overlay">
           <div class="spinner"></div>
         </div>
-        <div class="preview-content" id="preview-content">
+        <div class="preview-content hljs" id="preview-content">
           <div class="empty-state">Select a result to preview file</div>
         </div>
         
@@ -136,7 +136,7 @@
           <div class="editor-wrapper">
             <div class="editor-line-numbers" id="editor-line-numbers"></div>
             <div class="editor-content-wrapper">
-              <div id="editor-backdrop"></div>
+              <div id="editor-backdrop" class="hljs"></div>
               <textarea id="file-editor" spellcheck="false"></textarea>
             </div>
           </div>

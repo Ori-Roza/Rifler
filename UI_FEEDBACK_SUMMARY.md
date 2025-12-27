@@ -42,15 +42,9 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [x] No select borders on various elements
 
 ## **Border/Selection Issues**
-- [ ] Weird selection borders throughout UI
-- [ ] Need higher quality, consistent borders
-- [ ] Use single border with fitting color (like selected text color) for all buttons/inputs
-
-## **Performance/Loading Issues**
-- [ ] Rust support should be in milliseconds, not current performance
-- [ ] Weird loading behavior when opening extension first time after VSCode opens
-- [ ] Loading more scripts online than necessary
-- [ ] Make all scripts local-only for instant extension opening
+- [x] Weird selection borders throughout UI
+- [x] Need higher quality, consistent borders
+- [x] Use single border with fitting color (like selected text color) for all buttons/inputs
 
 ## **Preview Panel Quality Issues**
 - [ ] Replace buttons are much better in design

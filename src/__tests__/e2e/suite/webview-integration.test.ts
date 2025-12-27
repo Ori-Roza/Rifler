@@ -1646,4 +1646,118 @@ suite('Rifler Virtualization Tests', () => {
     
     log('   ✅ maxResults configuration is accessible');
   });
+
+  // ============================================================================
+  // Preview Scrolling Tests
+  // ============================================================================
+
+  test('Preview should scroll to show active result line', async function() {
+    this.timeout(30000);
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('__test_ensurePanelOpen');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const currentPanel = testHelpers.getCurrentPanel();
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up message listener for search and scroll verification');
+    let searchCompleted = false;
+    let results: any[] = [];
+    let testPhase = 0; // 0: waiting for search, 1: testing first result, 2: testing middle, 3: testing last
+
+    const scrollTestPromise = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for scroll test completion'));
+      }, 20000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          searchCompleted = true;
+          results = message.results;
+          log(`   ✅ Search completed with ${results.length} results`);
+          
+          // If we have at least 3 results, proceed with scroll testing
+          if (results.length >= 3) {
+            testPhase = 1;
+            // Test scrolling to first result
+            setTimeout(() => {
+              currentPanel.webview.postMessage({
+                type: '__test_setActiveIndex',
+                index: 0
+              });
+            }, 1000);
+          } else {
+            clearTimeout(timeout);
+            disposable.dispose();
+            reject(new Error(`Need at least 3 results for scroll test, got ${results.length}`));
+          }
+        } else if (message.type === '__test_previewScrollInfo') {
+          if (testPhase === 1) {
+            // First scroll check (index 0)
+            if (message.hasActiveLine && message.isActiveLineVisible) {
+              log(`   ✅ First result line is visible in preview (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`);
+              
+              // Now test scrolling to a different result (middle one)
+              testPhase = 2;
+              const middleIndex = Math.floor(results.length / 2);
+              setTimeout(() => {
+                currentPanel.webview.postMessage({
+                  type: '__test_setActiveIndex',
+                  index: middleIndex
+                });
+              }, 1000);
+            } else {
+              clearTimeout(timeout);
+              disposable.dispose();
+              reject(new Error(`First result line should be visible but is not (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`));
+            }
+          } else if (testPhase === 2) {
+            // Second scroll check (middle result)
+            if (message.hasActiveLine && message.isActiveLineVisible) {
+              log(`   ✅ Middle result line is visible in preview (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`);
+              
+              // Test scrolling to last result
+              testPhase = 3;
+              setTimeout(() => {
+                currentPanel.webview.postMessage({
+                  type: '__test_setActiveIndex',
+                  index: results.length - 1
+                });
+              }, 1000);
+            } else {
+              clearTimeout(timeout);
+              disposable.dispose();
+              reject(new Error(`Middle result line should be visible but is not (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`));
+            }
+          } else if (testPhase === 3) {
+            // Third scroll check (last result)
+            if (message.hasActiveLine && message.isActiveLineVisible) {
+              log(`   ✅ Last result line is visible in preview (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`);
+              clearTimeout(timeout);
+              disposable.dispose();
+              resolve();
+            } else {
+              clearTimeout(timeout);
+              disposable.dispose();
+              reject(new Error(`Last result line should be visible but is not (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`));
+            }
+          }
+        }
+      });
+    });
+
+    await step('Triggering search for multiple results');
+    currentPanel.webview.postMessage({
+      type: '__test_setSearchInput',
+      value: 'function|class|const'
+    });
+
+    await step('Waiting for scroll test completion');
+    await scrollTestPromise;
+    
+    log('   ✅ Preview scrolling test passed');
+  });
 });

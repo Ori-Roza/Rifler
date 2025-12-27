@@ -83,14 +83,16 @@ body.loaded {
 }
 
 :root {
-  --rifler-highlight: rgba(255, 213, 79, 0.55);
-  --rifler-highlight-strong: rgba(255, 213, 79, 0.72);
-  --rifler-highlight-muted: rgba(255, 213, 79, 0.25);
-  --rifler-highlight-border: #e0b700;
+  --rifler-highlight: rgba(255, 213, 79, 0.35);
+  --rifler-highlight-strong: rgba(255, 213, 79, 0.5);
+  --rifler-highlight-muted: rgba(255, 213, 79, 0.15);
+  --rifler-highlight-border: rgba(224, 183, 0, 0.4);
   --rifler-primary: #3B82F6;
   --rifler-primary-dim: rgba(59, 130, 246, 0.15);
   --rifler-highlight-bg: #584c2e;
   --rifler-highlight-text: #E6E6B6;
+  --rifler-match-bg: rgba(254, 240, 138, 0.3);
+  --rifler-match-active-bg: rgba(254, 240, 138, 0.5);
 }
 
 /* ===== Header ===== */
@@ -321,7 +323,6 @@ body.loaded {
 #filter-btn.active {
   background-color: rgba(59, 130, 246, 0.1); /* bg-primary/10 */
   color: #3b82f6; /* text-primary */
-  border: 1px solid rgba(59, 130, 246, 0.2); /* border-primary/20 */
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
 }
 
@@ -676,16 +677,17 @@ body.loaded {
 .result-file-header {
   display: flex;
   align-items: center;
-  padding: 4px 12px;
+  padding: 6px 12px;
   background-color: var(--vscode-sideBar-background);
   border-left: 2px solid transparent;
   border-bottom: 1px solid var(--vscode-widget-border, #444);
-  font-size: 12px;
-  font-weight: 600;
-  height: 28px;
+  height: 40px;
   box-sizing: border-box;
   cursor: pointer;
   transition: all 0.1s;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .result-file-header:hover {
@@ -713,25 +715,33 @@ body.loaded {
   line-height: 1;
 }
 
+.result-file-header .file-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.2;
+  gap: 2px;
+}
+
 .result-file-header .file-name {
+  font-size: 13px;
+  font-weight: 600;
   color: var(--vscode-foreground);
-  margin-right: 8px;
-  flex-shrink: 0;
-  max-width: 40%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .result-file-header .file-path {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--vscode-descriptionForeground);
-  flex: 1;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: 0.7;
+  opacity: 0.6;
+  font-family: var(--vscode-editor-font-family, monospace);
+  margin-top: 1px;
 }
 
 .result-file-header .match-count {
@@ -746,15 +756,15 @@ body.loaded {
 }
 
 .result-item {
-  padding: 4px 12px 4px 56px;
-  border-left: 2px solid transparent;
+  padding: 4px 12px;
+  border-left: 3px solid transparent;
   cursor: pointer;
   transition: all 0.1s;
   overflow: hidden;
   height: 28px;
   box-sizing: border-box;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0;
 }
 
@@ -764,45 +774,34 @@ body.loaded {
 }
 
 .result-item.active {
-  background-color: var(--vscode-list-activeSelectionBackground);
-  color: var(--vscode-list-activeSelectionForeground);
-  border-left-color: var(--vscode-focusBorder);
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--vscode-foreground);
+  border-left: 3px solid var(--rifler-primary);
+}
+
+.result-item.active .result-line-number {
+  color: var(--rifler-primary);
+  font-weight: 600;
+  opacity: 1;
+}
+
+.result-item.active .result-preview {
+  color: var(--vscode-foreground);
 }
 
 .result-meta {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   flex-shrink: 0;
   width: 32px;
   justify-content: flex-end;
   margin-right: 12px;
+  height: 100%;
 }
 
-.result-line-number {
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground);
-  font-family: var(--vscode-editor-font-family, monospace);
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-.result-item.active .result-line-number {
-  color: inherit;
-}
-
-.result-preview {
-  flex: 1;
-  min-width: 0;
-  font-size: 12px;
-  font-family: var(--vscode-editor-font-family, monospace);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--vscode-foreground);
-}
-
-.result-item.active .result-preview {
-  color: inherit;
+.result-item.active .result-meta {
+  background-color: transparent;
+  border-right: none;
 }
 
 .result-preview .match-highlight {
@@ -878,14 +877,21 @@ body.loaded {
   text-align: right;
 }
 
-.result-item.active .result-line-number {
-  color: inherit;
-  opacity: 0.8;
+.result-line-number {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  opacity: 0.6;
+  flex-shrink: 0;
+  text-align: right;
+  margin-top: 2px;
+  user-select: none;
 }
 
 .result-preview {
   font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 20px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -899,8 +905,16 @@ body.loaded {
   padding: 0;
 }
 
+.result-preview.hljs * {
+  background: transparent !important;
+}
+
 .result-item.active .result-preview {
-  color: inherit;
+  /* Allow syntax highlighting to show even when active */
+}
+
+.result-item.active .result-meta {
+  border-right-color: var(--rifler-primary);
 }
 
 .result-actions {
@@ -948,11 +962,11 @@ body.loaded {
 }
 
 .result-preview .match {
-  background-color: var(--rifler-highlight-bg);
+  background-color: var(--rifler-match-bg);
   color: var(--rifler-highlight-text);
   border-radius: 2px;
   padding: 0 2px;
-  font-weight: 500;
+  font-weight: bold;
 }
 
 .empty-state {
@@ -1185,6 +1199,10 @@ body.loaded {
   padding: 8px 0;
   z-index: 1;
   direction: ltr;
+  display: grid;
+  grid-template-columns: 1fr;
+  min-width: 100%;
+  width: fit-content;
 }
 
 /* ===== Preview Code Rows (Spec: code left, line number far right) ===== */
@@ -1203,21 +1221,15 @@ body.loaded {
 
 /* Soft full-row highlight for hit lines (must cover BOTH columns) */
 .pvLine.isHit {
-  background-color: color-mix(
-    in srgb,
-    var(--vscode-editor-findMatchHighlightBackground, rgba(255, 213, 79, 0.25)) 35%,
-    transparent
-  );
+  background-color: rgba(255, 213, 79, 0.1);
 }
 
 /* Active/current line (kept subtle; separate from hit highlight) */
 .pvLine.isActive {
-  outline: 1px solid color-mix(
-    in srgb,
-    var(--vscode-focusBorder, rgba(0, 122, 204, 0.8)) 55%,
-    transparent
-  );
+  background-color: rgba(255, 213, 79, 0.15);
+  outline: 1px solid var(--rifler-highlight-border);
   outline-offset: -1px;
+  z-index: 2;
 }
 
 .pvCode {
@@ -1228,6 +1240,11 @@ body.loaded {
   overflow: visible;
   direction: ltr;
   min-width: 0;
+}
+
+.pvCode.hljs,
+.pvCode.hljs *:not(.pvMatch):not(.pvMatch *):not(.match):not(.match *) {
+  background: transparent !important;
 }
 
 /* Rightmost fixed-width line-number column */
@@ -1255,20 +1272,28 @@ body.loaded {
 
 .pvLineNo.has-match {
   font-weight: bold !important;
-  color: var(--vscode-editorLineNumber-activeForeground, #ff6b35) !important;
+  color: var(--rifler-highlight-border) !important;
 }
 
 /* Stronger token highlight than the row highlight + bold */
 .pvMatch,
-.preview-content .match {
-  background-color: color-mix(
-    in srgb,
-    var(--vscode-editor-findMatchBackground, rgba(255, 213, 79, 0.55)) 70%,
-    transparent
-  );
+.preview-content .match,
+.result-preview .match {
+  background-color: var(--rifler-match-bg);
+  color: var(--rifler-highlight-text) !important;
   border-radius: 2px;
   padding: 0 2px;
-  font-weight: 700;
+  font-weight: bold;
+}
+
+.pvMatch *,
+.preview-content .match *,
+.result-preview .match * {
+  color: inherit !important;
+}
+
+.pvLine.isActive .pvMatch {
+  background-color: var(--rifler-match-active-bg);
 }
 
 /* ===== Editor Container ===== */
@@ -1524,4 +1549,49 @@ body.loaded {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Ensure all text in preview content uses the correct foreground color */
+.preview-content,
+.preview-content .pvCode {
+  color: var(--vscode-editor-foreground);
+}
+
+.preview-content.hljs {
+  background: transparent !important;
+  padding: 0;
+}
+
+/* Final overrides for highlight.js colors to prevent red text issues */
+.hljs, .hljs * {
+  background: transparent !important;
+}
+
+/* Fallback colors for highlight.js if theme fails to load or is overridden */
+.hljs-keyword, .hljs-selector-tag, .hljs-subst { color: #ff7b72 !important; }
+.hljs-string, .hljs-doctag, .hljs-regexp, .hljs-attr, .hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-selector-id, .hljs-selector-class, .hljs-quote, .hljs-template-tag, .hljs-deletion { color: #a5d6ff !important; }
+.hljs-title, .hljs-section, .hljs-selector-attr, .hljs-selector-pseudo, .hljs-name { color: #d2a8ff !important; }
+.hljs-symbol, .hljs-bullet, .hljs-link, .hljs-meta, .hljs-selector-id, .hljs-title { color: #79c0ff !important; }
+.hljs-comment, .hljs-quote { color: #8b949e !important; }
+.hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable, .hljs-tag .hljs-attr { color: #79c0ff !important; }
+
+/* Allow syntax highlighting colors but protect against common red text issues */
+.result-preview.hljs *,
+.pvCode.hljs *,
+#editor-backdrop.hljs * {
+  /* We allow colors here now */
+}
+
+/* But matches must keep their color and be bold */
+.match, .match *, .pvMatch, .pvMatch * {
+  color: var(--rifler-highlight-text) !important;
+  font-weight: bold !important;
+}
+
+.match, .pvMatch {
+  background-color: var(--rifler-match-bg) !important;
+}
+
+.pvLine.isActive .pvMatch {
+  background-color: var(--rifler-match-active-bg) !important;
 }

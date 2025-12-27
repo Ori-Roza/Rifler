@@ -21,7 +21,11 @@ console.log('[Rifler] Webview script starting...');
 })();
 
 (function() {
-  console.log('[Rifler] IIFE initialization started');
+  console.log('[Rifler] IIFE initialization started. hljs available:', typeof hljs !== 'undefined');
+  if (typeof hljs !== 'undefined') {
+    console.log('[Rifler] hljs version:', hljs.versionString);
+    console.log('[Rifler] hljs languages:', hljs.listLanguages().join(', '));
+  }
   
   const state = {
     results: [],
@@ -179,7 +183,7 @@ console.log('[Rifler] Webview script starting...');
     filtersContainer: !!filtersContainer
   });
 
-  function getLanguageFromFilename(filename) {
+  function getLanguageFromFilename_OLD(filename) {
     const ext = (filename || '').split('.').pop().toLowerCase();
     const langMap = {
       'js': 'javascript',
@@ -816,10 +820,16 @@ console.log('[Rifler] Webview script starting...');
     
     let highlighted = '';
     
-    if (typeof hljs !== 'undefined' && language) {
+    // Re-enable syntax highlighting
+    if (typeof hljs !== 'undefined') {
       try {
-        highlighted = hljs.highlight(text, { language: language }).value;
+        if (language && hljs.getLanguage(language)) {
+          highlighted = hljs.highlight(text, { language }).value;
+        } else {
+          highlighted = hljs.highlightAuto(text).value;
+        }
       } catch (e) {
+        console.error('[Rifler] Highlight error in editor:', e);
         highlighted = text
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -858,9 +868,8 @@ console.log('[Rifler] Webview script starting...');
                 fragment.appendChild(document.createTextNode(nodeText.substring(lastIndex, index)));
               }
               
-              const mark = document.createElement('mark');
-              mark.style.background = 'var(--rifler-highlight-strong)';
-              mark.style.color = 'inherit';
+              const mark = document.createElement('span');
+              mark.className = 'match';
               mark.textContent = nodeText.substring(index, index + searchQuery.length);
               fragment.appendChild(mark);
               
@@ -1225,8 +1234,14 @@ console.log('[Rifler] Webview script starting...');
 
   function applyPreviewHeight(height, { updateLastExpanded = true, persist = false, visible = true } = {}) {
     const containerHeight = getContainerHeight();
-    if (containerHeight <= 0) return; // Don't apply if we don't know the container height
-
+    
+    // Always set visibility, even if we can't apply height yet
+    if (previewPanelContainer) {
+      previewPanelContainer.style.display = visible ? 'flex' : 'none';
+    }
+    
+    if (containerHeight <= 0) return; // Don't apply height if we don't know the container height
+    
     const maxPreviewHeight = Math.max(PREVIEW_MIN_HEIGHT, containerHeight - MIN_PANEL_HEIGHT);
     const clamped = Math.min(Math.max(PREVIEW_MIN_HEIGHT, height), maxPreviewHeight);
     const newResultsHeight = Math.max(MIN_PANEL_HEIGHT, containerHeight - clamped);
@@ -1239,9 +1254,6 @@ console.log('[Rifler] Webview script starting...');
     if (previewPanelContainer) {
       previewPanelContainer.style.flex = 'none';
       previewPanelContainer.style.height = (clamped + RESIZER_HEIGHT) + 'px';
-      previewPanelContainer.style.display = visible ? 'flex' : 'none';
-    }
-    if (previewPanel) {
       previewPanel.style.height = clamped + 'px';
     }
     
@@ -1696,6 +1708,30 @@ console.log('[Rifler] Webview script starting...');
           openResultInEditor(message.index);
         }
         break;
+      case '__test_setActiveIndex':
+        if (typeof message.index === 'number') {
+          setActiveIndex(message.index);
+        }
+        break;
+      case '__test_getPreviewScrollInfo':
+        const previewContent = document.getElementById('preview-content');
+        const activeLineEl = previewContent ? previewContent.querySelector('.pvLine.isActive') : null;
+        const previewScrollTop = previewContent ? previewContent.scrollTop : 0;
+        const previewScrollHeight = previewContent ? previewContent.scrollHeight : 0;
+        const previewClientHeight = previewContent ? previewContent.clientHeight : 0;
+        
+        vscode.postMessage({
+          type: '__test_previewScrollInfo',
+          hasActiveLine: !!activeLineEl,
+          activeLineTop: activeLineEl ? activeLineEl.offsetTop : 0,
+          scrollTop: previewScrollTop,
+          scrollHeight: previewScrollHeight,
+          clientHeight: previewClientHeight,
+          isActiveLineVisible: activeLineEl ? 
+            (activeLineEl.offsetTop >= previewScrollTop && 
+             activeLineEl.offsetTop + activeLineEl.offsetHeight <= previewScrollTop + previewClientHeight) : false
+        });
+        break;
       case '__test_simulateKeyboard':
         if (message.key === 'Enter' && message.ctrlKey) {
           openActiveResult();
@@ -2061,6 +2097,11 @@ console.log('[Rifler] Webview script starting...');
     hidePlaceholder();
     renderResultsVirtualized();
     
+    // Ensure preview panel is visible if we have results and an active index
+    if (state.activeIndex >= 0) {
+      applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: true });
+    }
+    
     if (!options.skipAutoLoad && state.activeIndex >= 0) {
       loadFileContent(state.results[state.activeIndex]);
     }
@@ -2118,8 +2159,10 @@ console.log('[Rifler] Webview script starting...');
       item.innerHTML = 
         '<span class="material-symbols-outlined arrow-icon">' + arrowIcon + '</span>' +
         '<span class="seti-icon ' + getFileIconName(itemData.fileName) + '"></span>' +
-        '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
-        '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
+        '<div class="file-info">' +
+          '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
+          '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
+        '</div>' +
         '<span class="match-count">' + itemData.matchCount + '</span>';
         
       item.addEventListener('click', () => {
@@ -2156,8 +2199,7 @@ console.log('[Rifler] Webview script starting...');
     const language = getLanguageFromFilename(itemData.fileName);
     const previewHtml = highlightMatchSafe(
       itemData.preview,
-      itemData.previewMatchRange.start,
-      itemData.previewMatchRange.end,
+      itemData.previewMatchRanges || [itemData.previewMatchRange],
       language
     );
 
@@ -2287,6 +2329,7 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function getLanguageFromFilename(fileName) {
+    if (!fileName) return null;
     const ext = fileName.split('.').pop().toLowerCase();
     const map = {
       'js': 'javascript',
@@ -2312,9 +2355,16 @@ console.log('[Rifler] Webview script starting...');
       'sh': 'bash',
       'yml': 'yaml',
       'yaml': 'yaml',
-      'sql': 'sql'
+      'sql': 'sql',
+      'toml': 'ini',
+      'conf': 'ini',
+      'dockerfile': 'dockerfile',
+      'swift': 'swift',
+      'kt': 'kotlin'
     };
-    return map[ext] || null;
+    const lang = map[ext] || null;
+    console.log(`[Rifler] getLanguageFromFilename: ${fileName} -> ${lang}`);
+    return lang;
   }
 
   function ensureActiveVisible() {
@@ -2357,13 +2407,6 @@ console.log('[Rifler] Webview script starting...');
 
   function handleFileContent(message) {
     if (!message) return;
-    
-    // Prevent processing the same file content multiple times
-    if (state.fileContent && 
-        state.fileContent.uri === message.uri && 
-        state.fileContent.content === message.content) {
-      return;
-    }
     
     // Clear loading timeout if it exists
     if (state.loadingTimeout) {
@@ -2516,9 +2559,33 @@ console.log('[Rifler] Webview script starting...');
       return;
     }
 
-    // Prevent rendering the same content multiple times
+    // Prevent rendering the same content multiple times, but always scroll to current line
     if (previewContent.dataset.lastRenderedUri === fileData.uri && 
         previewContent.dataset.lastRenderedContent === fileData.content) {
+      // Content is already rendered, just update the active line highlight and scroll
+      const currentResult = state.results[state.activeIndex];
+      const currentLine = currentResult ? currentResult.line : -1;
+      
+      // Update active line class
+      previewContent.querySelectorAll('.pvLine.isActive').forEach(el => el.classList.remove('isActive'));
+      
+      if (currentLine >= 0) {
+        const currentLineEl = previewContent.querySelector('[data-line="' + currentLine + '"]');
+        if (currentLineEl) {
+          console.log('[Rifler] Updating active line highlight and scrolling to line:', currentLine);
+          currentLineEl.classList.add('isActive');
+          
+          // Use scrollIntoView with a small timeout to ensure layout is ready
+          setTimeout(() => {
+            currentLineEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            
+            // Fallback for environments where scrollIntoView might fail (e.g. some headless tests)
+            if (previewContent.scrollTop === 0 && currentLineEl.offsetTop > previewContent.clientHeight) {
+              previewContent.scrollTop = currentLineEl.offsetTop - (previewContent.clientHeight / 2);
+            }
+          }, 50);
+        }
+      }
       return;
     }
     
@@ -2532,15 +2599,26 @@ console.log('[Rifler] Webview script starting...');
     const currentResult = state.results[state.activeIndex];
     const currentLine = currentResult ? currentResult.line : -1;
 
+    console.log('[Rifler] renderFilePreview: Rendering', lines.length, 'lines. Total matches:', fileData.matches ? fileData.matches.length : 0);
+
     const language = getLanguageFromFilename(fileData.fileName);
     console.log('[Rifler] Detected language:', language);
 
     const highlightSegment = (text) => {
       if (text === '') return '';
-      if (language && typeof hljs !== 'undefined') {
+      if (typeof hljs !== 'undefined') {
         try {
-          return hljs.highlight(text, { language }).value;
-        } catch {
+          let highlighted;
+          if (language && language !== 'file' && hljs.getLanguage(language)) {
+            highlighted = hljs.highlight(text, { language }).value;
+          } else {
+            // Fallback to auto-detection for unknown extensions
+            highlighted = hljs.highlightAuto(text).value;
+          }
+          // console.log('[Rifler] Highlighted segment:', highlighted.substring(0, 20));
+          return highlighted;
+        } catch (e) {
+          console.error('[Rifler] Highlight error:', e, 'Language:', language);
           return escapeHtml(text);
         }
       }
@@ -2562,15 +2640,20 @@ console.log('[Rifler] Webview script starting...');
       let cursor = 0;
 
       for (const r of safeRanges) {
-        const start = Math.max(0, Math.min(rawLine.length, Math.max(r.start, cursor)));
+        // Ensure we don't go backwards and stay within bounds
+        const start = Math.max(cursor, Math.min(rawLine.length, r.start));
         const end = Math.max(start, Math.min(rawLine.length, r.end));
 
-        html += highlightSegment(rawLine.slice(cursor, start));
+        if (start > cursor) {
+          html += highlightSegment(rawLine.slice(cursor, start));
+        }
         html += '<span class="pvMatch">' + highlightSegment(rawLine.slice(start, end)) + '</span>';
         cursor = end;
       }
 
-      html += highlightSegment(rawLine.slice(cursor));
+      if (cursor < rawLine.length) {
+        html += highlightSegment(rawLine.slice(cursor));
+      }
       return html === '' ? ' ' : html;
     };
 
@@ -2588,7 +2671,7 @@ console.log('[Rifler] Webview script starting...');
 
       html += '<div class="' + lineClass + '" data-line="' + idx + '">' +
         '<div class="pvLineNo' + (hasMatch ? ' has-match' : '') + '">' + (idx + 1) + '</div>' +
-        '<div class="pvCode">' + lineContent + '</div>' +
+        '<div class="pvCode hljs">' + lineContent + '</div>' +
       '</div>';
     });
 
@@ -2612,7 +2695,36 @@ console.log('[Rifler] Webview script starting...');
       const currentLineEl = previewContent.querySelector('[data-line="' + currentLine + '"]');
       if (currentLineEl) {
         console.log('[Rifler] Scrolling to line:', currentLine);
-        currentLineEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        
+        // Use scrollIntoView with a small timeout to ensure layout is ready
+        setTimeout(() => {
+          currentLineEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+          
+          // Fallback for environments where scrollIntoView might fail (e.g. some headless tests)
+          if (previewContent.scrollTop === 0 && currentLineEl.offsetTop > previewContent.clientHeight) {
+            previewContent.scrollTop = currentLineEl.offsetTop - (previewContent.clientHeight / 2);
+          }
+
+          // For E2E testing: send scroll info after a delay
+          setTimeout(() => {
+            const activeLineEl = previewContent.querySelector('.pvLine.isActive');
+            const previewScrollTop = previewContent.scrollTop;
+            const previewScrollHeight = previewContent.scrollHeight;
+            const previewClientHeight = previewContent.clientHeight;
+            
+            vscode.postMessage({
+              type: '__test_previewScrollInfo',
+              hasActiveLine: !!activeLineEl,
+              activeLineTop: activeLineEl ? activeLineEl.offsetTop : 0,
+              scrollTop: previewScrollTop,
+              scrollHeight: previewScrollHeight,
+              clientHeight: previewClientHeight,
+              isActiveLineVisible: activeLineEl ? 
+                (activeLineEl.offsetTop >= previewScrollTop && 
+                 activeLineEl.offsetTop + activeLineEl.offsetHeight <= previewScrollTop + previewClientHeight) : false
+            });
+          }, 500);
+        }, 50);
       }
     }
 
@@ -2691,35 +2803,84 @@ console.log('[Rifler] Webview script starting...');
     return html.substring(0, start) + '<span class="match">' + html.substring(start, end) + '</span>' + html.substring(end);
   }
 
-  function highlightMatchSafe(rawText, start, end, language = null) {
-    if (start < 0 || end <= start || start >= rawText.length) {
-      if (language && typeof hljs !== 'undefined') {
+  function highlightMatchSafe(rawText, ranges, language = null) {
+    // Normalize ranges to an array
+    let matchRanges = [];
+    if (Array.isArray(ranges)) {
+      matchRanges = ranges;
+    } else if (ranges && typeof ranges.start === 'number' && typeof ranges.end === 'number') {
+      matchRanges = [ranges];
+    }
+
+    // Filter and sort ranges
+    matchRanges = matchRanges
+      .filter(r => r && typeof r.start === 'number' && typeof r.end === 'number' && r.start >= 0 && r.end > r.start && r.start < rawText.length)
+      .sort((a, b) => a.start - b.start);
+
+    if (matchRanges.length === 0) {
+      if (typeof hljs !== 'undefined') {
         try {
-          return hljs.highlight(rawText, { language }).value;
+          if (language && language !== 'file' && hljs.getLanguage(language)) {
+            const res = hljs.highlight(rawText, { language }).value;
+            if (rawText.length > 0 && !res.includes('class="hljs-')) {
+              console.warn(`[Rifler] highlightMatchSafe: No hljs classes found in result for ${language}. Input: ${rawText.substring(0, 20)}`);
+            }
+            return res;
+          } else {
+            return hljs.highlightAuto(rawText).value;
+          }
         } catch (e) {
-          return escapeHtml(rawText);
+          console.error('[Rifler] highlightMatchSafe error:', e);
         }
       }
       return escapeHtml(rawText);
     }
-    
-    end = Math.min(end, rawText.length);
-    const before = rawText.substring(0, start);
-    const match = rawText.substring(start, end);
-    const after = rawText.substring(end);
 
-    if (language && typeof hljs !== 'undefined') {
-      try {
-        // Highlight parts separately to keep the match span
-        const hBefore = hljs.highlight(before, { language }).value;
-        const hMatch = hljs.highlight(match, { language }).value;
-        const hAfter = hljs.highlight(after, { language }).value;
-        return hBefore + '<span class="match">' + hMatch + '</span>' + hAfter;
-      } catch (e) {
-        // Fallback to basic escaping
+    let result = '';
+    let lastIndex = 0;
+
+    for (const range of matchRanges) {
+      const start = range.start;
+      const end = Math.min(range.end, rawText.length);
+
+      if (start < lastIndex) continue; // Skip overlapping ranges
+
+      const before = rawText.substring(lastIndex, start);
+      const match = rawText.substring(start, end);
+
+      if (typeof hljs !== 'undefined') {
+        try {
+          if (language && language !== 'file' && hljs.getLanguage(language)) {
+            result += hljs.highlight(before, { language }).value;
+            result += '<span class="match">' + hljs.highlight(match, { language }).value + '</span>';
+          } else {
+            result += hljs.highlightAuto(before).value;
+            result += '<span class="match">' + hljs.highlightAuto(match).value + '</span>';
+          }
+        } catch (e) {
+          result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
+        }
+      } else {
+        result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
       }
+      lastIndex = end;
     }
 
-    return escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>' + escapeHtml(after);
+    const remaining = rawText.substring(lastIndex);
+    if (typeof hljs !== 'undefined') {
+      try {
+        if (language && language !== 'file' && hljs.getLanguage(language)) {
+          result += hljs.highlight(remaining, { language }).value;
+        } else {
+          result += hljs.highlightAuto(remaining).value;
+        }
+      } catch (e) {
+        result += escapeHtml(remaining);
+      }
+    } else {
+      result += escapeHtml(remaining);
+    }
+
+    return result;
   }
 })();

@@ -24,6 +24,7 @@ export interface SearchResult {
     start: number;
     end: number;
   };
+  previewMatchRanges?: Array<{ start: number; end: number }>;
 }
 
 /** Scope options for search */
@@ -242,11 +243,13 @@ export function searchInContent(
   content: string,
   regex: RegExp,
   filePath: string,
-  maxResults: number = 5000
+  maxResults: number = 5000,
+  relativePath?: string
 ): SearchResult[] {
   const results: SearchResult[] = [];
   const lines = content.split('\n');
   const fileName = path.basename(filePath);
+  const finalRelativePath = relativePath || filePath;
 
   for (let lineIndex = 0; lineIndex < lines.length && results.length < maxResults; lineIndex++) {
     const line = lines[lineIndex];
@@ -255,30 +258,40 @@ export function searchInContent(
     // Reset regex for each line
     regex.lastIndex = 0;
 
+    const lineMatches: Array<{ start: number; end: number; rawStart: number; rawLength: number }> = [];
     while ((match = regex.exec(line)) !== null) {
-      if (results.length >= maxResults) break;
-
       // Calculate the leading whitespace that will be trimmed
       const leadingWhitespace = line.length - line.trimStart().length;
       const adjustedStart = match.index - leadingWhitespace;
       const adjustedEnd = match.index + match[0].length - leadingWhitespace;
 
-      results.push({
-        uri: `file://${filePath}`,
-        fileName,
-        relativePath: filePath,
-        line: lineIndex,
-        character: match.index,
-        length: match[0].length,
-        preview: line.trim(),
-        previewMatchRange: {
-          start: Math.max(0, adjustedStart),
-          end: Math.max(0, adjustedEnd)
-        }
+      lineMatches.push({
+        start: Math.max(0, adjustedStart),
+        end: Math.max(0, adjustedEnd),
+        rawStart: match.index,
+        rawLength: match[0].length
       });
 
       // Prevent infinite loop for zero-length matches
       if (match[0].length === 0) regex.lastIndex++;
+    }
+
+    if (lineMatches.length > 0) {
+      const firstMatch = lineMatches[0];
+      results.push({
+        uri: `file://${filePath}`,
+        fileName,
+        relativePath: finalRelativePath,
+        line: lineIndex,
+        character: firstMatch.rawStart,
+        length: firstMatch.rawLength,
+        preview: line.trim(),
+        previewMatchRange: {
+          start: firstMatch.start,
+          end: firstMatch.end
+        },
+        previewMatchRanges: lineMatches.map(m => ({ start: m.start, end: m.end }))
+      });
     }
   }
 

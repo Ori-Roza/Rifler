@@ -57,10 +57,6 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [ ] UI should not follow VSCode current theme but use its own custom theme
 - [ ] This would allow using all design details properly
 
-## **Module/Project Mode Issues**
-- [ ] Module: Project mode not editable
-- [ ] Directory mode is editable - unclear why there are two similar modes
-
 ## **Switch Sidebar Issues**
 - [ ] Pressing switch between sidebar multiple times shows weird implementation results
 

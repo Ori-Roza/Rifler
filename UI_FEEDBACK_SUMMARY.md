@@ -33,7 +33,7 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [x] "File" option in scope select seems unnecessary
 
 ## **Project Input Issues**
-- [ ] Weird behavior when changing modes (shows "all files" instead of folder path)
+- [x] Weird behavior when changing modes (shows "all files" instead of folder path)
 
 ## **Button/Icon Quality Issues**
 - [ ] Search widget has bad quality icons

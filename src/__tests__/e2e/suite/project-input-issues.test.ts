@@ -190,6 +190,10 @@ suite('Rifler Project Input Issues E2E Tests', () => {
   test('Project mode should show workspace name instead of "All files"', async function() {
     this.timeout(15000);
 
+    await vscode.commands.executeCommand('rifler._openWindowInternal');
+    // Wait for webview to load
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     const panel = testHelpers.getCurrentPanel();
     assert.ok(panel, 'Panel should be open');
 
@@ -207,8 +211,19 @@ suite('Rifler Project Input Issues E2E Tests', () => {
       placeholder: status.directoryInputPlaceholder,
       value: status.directoryInputValue,
       readOnly: status.directoryInputReadOnly,
-      expectedWorkspaceName
+      expectedWorkspaceName,
+      workspaceName: status.directoryInputPlaceholder === expectedWorkspaceName ? 'CORRECT' : 'WRONG'
     });
+
+    // Check if the issue actually exists
+    if (status.directoryInputPlaceholder === 'All files') {
+      console.log('❌ CONFIRMED: Issue exists - showing "All files" instead of workspace name');
+      console.log('Expected:', expectedWorkspaceName, 'Got:', status.directoryInputPlaceholder);
+    } else if (status.directoryInputPlaceholder === expectedWorkspaceName) {
+      console.log('✅ Issue does NOT exist - showing workspace name correctly');
+    } else {
+      console.log('❓ Unexpected placeholder:', status.directoryInputPlaceholder);
+    }
 
     assert.strictEqual(status.directoryInputPlaceholder, expectedWorkspaceName, `Directory input should have workspace name "${expectedWorkspaceName}" as placeholder`);
     assert.strictEqual(status.directoryInputValue, testWorkspaceFolder.uri.fsPath, `Directory input should have workspace path as value`);

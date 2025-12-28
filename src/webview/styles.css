@@ -10,10 +10,10 @@
 }
 
 body {
-  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-  font-size: var(--vscode-font-size, 13px);
-  color: var(--vscode-foreground);
-  background-color: var(--vscode-editor-background);
+  font-family: var(--rifler-font-family);
+  font-size: var(--rifler-font-size);
+  color: var(--rifler-fg);
+  background-color: var(--rifler-bg);
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -34,7 +34,7 @@ body.loaded {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--vscode-editor-background);
+  background-color: var(--rifler-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -54,7 +54,7 @@ body.loaded {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--vscode-editor-background, #1e1e1e);
+  background: var(--rifler-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,8 +72,8 @@ body.loaded {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid var(--vscode-widget-border, #444);
-  border-top-color: var(--vscode-focusBorder, #007acc);
+  border: 3px solid var(--rifler-border);
+  border-top-color: var(--rifler-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -83,16 +83,56 @@ body.loaded {
 }
 
 :root {
+  /* Custom Rifler Theme - Fixed Colors (Dark Mode) */
+  --rifler-bg: #0d1117;
+  --rifler-fg: #c9d1d9;
+  --rifler-fg-muted: #8b949e;
+  --rifler-border: #30363d;
+  
+  --rifler-input-bg: #0d1117;
+  --rifler-input-border: #30363d;
+  --rifler-input-fg: #c9d1d9;
+  --rifler-input-placeholder: #484f58;
+  
+  --rifler-button-bg: #21262d;
+  --rifler-button-fg: #c9d1d9;
+  --rifler-button-hover: #30363d;
+  --rifler-button-secondary-bg: #30363d;
+  --rifler-button-secondary-fg: #c9d1d9;
+  --rifler-button-secondary-hover: #3b424b;
+  
+  --rifler-primary: #58a6ff;
+  --rifler-primary-hover: #79c0ff;
+  --rifler-focus-border: #58a6ff;
+  
+  --rifler-list-hover: #161b22;
+  --rifler-list-active: #1f242c;
+  
+  --rifler-badge-bg: #1f6feb;
+  --rifler-badge-fg: #ffffff;
+  
+  --rifler-error: #f85149;
+  --rifler-warning: #d29922;
+  --rifler-success: #3fb950;
+  
+  --rifler-scrollbar-thumb: #484f58;
+  --rifler-scrollbar-thumb-hover: #8b949e;
+  
+  --rifler-font-family: Menlo, Monaco, 'Courier New', monospace;
+  --rifler-font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', 'Consolas', 'Courier New', monospace;
+  --rifler-font-size: 13px;
+
+  /* Existing Rifler Variables */
   --rifler-highlight: rgba(255, 213, 79, 0.35);
   --rifler-highlight-strong: rgba(255, 213, 79, 0.5);
   --rifler-highlight-muted: rgba(255, 213, 79, 0.15);
   --rifler-highlight-border: rgba(224, 183, 0, 0.4);
-  --rifler-primary: #3B82F6;
-  --rifler-primary-dim: rgba(59, 130, 246, 0.15);
+  --rifler-primary-dim: rgba(88, 166, 255, 0.15);
   --rifler-highlight-bg: #584c2e;
   --rifler-highlight-text: #E6E6B6;
   --rifler-match-bg: rgba(254, 240, 138, 0.3);
   --rifler-match-active-bg: rgba(254, 240, 138, 0.5);
+  --rifler-shadow: rgba(0, 0, 0, 0.3);
 }
 
 /* ===== Header ===== */
@@ -103,10 +143,10 @@ body.loaded {
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  background-color: var(--vscode-sideBar-background);
-  border-bottom: 1px solid var(--vscode-widget-border, #444);
+  background-color: var(--rifler-bg);
+  border-bottom: 1px solid var(--rifler-border);
   box-sizing: border-box;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px var(--rifler-shadow);
   z-index: 20;
 }
 
@@ -133,7 +173,7 @@ body.loaded {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
 }
 
 .header-btn .material-symbols-outlined {
@@ -141,7 +181,7 @@ body.loaded {
 }
 
 .search-icon, .replace-icon, .scope-icon, .mask-icon, .filter-icon {
-  color: var(--vscode-input-placeholderForeground);
+  color: var(--rifler-input-placeholder);
   margin-right: 4px;
   font-size: 16px;
   flex-shrink: 0;
@@ -185,7 +225,7 @@ body.loaded {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   font-size: 14px;
   transition: all 0.15s ease;
 }
@@ -197,15 +237,15 @@ body.loaded {
 }
 
 .header-btn:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
-  color: var(--vscode-foreground);
+  background-color: var(--rifler-list-hover);
+  color: var(--rifler-fg);
 }
 
 /* ===== Search Section ===== */
 .search-section {
   flex-shrink: 0;
-  background-color: var(--vscode-sideBar-background);
-  border-bottom: 1px solid var(--vscode-widget-border, #444);
+  background-color: var(--rifler-bg);
+  border-bottom: 1px solid var(--rifler-border);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -228,8 +268,8 @@ body.loaded {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, #444);
+  background-color: var(--rifler-input-bg);
+  border: 1px solid var(--rifler-input-border);
   border-radius: 6px;
   padding: 4px 10px;
   transition: all 0.15s;
@@ -238,13 +278,13 @@ body.loaded {
 }
 
 .search-input-group:focus-within {
-  border-color: var(--vscode-focusBorder);
-  box-shadow: 0 0 0 1px var(--vscode-focusBorder), inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  border-color: var(--rifler-focus-border);
+  box-shadow: 0 0 0 1px var(--rifler-focus-border), inset 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .search-icon {
   font-size: 18px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   flex-shrink: 0;
   opacity: 0.6;
 }
@@ -253,16 +293,16 @@ body.loaded {
   flex: 1;
   padding: 4px 0;
   font-size: 13px;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--rifler-font-mono);
   background-color: transparent;
-  color: var(--vscode-input-foreground);
+  color: var(--rifler-input-fg);
   border: none;
   outline: none;
   min-width: 0;
 }
 
 .search-input::placeholder {
-  color: var(--vscode-input-placeholderForeground, #999);
+  color: var(--rifler-input-placeholder);
   opacity: 0.7;
 }
 
@@ -289,8 +329,8 @@ body.loaded {
   padding: 0;
   font-size: 10px;
   font-weight: 600;
-  font-family: var(--vscode-editor-font-family, monospace);
-  color: #9ca3af; /* text-gray-400 */
+  font-family: var(--rifler-font-mono);
+  color: var(--rifler-fg-muted);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 2px; /* rounded-sm */
@@ -300,34 +340,25 @@ body.loaded {
 }
 
 .option-btn:hover {
-  background-color: #e5e7eb; /* hover:bg-gray-200 */
-  color: #374151; /* hover:text-gray-700 */
+  background-color: var(--rifler-button-hover);
+  color: var(--rifler-fg);
 }
 
-@media (prefers-color-scheme: dark) {
-  .option-btn {
-    color: #6b7280; /* dark:text-gray-500 */
-  }
-  
-  .option-btn:hover {
-    background-color: #374151; /* dark:hover:bg-gray-700 */
-    color: #d1d5db; /* dark:hover:text-gray-300 */
-  }
-}
+
 
 .option-btn.active {
-  background-color: rgba(59, 130, 246, 0.1); /* bg-primary/10 */
-  color: #3b82f6; /* text-primary */
+  background-color: var(--rifler-primary-dim); /* bg-primary/10 */
+  color: var(--rifler-primary); /* text-primary */
 }
 
 #filter-btn.active {
-  background-color: rgba(59, 130, 246, 0.1); /* bg-primary/10 */
-  color: #3b82f6; /* text-primary */
+  background-color: var(--rifler-primary-dim); /* bg-primary/10 */
+  color: var(--rifler-primary); /* text-primary */
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
 }
 
 #filter-btn.active:hover {
-  background-color: rgba(59, 130, 246, 0.2); /* hover:bg-primary/20 */
+  background-color: rgba(88, 166, 255, 0.2); /* hover:bg-primary/20 */
 }
 
 #filter-btn:active {
@@ -339,8 +370,8 @@ body.loaded {
   display: none;
   align-items: center;
   gap: 6px;
-  background-color: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, #444);
+  background-color: var(--rifler-input-bg);
+  border: 1px solid var(--rifler-input-border);
   border-radius: 2px;
   padding: 4px 8px;
   margin-bottom: 4px;
@@ -352,12 +383,12 @@ body.loaded {
 }
 
 .replace-field-row:focus-within {
-  border-color: var(--vscode-focusBorder);
+  border-color: var(--rifler-focus-border);
 }
 
 .replace-icon {
   font-size: 12px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   flex-shrink: 0;
   opacity: 0.7;
 }
@@ -366,16 +397,16 @@ body.loaded {
   flex: 1;
   padding: 4px 0;
   font-size: 13px;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--rifler-font-mono);
   background-color: transparent;
-  color: var(--vscode-input-foreground);
+  color: var(--rifler-input-fg);
   border: none;
   outline: none;
   min-width: 0;
 }
 
 .replace-input::placeholder {
-  color: var(--vscode-input-placeholderForeground, #999);
+  color: var(--rifler-input-placeholder);
 }
 
 .replace-actions {
@@ -388,9 +419,9 @@ body.loaded {
   padding: 6px 12px;
   font-size: 11px;
   font-weight: 500;
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: 1px solid var(--vscode-widget-border);
+  background: var(--rifler-button-secondary-bg);
+  color: var(--rifler-button-secondary-fg);
+  border: 1px solid var(--rifler-border);
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
@@ -398,7 +429,7 @@ body.loaded {
 }
 
 .replace-actions button:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--rifler-button-secondary-hover);
 }
 
 .replace-actions button.primary {
@@ -408,19 +439,19 @@ body.loaded {
 }
 
 .replace-actions button.primary:hover {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--rifler-primary-hover);
+  border-color: var(--rifler-primary-hover);
 }
 
 .replace-actions button.secondary {
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--rifler-primary-dim);
   color: var(--rifler-primary);
-  border-color: rgba(59, 130, 246, 0.1);
+  border-color: var(--rifler-primary-dim);
 }
 
 .replace-actions button.secondary:hover {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.2);
+  background: rgba(88, 166, 255, 0.2);
+  border-color: rgba(88, 166, 255, 0.2);
 }
 
 /* ===== Filters Section (Restructured for Issue #83) ===== */
@@ -448,20 +479,20 @@ body.loaded {
   align-items: center;
   flex: 1;
   min-width: 0;
-  background-color: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, #444);
+  background-color: var(--rifler-input-bg);
+  border: 1px solid var(--rifler-input-border);
   border-radius: 6px;
   padding: 0 6px;
   height: 100%;
 }
 
 .filter-field:focus-within {
-  border-color: var(--vscode-focusBorder);
+  border-color: var(--rifler-focus-border);
 }
 
 .filter-label {
   font-size: 11px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   margin-right: 6px;
   white-space: nowrap;
   user-select: none;
@@ -478,9 +509,9 @@ body.loaded {
   flex: 1;
   background: transparent;
   border: none;
-  color: var(--vscode-input-foreground);
+  color: var(--rifler-input-fg);
   font-size: 12px;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--rifler-font-mono);
   padding: 2px 0;
   min-width: 0;
 }
@@ -490,11 +521,7 @@ body.loaded {
 }
 
 .filter-field.error {
-  border-color: var(--vscode-inputValidation-errorBorder, #f48771) !important;
-}
-
-.path-input.error {
-  /* Handled by parent .filter-field.error */
+  border-color: var(--rifler-error) !important;
 }
 
 .scope-field {
@@ -505,7 +532,7 @@ body.loaded {
   flex: 1;
   background: transparent;
   border: none;
-  color: var(--vscode-input-foreground);
+  color: var(--rifler-input-fg);
   font-size: 11px;
   cursor: pointer;
   padding: 2px 0;
@@ -523,15 +550,15 @@ body.loaded {
   height: 36px;
   background: transparent;
   border: none;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.1s;
 }
 
 .icon-btn:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
-  color: var(--vscode-foreground);
+  background-color: var(--rifler-list-hover);
+  color: var(--rifler-fg);
 }
 
 .icon-btn.active {
@@ -566,15 +593,15 @@ body.loaded {
 }
 
 .validation-message.error {
-  background-color: var(--vscode-inputValidation-errorBackground, rgba(244, 135, 113, 0.1));
-  color: var(--vscode-inputValidation-errorForeground, #f48771);
-  border: 1px solid var(--vscode-inputValidation-errorBorder, #f48771);
+  background-color: var(--rifler-error);
+  color: #ffffff;
+  border: 1px solid var(--rifler-error);
 }
 
 .validation-message.warning {
-  background-color: var(--vscode-inputValidation-warningBackground, rgba(220, 169, 39, 0.1));
-  color: var(--vscode-inputValidation-warningForeground, #dca927);
-  border: 1px solid var(--vscode-inputValidation-warningBorder, #dca927);
+  background-color: var(--rifler-warning);
+  color: #ffffff;
+  border: 1px solid var(--rifler-warning);
 }
 
 @keyframes slideIn {
@@ -592,13 +619,13 @@ body.loaded {
 .results-summary-bar {
   flex-shrink: 0;
   padding: 6px 12px;
-  background-color: var(--vscode-sideBar-background);
-  border-bottom: 1px solid var(--vscode-widget-border, #444);
+  background-color: var(--rifler-bg);
+  border-bottom: 1px solid var(--rifler-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 11px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   position: relative;
@@ -613,7 +640,7 @@ body.loaded {
 .collapse-all-btn {
   background: transparent;
   border: none;
-  color: var(--vscode-textLink-foreground);
+  color: var(--rifler-primary);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
@@ -632,8 +659,8 @@ body.loaded {
 }
 
 .collapse-all-btn:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
-  color: var(--vscode-textLink-activeForeground);
+  background-color: var(--rifler-list-hover);
+  color: var(--rifler-primary-hover);
 }
 
 /* ===== Main Content ===== */
@@ -653,7 +680,7 @@ body.loaded {
   flex-direction: column;
   min-height: 0;
   position: relative;
-  background-color: var(--vscode-editor-background);
+  background-color: var(--rifler-bg);
 }
 
 .results-list {
@@ -664,7 +691,7 @@ body.loaded {
   padding-top: 4px;
   margin-top: 2px;
   scrollbar-width: thin;
-  scrollbar-color: var(--vscode-scrollbarSlider-background) var(--vscode-editor-background);
+  scrollbar-color: var(--rifler-scrollbar-thumb) var(--rifler-bg);
 }
 
 .results-list::-webkit-scrollbar {
@@ -672,16 +699,16 @@ body.loaded {
 }
 
 .results-list::-webkit-scrollbar-track {
-  background: var(--vscode-editor-background);
+  background: var(--rifler-bg);
 }
 
 .results-list::-webkit-scrollbar-thumb {
-  background: var(--vscode-scrollbarSlider-background);
+  background: var(--rifler-scrollbar-thumb);
   border-radius: 4px;
 }
 
 .results-list::-webkit-scrollbar-thumb:hover {
-  background: var(--vscode-scrollbarSlider-hoverBackground);
+  background: var(--rifler-scrollbar-thumb-hover);
 }
 
 /* ===== Result Items ===== */
@@ -689,9 +716,9 @@ body.loaded {
   display: flex;
   align-items: center;
   padding: 6px 12px;
-  background-color: var(--vscode-sideBar-background);
+  background-color: var(--rifler-bg);
   border-left: 2px solid transparent;
-  border-bottom: 1px solid var(--vscode-widget-border, #444);
+  border-bottom: 1px solid var(--rifler-border);
   height: 40px;
   box-sizing: border-box;
   cursor: pointer;
@@ -702,14 +729,14 @@ body.loaded {
 }
 
 .result-file-header:hover {
-  border-left-color: var(--vscode-focusBorder);
-  background-color: var(--vscode-list-hoverBackground);
+  border-left-color: var(--rifler-focus-border);
+  background-color: var(--rifler-list-hover);
 }
 
 .result-file-header .arrow-icon {
   font-size: 16px;
   margin-right: 4px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   opacity: 0.8;
   flex-shrink: 0;
 }
@@ -744,7 +771,7 @@ body.loaded {
 .result-file-header .file-name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--vscode-foreground);
+  color: var(--rifler-fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -752,18 +779,18 @@ body.loaded {
 
 .result-file-header .file-path {
   font-size: 10px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   opacity: 0.6;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--rifler-font-mono);
   margin-top: 1px;
 }
 
 .result-file-header .match-count {
-  background-color: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
+  background-color: var(--rifler-badge-bg);
+  color: var(--rifler-badge-fg);
   padding: 1px 6px;
   border-radius: 10px;
   font-size: 10px;
@@ -786,13 +813,13 @@ body.loaded {
 }
 
 .result-item:hover {
-  background-color: var(--vscode-list-hoverBackground);
-  border-left-color: var(--vscode-focusBorder);
+  background-color: var(--rifler-list-hover);
+  border-left-color: var(--rifler-focus-border);
 }
 
 .result-item.active {
-  background-color: rgba(59, 130, 246, 0.1);
-  color: var(--vscode-foreground);
+  background-color: var(--rifler-primary-dim);
+  color: var(--rifler-fg);
   border-left: 3px solid var(--rifler-primary);
 }
 
@@ -803,7 +830,7 @@ body.loaded {
 }
 
 .result-item.active .result-preview {
-  color: var(--vscode-foreground);
+  color: var(--rifler-fg);
 }
 
 .result-meta {
@@ -822,8 +849,8 @@ body.loaded {
 }
 
 .result-preview .match-highlight {
-  background-color: var(--vscode-editor-findMatchHighlightBackground, #ea5c0055);
-  color: var(--vscode-editor-findMatchHighlightForeground);
+  background-color: var(--rifler-highlight);
+  color: var(--rifler-fg);
   border-radius: 1px;
 }
 
@@ -841,7 +868,7 @@ body.loaded {
 .open-in-editor-btn {
   background: transparent;
   border: none;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
@@ -851,8 +878,8 @@ body.loaded {
 }
 
 .open-in-editor-btn:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
-  color: var(--vscode-foreground);
+  background-color: var(--rifler-list-hover);
+  color: var(--rifler-fg);
 }
 
 .open-in-editor-btn .material-symbols-outlined {
@@ -874,7 +901,7 @@ body.loaded {
 .end-of-results-line {
   flex: 1;
   height: 1px;
-  background-color: var(--vscode-widget-border, #444);
+  background-color: var(--rifler-border);
 }
 
 .end-of-results-content {
@@ -885,7 +912,7 @@ body.loaded {
   font-weight: 700;
   letter-spacing: 1.5px;
   white-space: nowrap;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
 }
 
 .end-of-results-content .material-symbols-outlined {
@@ -896,8 +923,8 @@ body.loaded {
 
 .result-line-number {
   font-size: 11px;
-  color: var(--vscode-descriptionForeground);
-  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--rifler-fg-muted);
+  font-family: var(--rifler-font-mono);
   opacity: 0.6;
   flex-shrink: 0;
   text-align: right;
@@ -906,13 +933,13 @@ body.loaded {
 }
 
 .result-preview {
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--rifler-font-mono);
   font-size: 12px;
   line-height: 20px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--vscode-editor-foreground);
+  color: var(--rifler-fg);
   opacity: 0.9;
   flex: 1;
 }
@@ -924,10 +951,6 @@ body.loaded {
 
 .result-preview.hljs * {
   background: transparent !important;
-}
-
-.result-item.active .result-preview {
-  /* Allow syntax highlighting to show even when active */
 }
 
 .result-item.active .result-meta {
@@ -948,7 +971,7 @@ body.loaded {
 .open-in-editor-btn {
   background: transparent;
   border: none;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   cursor: pointer;
   padding: 2px;
   border-radius: 6px;
@@ -958,8 +981,8 @@ body.loaded {
 }
 
 .open-in-editor-btn:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
-  color: var(--vscode-foreground);
+  background-color: var(--rifler-list-hover);
+  color: var(--rifler-fg);
 }
 
 .result-item.active .open-in-editor-btn {
@@ -968,7 +991,7 @@ body.loaded {
 
 .match-highlight {
   background-color: var(--rifler-highlight);
-  color: var(--vscode-editor-foreground);
+  color: var(--rifler-fg);
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -991,7 +1014,7 @@ body.loaded {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   font-style: italic;
   font-size: 12px;
 }
@@ -1013,24 +1036,24 @@ body.loaded {
   display: flex; /* Start visible by default */
   flex-direction: column;
   min-height: 0;
-  border-top: 1px solid var(--vscode-widget-border, #444);
+  border-top: 1px solid var(--rifler-border);
   box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
   z-index: 30;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   overflow: hidden;
-  background-color: var(--vscode-editor-background);
+  background-color: var(--rifler-bg);
 }
 
 /* ===== Drag Handle ===== */
 .drag-handle {
   flex-shrink: 0;
   height: 22px;
-  background: var(--vscode-sideBar-background);
+  background: var(--rifler-bg);
   cursor: grab;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 0 8px;
   transition: all 0.15s ease;
   user-select: none;
@@ -1046,7 +1069,7 @@ body.loaded {
 
 .drag-handle:hover,
 .drag-handle.dragging {
-  background-color: var(--vscode-list-hoverBackground);
+  background-color: var(--rifler-list-hover);
 }
 
 .preview-toggle-btn {
@@ -1058,16 +1081,18 @@ body.loaded {
   background: transparent;
   border: none;
   border-radius: 2px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   cursor: pointer;
   opacity: 0.6;
   transition: all 0.15s ease;
   flex-shrink: 0;
+  position: absolute;
+  left: 8px;
 }
 
 .preview-toggle-btn:hover {
   opacity: 1;
-  background-color: var(--vscode-toolbar-hoverBackground);
+  background-color: var(--rifler-list-hover);
 }
 
 .preview-toggle-btn .material-symbols-outlined {
@@ -1077,7 +1102,7 @@ body.loaded {
 .drag-handle-bar {
   width: 40px;
   height: 4px;
-  background-color: var(--vscode-descriptionForeground);
+  background-color: var(--rifler-fg-muted);
   border-radius: 2px;
   opacity: 0.4;
   transition: opacity 0.15s ease;
@@ -1100,15 +1125,15 @@ body.loaded {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background-color: var(--vscode-editor-background);
+  background-color: var(--rifler-bg);
   overflow: hidden;
 }
 
 .preview-header {
   flex-shrink: 0;
   padding: 8px 8px;
-  background-color: var(--vscode-sideBar-background);
-  border-bottom: 1px solid var(--vscode-widget-border, #444);
+  background-color: var(--rifler-bg);
+  border-bottom: 1px solid var(--rifler-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1137,13 +1162,13 @@ body.loaded {
   justify-content: center;
   font-size: 16px;
   line-height: 1;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   opacity: 0.8;
 }
 
 
 .preview-filename {
-  color: var(--vscode-textLink-foreground);
+  color: var(--rifler-primary);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -1152,7 +1177,7 @@ body.loaded {
 
 .preview-filepath {
   font-size: 11px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1173,9 +1198,9 @@ body.loaded {
 .preview-actions button {
   padding: 3px 8px;
   font-size: 11px;
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: 1px solid var(--vscode-widget-border);
+  background: var(--rifler-button-secondary-bg);
+  color: var(--rifler-button-secondary-fg);
+  border: 1px solid var(--rifler-border);
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
@@ -1183,17 +1208,17 @@ body.loaded {
 }
 
 .preview-actions button:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--rifler-button-secondary-hover);
 }
 
 .preview-actions button.primary {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  border-color: var(--vscode-button-background);
+  background: var(--rifler-button-bg);
+  color: var(--rifler-button-fg);
+  border-color: var(--rifler-button-bg);
 }
 
 .preview-actions button.primary:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: var(--rifler-button-hover);
 }
 
 .preview-body {
@@ -1201,7 +1226,7 @@ body.loaded {
   position: relative;
   min-height: 0;
   overflow: hidden;
-  background-color: var(--vscode-editor-background);
+  background-color: var(--rifler-bg);
 }
 
 .preview-content {
@@ -1211,11 +1236,11 @@ body.loaded {
   right: 0;
   bottom: 0;
   overflow: auto;
-  font-family: var(--vscode-editor-font-family, 'JetBrains Mono', 'Consolas', monospace);
+  font-family: var(--rifler-font-mono);
   font-size: 13px;
   line-height: 20px;
-  background-color: var(--vscode-editor-background);
-  color: var(--vscode-editor-foreground);
+  background-color: var(--rifler-bg);
+  color: var(--rifler-fg);
   padding: 8px 0;
   z-index: 1;
   direction: ltr;
@@ -1236,7 +1261,7 @@ body.loaded {
 }
 
 .pvLine:hover {
-  background-color: var(--vscode-editor-lineHighlightBackground);
+  background-color: var(--rifler-list-hover);
 }
 
 /* Soft full-row highlight for hit lines (must cover BOTH columns) */
@@ -1256,7 +1281,7 @@ body.loaded {
   flex: 1;
   padding-left: 10px;
   padding-right: 10px;
-  color: var(--vscode-editor-foreground);
+  color: var(--rifler-fg);
   overflow: visible;
   direction: ltr;
   min-width: 0;
@@ -1280,13 +1305,13 @@ body.loaded {
   unicode-bidi: isolate;
   border-right: 1px solid color-mix(
     in srgb,
-    var(--vscode-widget-border, rgba(128, 128, 128, 0.22)) 55%,
+    var(--rifler-border) 55%,
     transparent
   );
   color: color-mix(
     in srgb,
-    var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground)) 70%,
-    var(--vscode-foreground) 30%
+    var(--rifler-fg-muted) 70%,
+    var(--rifler-fg) 30%
   );
 }
 
@@ -1324,7 +1349,7 @@ body.loaded {
   right: 0;
   bottom: 0;
   overflow: hidden;
-  background-color: var(--vscode-editor-background);
+  background-color: var(--rifler-bg);
   display: none;
   flex-direction: column;
   z-index: 2;
@@ -1348,11 +1373,11 @@ body.loaded {
   width: 56px;
   padding: 8px 0;
   text-align: right;
-  font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
+  font-family: var(--rifler-font-mono);
   font-size: 13px;
   line-height: 20px;
-  color: var(--vscode-editorLineNumber-foreground, #858585);
-  background-color: var(--vscode-editor-background);
+  color: var(--rifler-fg-muted);
+  background-color: var(--rifler-bg);
   user-select: none;
   overflow: hidden;
   box-sizing: border-box;
@@ -1360,7 +1385,7 @@ body.loaded {
   direction: ltr;
   unicode-bidi: isolate;
   border-left: none;
-  border-right: 1px solid var(--vscode-widget-border, #333);
+  border-right: 1px solid var(--rifler-border);
 }
 
 .editor-line-numbers div {
@@ -1385,7 +1410,7 @@ body.loaded {
   margin: 0;
   padding: 8px 32px;
   border: none;
-  font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
+  font-family: var(--rifler-font-mono);
   font-size: 13px;
   line-height: 20px;
   letter-spacing: 0.2px;
@@ -1399,7 +1424,7 @@ body.loaded {
   z-index: 2;
   color: transparent;
   background: transparent;
-  caret-color: var(--vscode-editor-foreground);
+  caret-color: var(--rifler-fg);
   resize: none;
   outline: none;
 }
@@ -1407,8 +1432,8 @@ body.loaded {
 #editor-backdrop {
   z-index: 1;
   pointer-events: none;
-  background-color: var(--vscode-editor-background);
-  color: var(--vscode-editor-foreground);
+  background-color: var(--rifler-bg);
+  color: var(--rifler-fg);
 }
 
 /* Replace Widget */
@@ -1417,8 +1442,8 @@ body.loaded {
   top: 8px;
   right: 8px;
   z-index: 10;
-  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-  border: 1px solid var(--vscode-widget-border);
+  background: var(--rifler-bg);
+  border: 1px solid var(--rifler-border);
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   padding: 8px;
   border-radius: 4px;
@@ -1443,7 +1468,7 @@ body.loaded {
 
 .replace-widget-label {
   font-size: 11px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   min-width: 50px;
   white-space: nowrap;
 }
@@ -1452,15 +1477,15 @@ body.loaded {
   flex: 1;
   padding: 4px 8px;
   font-size: 12px;
-  background-color: var(--vscode-input-background);
-  color: var(--vscode-input-foreground);
-  border: 1px solid var(--vscode-input-border, #444);
+  background-color: var(--rifler-input-bg);
+  color: var(--rifler-input-fg);
+  border: 1px solid var(--rifler-input-border);
   border-radius: 2px;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--rifler-font-mono);
 }
 
 .replace-widget input:focus {
-  border-color: var(--vscode-focusBorder);
+  border-color: var(--rifler-focus-border);
   outline: none;
 }
 
@@ -1481,15 +1506,15 @@ body.loaded {
 
 .replace-match-count {
   font-size: 11px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--rifler-fg-muted);
   margin-left: auto;
   white-space: nowrap;
 }
 
 .replace-widget button {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: 1px solid var(--vscode-widget-border);
+  background: var(--rifler-button-secondary-bg);
+  color: var(--rifler-button-secondary-fg);
+  border: 1px solid var(--rifler-border);
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 6px;
@@ -1499,35 +1524,35 @@ body.loaded {
 }
 
 .replace-widget button:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--rifler-button-secondary-hover);
 }
 
 .replace-widget button.primary {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  border-color: var(--vscode-button-background);
+  background: var(--rifler-button-bg);
+  color: var(--rifler-button-fg);
+  border-color: var(--rifler-button-bg);
 }
 
 .replace-widget button.primary:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: var(--rifler-button-hover);
 }
 
 .replace-widget button.secondary {
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--rifler-primary-dim);
   color: var(--rifler-primary);
-  border-color: rgba(59, 130, 246, 0.1);
+  border-color: var(--rifler-primary-dim);
 }
 
 .replace-widget button.secondary:hover {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.2);
+  background: rgba(88, 166, 255, 0.2);
+  border-color: rgba(88, 166, 255, 0.2);
 }
 
 /* Context Menu */
 .context-menu {
   position: fixed;
-  background-color: var(--vscode-menu-background);
-  border: 1px solid var(--vscode-menu-border);
+  background-color: var(--rifler-bg);
+  border: 1px solid var(--rifler-border);
   border-radius: 4px;
   padding: 4px 0;
   min-width: 160px;
@@ -1539,7 +1564,7 @@ body.loaded {
   padding: 6px 12px;
   cursor: pointer;
   font-size: 12px;
-  color: var(--vscode-menu-foreground);
+  color: var(--rifler-fg);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1547,8 +1572,8 @@ body.loaded {
 }
 
 .context-menu-item:hover {
-  background-color: var(--vscode-menu-selectionBackground);
-  color: var(--vscode-menu-selectionForeground);
+  background-color: var(--rifler-list-active);
+  color: var(--rifler-fg);
 }
 
 .context-menu-item .shortcut {
@@ -1561,8 +1586,8 @@ body.loaded {
 #query.invalid,
 #replace-input.invalid,
 #file-mask.invalid {
-  border-color: var(--vscode-inputValidation-errorBorder, #f48771) !important;
-  background-color: var(--vscode-inputValidation-errorBackground, rgba(244, 135, 113, 0.1)) !important;
+  border-color: var(--rifler-error) !important;
+  background-color: var(--rifler-error) !important;
   pointer-events: auto !important;
   cursor: text !important;
 }
@@ -1570,8 +1595,8 @@ body.loaded {
 #query.invalid:focus,
 #replace-input.invalid:focus,
 #file-mask.invalid:focus {
-  border-color: var(--vscode-focusBorder) !important;
-  outline: 1px solid var(--vscode-focusBorder) !important;
+  border-color: var(--rifler-focus-border) !important;
+  outline: 1px solid var(--rifler-focus-border) !important;
   outline-offset: -1px;
 }
 
@@ -1585,7 +1610,7 @@ body.loaded {
 /* Ensure all text in preview content uses the correct foreground color */
 .preview-content,
 .preview-content .pvCode {
-  color: var(--vscode-editor-foreground);
+  color: var(--rifler-fg);
 }
 
 .preview-content.hljs {
@@ -1605,13 +1630,6 @@ body.loaded {
 .hljs-symbol, .hljs-bullet, .hljs-link, .hljs-meta, .hljs-selector-id, .hljs-title { color: #79c0ff !important; }
 .hljs-comment, .hljs-quote { color: #8b949e !important; }
 .hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable, .hljs-tag .hljs-attr { color: #79c0ff !important; }
-
-/* Allow syntax highlighting colors but protect against common red text issues */
-.result-preview.hljs *,
-.pvCode.hljs *,
-#editor-backdrop.hljs * {
-  /* We allow colors here now */
-}
 
 /* But matches must keep their color and be bold */
 .match, .match *, .pvMatch, .pvMatch * {

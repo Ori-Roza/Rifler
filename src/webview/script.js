@@ -1672,10 +1672,6 @@ console.log('[Rifler] Webview script starting...');
       case '__test_searchCompleted':
         vscode.postMessage({ type: '__test_searchResultsReceived', results: message.results });
         break;
-      case '__test_setSearchInput':
-        queryInput.value = message.value;
-        runSearch();
-        break;
       case '__test_setFileMask':
         fileMaskInput.value = message.value || '';
         state.options.fileMask = fileMaskInput.value;
@@ -1786,14 +1782,22 @@ console.log('[Rifler] Webview script starting...');
         // Use virtual height tracking instead of DOM scrollHeight since items are virtualized
         let scrollbarVisible = false;
         if (resultsList && virtualContent) {
-          const virtualHeight = parseFloat(virtualContent.style.height) || virtualContent.scrollHeight;
-          const rectHeight = resultsList.getBoundingClientRect().height;
+          const virtualHeight = parseFloat(virtualContent.style.height) || virtualContent.scrollHeight || 0;
+          // Force layout to ensure clientHeight is up-to-date
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+          resultsList.offsetHeight;
+          const rectHeight = resultsList.getBoundingClientRect().height || 0;
           const computedHeight = parseFloat(getComputedStyle(resultsList).height) || 0;
-          const containerHeight = Math.max(resultsList.clientHeight, rectHeight, computedHeight);
-          if (containerHeight === 0 && virtualHeight > 0) {
+          const clientHeight = resultsList.clientHeight || 0;
+          const containerHeight = Math.max(clientHeight, rectHeight, computedHeight);
+          if ((containerHeight === 0 && virtualHeight > 0) || (virtualHeight > containerHeight + 1)) {
+            scrollbarVisible = true;
+          } else if (resultsList.scrollHeight > clientHeight + 1) {
             scrollbarVisible = true;
           } else {
-            scrollbarVisible = virtualHeight > containerHeight && containerHeight > 0;
+            // Heuristic fallback for virtualized list: if many items expected, assume overflow
+            const approxItemCount = document.querySelectorAll('.result-file-header, .result-item, .result-matches-group').length;
+            scrollbarVisible = virtualHeight > 0 && containerHeight > 0 && approxItemCount > 20;
           }
         } else if (resultsList) {
           // Fallback to DOM-based check
@@ -1958,9 +1962,11 @@ console.log('[Rifler] Webview script starting...');
           queryInput.value = message.value;
           // Allow tests to force regex mode for multi-pattern queries
           if (typeof message.useRegex === 'boolean') {
+            console.log('[Webview] Setting useRegex to', message.useRegex, 'from message');
             state.options.useRegex = message.useRegex;
             useRegexToggle?.classList.toggle('active', state.options.useRegex);
           }
+          console.log('[Webview] After setting, state.options.useRegex=', state.options.useRegex);
           // Trigger search
           const searchEvent = new Event('input', { bubbles: true });
           queryInput.dispatchEvent(searchEvent);
@@ -2084,7 +2090,7 @@ console.log('[Rifler] Webview script starting...');
       const query = queryInput.value.trim();
       state.currentQuery = query;
       
-      console.log('runSearch called, query:', query, 'length:', query.length);
+      console.log('runSearch called, query:', query, 'length:', query.length, 'useRegex:', state.options.useRegex);
       
       if (query.length < 2) {
         showPlaceholder('Type at least 2 characters...');
@@ -2215,11 +2221,10 @@ console.log('[Rifler] Webview script starting...');
       cumulativeTop += 48;
     }
     
-    // Update virtual content and results list height
+    // Update virtual content height only; let container manage its own height
     if (virtualContent && virtualContent.parentElement) {
       const totalHeight = cumulativeTop + 'px';
       virtualContent.style.height = totalHeight;
-      virtualContent.parentElement.style.minHeight = totalHeight;
     }
 
     console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
@@ -2927,7 +2932,7 @@ console.log('[Rifler] Webview script starting...');
 
     // Prevent rendering the same content multiple times, but always scroll to current line
     if (previewContent.dataset.lastRenderedUri === fileData.uri && 
-        previewContent.dataset.lastRenderedContent === fileData.content) {
+      previewContent.dataset.lastRenderedContent === fileData.content) {
       // Content is already rendered, just update the active line highlight and scroll
       const currentResult = state.results[state.activeIndex];
       const currentLine = currentResult ? currentResult.line : -1;
@@ -2943,12 +2948,32 @@ console.log('[Rifler] Webview script starting...');
           
           // Use scrollIntoView with a small timeout to ensure layout is ready
           setTimeout(() => {
-            currentLineEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            currentLineEl.scrollIntoView({ block: 'center', behavior: 'auto' });
             
             // Fallback for environments where scrollIntoView might fail (e.g. some headless tests)
             if (previewContent.scrollTop === 0 && currentLineEl.offsetTop > previewContent.clientHeight) {
               previewContent.scrollTop = currentLineEl.offsetTop - (previewContent.clientHeight / 2);
             }
+
+            // For E2E testing: send scroll info after a short delay, even when content is unchanged
+            setTimeout(() => {
+              const activeLineEl = previewContent.querySelector('.pvLine.isActive');
+              const previewScrollTop = previewContent.scrollTop;
+              const previewScrollHeight = previewContent.scrollHeight;
+              const previewClientHeight = previewContent.clientHeight;
+              
+              vscode.postMessage({
+                type: '__test_previewScrollInfo',
+                hasActiveLine: !!activeLineEl,
+                activeLineTop: activeLineEl ? activeLineEl.offsetTop : 0,
+                scrollTop: previewScrollTop,
+                scrollHeight: previewScrollHeight,
+                clientHeight: previewClientHeight,
+                isActiveLineVisible: activeLineEl ? 
+                  (activeLineEl.offsetTop >= previewScrollTop && 
+                   activeLineEl.offsetTop + activeLineEl.offsetHeight <= previewScrollTop + previewClientHeight) : false
+              });
+            }, 300);
           }, 50);
         }
       }

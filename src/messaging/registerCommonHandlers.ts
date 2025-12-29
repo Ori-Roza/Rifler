@@ -19,6 +19,13 @@ export interface CommonHandlerDeps {
 export function registerCommonHandlers(handler: MessageHandler, deps: CommonHandlerDeps) {
   handler.registerHandler('runSearch', async (message) => {
     const msg = message as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; };
+    console.log('[Rifler] runSearch handler called:', {
+      query: msg.query,
+      scope: msg.scope,
+      hasDirectoryPath: !!msg.directoryPath,
+      directoryPath: msg.directoryPath,
+      options: msg.options
+    });
     const results = await performSearch(
       msg.query,
       msg.scope,
@@ -26,6 +33,7 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       msg.directoryPath,
       msg.modulePath
     );
+    console.log('[Rifler] Search returned', results.length, 'results');
     deps.postMessage({ type: 'searchResults', results, maxResults: 10000 });
   });
 

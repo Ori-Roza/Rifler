@@ -65,7 +65,7 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [x] Add setting option to show results on every search with files collapsed
 
 ## **Results List Bug**
-- [ ] Scrolling bug: when many file results in collapse all mode, scrolling below viewport sends scroll to top
+- [x] Scrolling bug: when many file results in collapse all mode, scrolling below viewport sends scroll to top
 - [x] add scroll to file with more than 5 results
 
 ## **General Feedback**

@@ -69,4 +69,4 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [x] add scroll to file with more than 5 results
 
 ## **General Feedback**
-- [ ] Need proper usability testing to catch implementation issues
+- [x] Need proper usability testing to catch implementation issues

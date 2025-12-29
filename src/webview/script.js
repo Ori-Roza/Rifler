@@ -1774,9 +1774,26 @@ console.log('[Rifler] Webview script starting...');
       case '__test_toggleReplace':
         toggleReplace();
         break;
+      case '__test_setResultsListHeight':
+        {
+          const resultsList = document.getElementById('results-list');
+          if (!resultsList) {
+            break;
+          }
+          if (typeof message.height === 'number') {
+            resultsList.style.maxHeight = `${message.height}px`;
+            resultsList.style.height = `${message.height}px`;
+          } else if (message.height === null) {
+            resultsList.style.maxHeight = '';
+            resultsList.style.height = '';
+          }
+        }
+        break;
       case '__test_getResultsListStatus':
         const resultsList = document.getElementById('results-list');
         const virtualContent = document.getElementById('results-virtual-content');
+        const forcedHeight = resultsList ? (resultsList.style.height || resultsList.style.maxHeight || '') : '';
+        const resultCountFromState = Array.isArray(state.results) ? state.results.length : 0;
         
         // For virtual rendering, check if we have content that would require scrolling
         // Use virtual height tracking instead of DOM scrollHeight since items are virtualized
@@ -1797,7 +1814,10 @@ console.log('[Rifler] Webview script starting...');
           } else {
             // Heuristic fallback for virtualized list: if many items expected, assume overflow
             const approxItemCount = document.querySelectorAll('.result-file-header, .result-item, .result-matches-group').length;
-            scrollbarVisible = virtualHeight > 0 && containerHeight > 0 && approxItemCount > 20;
+            const combinedCount = Math.max(resultCountFromState, approxItemCount);
+            const hasForcedHeight = !!forcedHeight;
+            scrollbarVisible = (virtualHeight > 0 && containerHeight > 0 && combinedCount > 20)
+              || (hasForcedHeight && containerHeight > 0);
           }
         } else if (resultsList) {
           // Fallback to DOM-based check
@@ -1874,6 +1894,32 @@ console.log('[Rifler] Webview script starting...');
           state.currentScope = message.scope;
           scopeSelect.value = message.scope;
           updateScopeInputs();
+        }
+        break;
+      case '__test_getFocusInfo':
+        const searchInput = document.getElementById('search-input');
+        const activeElement = document.activeElement;
+        vscode.postMessage({
+          type: '__test_focusInfo',
+          searchInputFocused: activeElement === searchInput,
+          activeElementId: activeElement ? activeElement.id : null,
+          activeElementTag: activeElement ? activeElement.tagName : null
+        });
+        break;
+      case '__test_simulateKeyboard':
+        if (message.key === 'ArrowDown') {
+          // Simulate arrow down for result navigation
+          const currentActive = state.activeIndex;
+          if (state.results && state.results.length > 0) {
+            state.activeIndex = Math.min(currentActive + 1, state.results.length - 1);
+            renderResults();
+          }
+        } else if (message.key === 'ArrowUp') {
+          const currentActive = state.activeIndex;
+          if (state.results && state.results.length > 0) {
+            state.activeIndex = Math.max(currentActive - 1, 0);
+            renderResults();
+          }
         }
         break;
       case 'restorePreviewPanelState':

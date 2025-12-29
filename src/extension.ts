@@ -460,13 +460,7 @@ export function deactivate() {
 // Export test helpers
 export const testHelpers = {
   getPanelManager: () => panelManager,
-  getCurrentPanel: () => {
-    if (!panelManager?.panel) {
-      // Ensure a panel exists for tests; create if missing
-      panelManager?.createOrShowPanel();
-    }
-    return panelManager?.panel;
-  },
+  getCurrentPanel: () => panelManager?.panel,
   getStateStore: () => stateStore
 };
 

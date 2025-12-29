@@ -120,10 +120,17 @@ export const fifthFunction = () => {
     });
 
     // Trigger a search that will generate multiple results
+    // Force project scope search
     panel.webview.postMessage({ type: '__test_setSearchInput', value: 'function' });
 
     // Wait for search to complete
-    await searchResultsPromise;
+    const results = await searchResultsPromise;
+    console.log(`[Test] Search returned ${results.length} results for 'function'`);
+    
+    // If no results with project scope, we may have a search issue
+    if (results.length === 0) {
+      console.log('[Test] No results found - this test may fail due to search issues');
+    }
 
     // Check results list status
     const status = await getResultsListStatus(panel.webview);

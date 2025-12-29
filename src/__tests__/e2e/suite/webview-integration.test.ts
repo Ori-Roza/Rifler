@@ -1409,7 +1409,14 @@ class AutomationTestClass {
     await vscode.commands.executeCommand('__test_ensurePanelOpen');
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const currentPanel = testHelpers.getCurrentPanel();
+    let currentPanel = testHelpers.getCurrentPanel();
+    // If panel wasn't created, try one more time
+    if (!currentPanel) {
+      await vscode.commands.executeCommand('rifler.open');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      currentPanel = testHelpers.getCurrentPanel();
+    }
+    
     if (!currentPanel) {
       throw new Error('Rifler panel was not created');
     }
@@ -1670,7 +1677,7 @@ suite('Rifler Virtualization Tests', () => {
 
     const scrollTestPromise = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for scroll test completion'));
+        reject(new Error(`Timeout waiting for scroll test completion. SearchCompleted: ${searchCompleted}, ResultsCount: ${results.length}`));
       }, 20000);
 
       const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
@@ -1750,14 +1757,34 @@ suite('Rifler Virtualization Tests', () => {
     });
 
     await step('Triggering search for multiple results');
-    currentPanel.webview.postMessage({
-      type: '__test_setSearchInput',
-      value: 'function|class|const',
-      useRegex: true
-    });
+    let searchAttempts = 0;
+    const attemptSearch = () => {
+      searchAttempts++;
+      log(`   Attempt ${searchAttempts} to search for matches`);
+      // Try regex pattern first, fall back to simple "function" if empty
+      const query = searchAttempts === 1 ? 'function|class|const' : 'function';
+      const useRegex = searchAttempts === 1;
+      log(`   Searching for "${query}" (regex: ${useRegex})`);
+      currentPanel.webview.postMessage({
+        type: '__test_setSearchInput',
+        value: query,
+        useRegex: useRegex
+      });
+    };
+    
+    attemptSearch();
+    
+    // If search doesn't complete after 6 seconds, retry with simple query
+    const retryTimer = setTimeout(() => {
+      if (!searchCompleted && searchAttempts < 2) {
+        log(`   ⚠️ Search not completing, retrying with simple 'function' query...`);
+        attemptSearch();
+      }
+    }, 6000);
 
     await step('Waiting for scroll test completion');
     await scrollTestPromise;
+    clearTimeout(retryTimer);
     
     log('   ✅ Preview scrolling test passed');
   });

@@ -451,16 +451,31 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
     const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
     const state = store.get('rifler.sidebarState');
-    console.log('SidebarProvider._restoreState: state =', state ? 'exists' : 'undefined', state);
-    if (state && this._view) {
-      console.log('SidebarProvider._restoreState: sending restoreState message');
+
+    if (this._view) {
+      // Send configuration to webview
+      const replaceKeybinding = cfg.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
+      const maxResults = cfg.get<number>('maxResults', 10000);
+      const resultsShowCollapsed = cfg.get<boolean>('results.showCollapsed', false);
+
       this._view.webview.postMessage({
-        type: 'restoreState',
-        state
+        type: 'config',
+        replaceKeybinding,
+        maxResults,
+        resultsShowCollapsed
       });
-    } else if (this._view) {
-      console.log('SidebarProvider._restoreState: no state to restore, sending clearState');
-      this._view.webview.postMessage({ type: 'clearState' });
+
+      console.log('SidebarProvider._restoreState: state =', state ? 'exists' : 'undefined', state);
+      if (state) {
+        console.log('SidebarProvider._restoreState: sending restoreState message');
+        this._view.webview.postMessage({
+          type: 'restoreState',
+          state
+        });
+      } else {
+        console.log('SidebarProvider._restoreState: no state to restore, sending clearState');
+        this._view.webview.postMessage({ type: 'clearState' });
+      }
     }
   }
 

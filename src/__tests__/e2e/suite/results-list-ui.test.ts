@@ -205,4 +205,168 @@ export const fifthFunction = () => {
     // Tooltips should be present on truncated elements
     assert.strictEqual(status.tooltipsPresent, true, 'Tooltips should be present on truncated file names and paths');
   });
+
+  async function getCollapsedResultsStatus(webview: vscode.Webview): Promise<any> {
+    return new Promise((resolve) => {
+      const disposable = webview.onDidReceiveMessage((message) => {
+        if (message.type === '__test_collapsedResultsStatus') {
+          disposable.dispose();
+          resolve(message);
+        }
+      });
+      webview.postMessage({ type: '__test_getCollapsedResultsStatus' });
+
+      // Timeout after 2 seconds
+      setTimeout(() => {
+        disposable.dispose();
+        resolve(null);
+      }, 2000);
+    });
+  }
+
+  test('Results should be expanded by default when resultsShowCollapsed is false', async function() {
+    this.timeout(15000);
+
+    await vscode.commands.executeCommand('rifler._openWindowInternal');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const panel = testHelpers.getCurrentPanel();
+    assert.ok(panel, 'Panel should be open');
+
+    // Ensure setting is disabled
+    const config = vscode.workspace.getConfiguration('rifler');
+    await config.update('results.showCollapsed', false, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Clear state
+    panel.webview.postMessage({ type: 'clearState' });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Set up promise to wait for search completion
+    const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for search results'));
+      }, 8000);
+
+      const disposable = panel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.results);
+        }
+      });
+    });
+
+    // Trigger a search
+    panel.webview.postMessage({ type: '__test_setSearchInput', value: 'function' });
+    
+    // Wait for search to complete
+    await searchResultsPromise;
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Check collapsed results status
+    const status = await getCollapsedResultsStatus(panel.webview);
+    assert.ok(status, 'Should receive collapsed results status');
+    
+    // Results should be expanded by default
+    assert.strictEqual(status.allResultsExpanded, true, 'All results should be expanded when setting is false');
+  });
+
+  test('Results should be collapsed by default when resultsShowCollapsed is true', async function() {
+    this.timeout(15000);
+
+    const panel = testHelpers.getCurrentPanel();
+    assert.ok(panel, 'Panel should be open');
+
+    // Enable the collapsed results setting
+    const config = vscode.workspace.getConfiguration('rifler');
+    await config.update('results.showCollapsed', true, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Clear state and trigger fresh load
+    panel.webview.postMessage({ type: 'clearState' });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Reload the panel to apply new settings
+    await vscode.commands.executeCommand('rifler._openWindowInternal');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const freshPanel = testHelpers.getCurrentPanel();
+    assert.ok(freshPanel, 'Panel should be open');
+
+    // Set up promise to wait for search completion
+    const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for search results'));
+      }, 8000);
+
+      const disposable = freshPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.results);
+        }
+      });
+    });
+
+    // Trigger a search
+    freshPanel.webview.postMessage({ type: '__test_setSearchInput', value: 'function' });
+    
+    // Wait for search to complete
+    await searchResultsPromise;
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Check collapsed results status
+    const status = await getCollapsedResultsStatus(freshPanel.webview);
+    assert.ok(status, 'Should receive collapsed results status');
+    
+    // All results should be collapsed by default
+    assert.strictEqual(status.allResultsCollapsed, true, 'All results should be collapsed when setting is true');
+  });
+
+  test('User should be able to expand collapsed results individually', async function() {
+    this.timeout(15000);
+
+    const panel = testHelpers.getCurrentPanel();
+    assert.ok(panel, 'Panel should be open');
+
+    // Ensure collapsed results setting is enabled
+    const config = vscode.workspace.getConfiguration('rifler');
+    await config.update('results.showCollapsed', true, vscode.ConfigurationTarget.Workspace);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Set up promise to wait for search completion
+    const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for search results'));
+      }, 8000);
+
+      const disposable = panel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.results);
+        }
+      });
+    });
+
+    // Trigger a search
+    panel.webview.postMessage({ type: '__test_setSearchInput', value: 'function' });
+    
+    // Wait for search to complete
+    await searchResultsPromise;
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Expand the first file header
+    panel.webview.postMessage({ type: '__test_expandFirstFileHeader' });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Check status after expansion
+    const status = await getCollapsedResultsStatus(panel.webview);
+    assert.ok(status, 'Should receive collapsed results status');
+    
+    // First file should be expanded, others should be collapsed
+    assert.strictEqual(status.firstFileExpanded, true, 'First file should be expanded after user interaction');
+    assert.ok(status.otherFilesCollapsed, 'Other files should remain collapsed');
+  });
 });

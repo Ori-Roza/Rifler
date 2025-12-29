@@ -46,6 +46,7 @@ console.log('[Rifler] Webview script starting...');
     maxResultsCap: 10000,
     collapsedFiles: new Set(),
     previewPanelCollapsed: false, // Track preview panel state
+    resultsShowCollapsed: false, // Show results collapsed by default if enabled in settings
     options: {
       matchCase: false,
       wholeWord: false,
@@ -1562,6 +1563,9 @@ console.log('[Rifler] Webview script starting...');
         if (message.maxResults) {
           state.maxResultsCap = message.maxResults;
         }
+        if (typeof message.resultsShowCollapsed === 'boolean') {
+          state.resultsShowCollapsed = message.resultsShowCollapsed;
+        }
         break;
       case 'focusSearch':
         queryInput.focus();
@@ -1864,6 +1868,68 @@ console.log('[Rifler] Webview script starting...');
           }
         }
         break;
+      case '__test_getCollapsedResultsStatus':
+        // Check if all results are collapsed
+        const fileHeaders = document.querySelectorAll('.result-file-header');
+        let allResultsCollapsed = true;
+        let allResultsExpanded = true;
+        
+        fileHeaders.forEach((header) => {
+          const isCollapsed = header.classList.contains('collapsed');
+          if (!isCollapsed) {
+            allResultsCollapsed = false;
+          }
+          if (isCollapsed) {
+            allResultsExpanded = false;
+          }
+        });
+
+        // Check if first file is expanded and others are collapsed
+        let firstFileExpanded = false;
+        let otherFilesCollapsed = true;
+        if (fileHeaders.length > 0) {
+          const firstHeader = fileHeaders[0];
+          firstFileExpanded = !firstHeader.classList.contains('collapsed');
+          
+          for (let i = 1; i < fileHeaders.length; i++) {
+            if (!fileHeaders[i].classList.contains('collapsed')) {
+              otherFilesCollapsed = false;
+              break;
+            }
+          }
+        }
+
+        vscode.postMessage({
+          type: '__test_collapsedResultsStatus',
+          allResultsCollapsed: allResultsCollapsed,
+          allResultsExpanded: allResultsExpanded,
+          firstFileExpanded: firstFileExpanded,
+          otherFilesCollapsed: otherFilesCollapsed,
+          totalFileHeaders: fileHeaders.length
+        });
+        break;
+      case '__test_expandFirstFileHeader':
+        // Find and click the first file header to expand it
+        const firstFileHeader = document.querySelector('.result-file-header');
+        if (firstFileHeader) {
+          // Simulate a click on the header to toggle collapse state
+          const toggleBtn = firstFileHeader.querySelector('.toggle-collapse-btn');
+          if (toggleBtn) {
+            toggleBtn.click();
+          } else {
+            // If no button found, try clicking the header itself
+            firstFileHeader.click();
+          }
+        }
+        break;
+      case '__test_setSearchInput':
+        if (queryInput && message.value !== undefined) {
+          queryInput.value = message.value;
+          // Trigger search
+          const searchEvent = new Event('input', { bubbles: true });
+          queryInput.dispatchEvent(searchEvent);
+        }
+        break;
     }
   });
 
@@ -2051,7 +2117,8 @@ console.log('[Rifler] Webview script starting...');
 
     state.renderItems = [];
     groups.forEach(group => {
-      const isCollapsed = state.collapsedFiles.has(group.path);
+      // Determine if group should be collapsed based on setting or user action
+      const isCollapsed = state.resultsShowCollapsed || state.collapsedFiles.has(group.path);
       state.renderItems.push({
         type: 'fileHeader',
         path: group.path,

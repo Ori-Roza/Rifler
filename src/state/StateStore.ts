@@ -10,6 +10,7 @@ export class StateStore {
   private minimized = false;
   private savedState: MinimizeMessage['state'] | undefined;
   private previewPanelCollapsed = false;
+  private resultsShowCollapsed = false;
   private visibilityCallbacks: Array<(visible: boolean) => void> = [];
 
   constructor(private readonly context: vscode.ExtensionContext) {
@@ -30,6 +31,9 @@ export class StateStore {
       this.savedState = undefined;
       this.previewPanelCollapsed = false;
     }
+
+    // Load results show collapsed setting from configuration
+    this.resultsShowCollapsed = cfg.get<boolean>('results.showCollapsed', false);
   }
 
   getSidebarVisible(): boolean {
@@ -82,4 +86,11 @@ export class StateStore {
       store.update('rifler.previewPanelCollapsed', collapsed);
     }
   }
-}
+
+  getResultsShowCollapsed(): boolean {
+    return this.resultsShowCollapsed;
+  }
+
+  setResultsShowCollapsed(collapsed: boolean): void {
+    this.resultsShowCollapsed = collapsed;
+  }}

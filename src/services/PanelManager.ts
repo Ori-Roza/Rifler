@@ -255,11 +255,17 @@ export class PanelManager {
     const config = vscode.workspace.getConfiguration('rifler');
     const replaceKeybinding = config.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
     const maxResults = config.get<number>('maxResults', 10000);
-
+    const resultsShowCollapsed = config.get<boolean>('results.showCollapsed', false);
+    console.log('[Rifler] Initializing webview with config:', {
+      replaceKeybinding,
+      maxResults,
+      resultsShowCollapsed
+    });
     this.currentPanel.webview.postMessage({
       type: 'config',
       replaceKeybinding,
-      maxResults
+      maxResults,
+      resultsShowCollapsed
     });
 
     if (shouldShowReplace) {

@@ -204,6 +204,12 @@
           "minimum": 100,
           "markdownDescription": "Maximum number of search results to collect. With virtualized rendering, higher values are handled efficiently.",
           "order": 5
+        },
+        "rifler.results.showCollapsed": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show search results in a collapsed state by default. When enabled, file groups will be collapsed to show only match counts until expanded.",
+          "order": 6
         }
       }
     }

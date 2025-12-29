@@ -1752,7 +1752,8 @@ suite('Rifler Virtualization Tests', () => {
     await step('Triggering search for multiple results');
     currentPanel.webview.postMessage({
       type: '__test_setSearchInput',
-      value: 'function|class|const'
+      value: 'function|class|const',
+      useRegex: true
     });
 
     await step('Waiting for scroll test completion');

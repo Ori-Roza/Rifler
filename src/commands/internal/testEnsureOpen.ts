@@ -9,3 +9,4 @@ export function testEnsureOpenCommand(ctx: CommandContext): void {
     ctx.panelManager.createOrShowPanel();
   }
 }
+

@@ -566,4 +566,14 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       'svelte': 'svelte'
     };
     return langMap[ext || ''] || 'file';
-  }}
+  }
+
+  public sendConfigUpdate(resultsShowCollapsed: boolean): void {
+    if (this._view) {
+      this._view.webview.postMessage({
+        type: 'config',
+        resultsShowCollapsed
+      });
+    }
+  }
+}

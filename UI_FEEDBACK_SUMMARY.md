@@ -54,17 +54,19 @@ Based on GitHub comment feedback from Issue #83, here's a comprehensive list of 
 - [ ] Selected line, selected word, non-result lines should all be visually distinct
 
 ## **Theme Issues**
-- [ ] UI should not follow VSCode current theme but use its own custom theme
-- [ ] This would allow using all design details properly
+- [x] UI should not follow VSCode current theme but use its own custom theme
+- [x] This would allow using all design details properly
 
 ## **Switch Sidebar Issues**
-- [ ] Pressing switch between sidebar multiple times shows weird implementation results
+- [x] Pressing switch between sidebar multiple times shows weird implementation results
+- [x] When switching between sidebar and tab, and make tab thiner, sidebar is shown. if user switches between sidebar and tab - only tab should be displayed.
 
 ## **Settings Issues**
-- [ ] Add setting option to show results on every search with files collapsed
+- [x] Add setting option to show results on every search with files collapsed
 
 ## **Results List Bug**
 - [ ] Scrolling bug: when many file results in collapse all mode, scrolling below viewport sends scroll to top
+- [x] add scroll to file with more than 5 results
 
 ## **General Feedback**
 - [ ] Need proper usability testing to catch implementation issues

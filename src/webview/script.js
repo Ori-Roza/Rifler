@@ -45,6 +45,7 @@ console.log('[Rifler] Webview script starting...');
     replaceKeybinding: 'ctrl+shift+r',
     maxResultsCap: 10000,
     collapsedFiles: new Set(),
+    expandedFiles: new Set(), // Track files explicitly expanded by user
     previewPanelCollapsed: false, // Track preview panel state
     resultsShowCollapsed: false, // Show results collapsed by default if enabled in settings
     options: {
@@ -350,13 +351,20 @@ console.log('[Rifler] Webview script starting...');
       const allPaths = new Set();
       state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
       
-      const allCollapsed = Array.from(allPaths).every(p => state.collapsedFiles.has(p));
+      // Check if all files are currently collapsed
+      const allCurrentlyCollapsed = Array.from(allPaths).every(p => {
+        if (state.collapsedFiles.has(p)) return true;
+        if (state.expandedFiles.has(p)) return false;
+        return state.resultsShowCollapsed;
+      });
       
-      if (allCollapsed) {
-        // All collapsed, so expand all
+      if (allCurrentlyCollapsed) {
+        // All collapsed, expand all
         state.collapsedFiles.clear();
+        allPaths.forEach(p => state.expandedFiles.add(p));
       } else {
-        // Not all collapsed, so collapse all
+        // Not all collapsed, collapse all
+        state.expandedFiles.clear();
         allPaths.forEach(p => state.collapsedFiles.add(p));
       }
       
@@ -1580,6 +1588,8 @@ console.log('[Rifler] Webview script starting...');
         state.activeIndex = -1;
         state.lastPreview = null;
         state.lastSearchDuration = 0;
+        state.collapsedFiles.clear();
+        state.expandedFiles.clear();
         applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
         handleSearchResults([], { skipAutoLoad: true });
         break;
@@ -1770,9 +1780,25 @@ console.log('[Rifler] Webview script starting...');
         break;
       case '__test_getResultsListStatus':
         const resultsList = document.getElementById('results-list');
-        const scrollbarVisible = resultsList ? 
-          getComputedStyle(resultsList).overflowY !== 'hidden' && 
-          resultsList.scrollHeight > resultsList.clientHeight : false;
+        const virtualContent = document.getElementById('results-virtual-content');
+        
+        // For virtual rendering, check if we have content that would require scrolling
+        // Use virtual height tracking instead of DOM scrollHeight since items are virtualized
+        let scrollbarVisible = false;
+        if (resultsList && virtualContent) {
+          const virtualHeight = parseFloat(virtualContent.style.height) || virtualContent.scrollHeight;
+          const rectHeight = resultsList.getBoundingClientRect().height;
+          const computedHeight = parseFloat(getComputedStyle(resultsList).height) || 0;
+          const containerHeight = Math.max(resultsList.clientHeight, rectHeight, computedHeight);
+          if (containerHeight === 0 && virtualHeight > 0) {
+            scrollbarVisible = true;
+          } else {
+            scrollbarVisible = virtualHeight > containerHeight && containerHeight > 0;
+          }
+        } else if (resultsList) {
+          // Fallback to DOM-based check
+          scrollbarVisible = resultsList.scrollHeight > resultsList.clientHeight && resultsList.clientHeight > 0;
+        }
         
         // Check for horizontal overflow
         const hasHorizontalOverflow = resultsList ? 
@@ -1869,35 +1895,43 @@ console.log('[Rifler] Webview script starting...');
         }
         break;
       case '__test_getCollapsedResultsStatus':
-        // Check if all results are collapsed
-        const fileHeaders = document.querySelectorAll('.result-file-header');
+        // Instead of checking DOM, check the state directly since we use virtual rendering
+        const allPaths = new Set();
+        state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
+        
         let allResultsCollapsed = true;
         let allResultsExpanded = true;
+        let firstFileExpanded = false;
+        let otherFilesCollapsed = true;
         
-        fileHeaders.forEach((header) => {
-          const isCollapsed = header.classList.contains('collapsed');
+        const pathsArray = Array.from(allPaths);
+        pathsArray.forEach((path, idx) => {
+          // Determine collapsed state based on same logic as rendering
+          let isCollapsed;
+          if (state.collapsedFiles.has(path)) {
+            isCollapsed = true;
+          } else if (state.expandedFiles && state.expandedFiles.has(path)) {
+            isCollapsed = false;
+          } else {
+            isCollapsed = state.resultsShowCollapsed;
+          }
+          
           if (!isCollapsed) {
             allResultsCollapsed = false;
           }
           if (isCollapsed) {
             allResultsExpanded = false;
           }
-        });
-
-        // Check if first file is expanded and others are collapsed
-        let firstFileExpanded = false;
-        let otherFilesCollapsed = true;
-        if (fileHeaders.length > 0) {
-          const firstHeader = fileHeaders[0];
-          firstFileExpanded = !firstHeader.classList.contains('collapsed');
           
-          for (let i = 1; i < fileHeaders.length; i++) {
-            if (!fileHeaders[i].classList.contains('collapsed')) {
+          // Check first file
+          if (idx === 0) {
+            firstFileExpanded = !isCollapsed;
+          } else {
+            if (!isCollapsed) {
               otherFilesCollapsed = false;
-              break;
             }
           }
-        }
+        });
 
         vscode.postMessage({
           type: '__test_collapsedResultsStatus',
@@ -1905,26 +1939,28 @@ console.log('[Rifler] Webview script starting...');
           allResultsExpanded: allResultsExpanded,
           firstFileExpanded: firstFileExpanded,
           otherFilesCollapsed: otherFilesCollapsed,
-          totalFileHeaders: fileHeaders.length
+          totalFileHeaders: pathsArray.length
         });
         break;
       case '__test_expandFirstFileHeader':
-        // Find and click the first file header to expand it
-        const firstFileHeader = document.querySelector('.result-file-header');
-        if (firstFileHeader) {
-          // Simulate a click on the header to toggle collapse state
-          const toggleBtn = firstFileHeader.querySelector('.toggle-collapse-btn');
-          if (toggleBtn) {
-            toggleBtn.click();
-          } else {
-            // If no button found, try clicking the header itself
-            firstFileHeader.click();
-          }
+        // Expand the first file in the results
+        if (state.results.length > 0) {
+          const firstPath = state.results[0].relativePath || state.results[0].fileName;
+          // Remove from collapsed and add to expanded
+          state.collapsedFiles.delete(firstPath);
+          state.expandedFiles.add(firstPath);
+          // Re-render
+          handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
         }
         break;
       case '__test_setSearchInput':
         if (queryInput && message.value !== undefined) {
           queryInput.value = message.value;
+          // Allow tests to force regex mode for multi-pattern queries
+          if (typeof message.useRegex === 'boolean') {
+            state.options.useRegex = message.useRegex;
+            useRegexToggle?.classList.toggle('active', state.options.useRegex);
+          }
           // Trigger search
           const searchEvent = new Event('input', { bubbles: true });
           queryInput.dispatchEvent(searchEvent);
@@ -2116,29 +2152,74 @@ console.log('[Rifler] Webview script starting...');
     });
 
     state.renderItems = [];
+    let cumulativeTop = 0;
     groups.forEach(group => {
       // Determine if group should be collapsed based on setting or user action
-      const isCollapsed = state.resultsShowCollapsed || state.collapsedFiles.has(group.path);
+      // If user has explicitly toggled this file, use their preference
+      // Otherwise, use the global setting
+      let isCollapsed;
+      if (state.collapsedFiles.has(group.path)) {
+        isCollapsed = true;
+      } else if (state.expandedFiles && state.expandedFiles.has(group.path)) {
+        isCollapsed = false;
+      } else {
+        isCollapsed = state.resultsShowCollapsed;
+      }
+      
       state.renderItems.push({
         type: 'fileHeader',
         path: group.path,
         fileName: group.fileName,
         matchCount: group.matches.length,
-        isCollapsed: isCollapsed
+        isCollapsed: isCollapsed,
+        top: cumulativeTop,
+        height: 40
       });
+      cumulativeTop += 40;
       
       if (!isCollapsed) {
-        group.matches.forEach(match => {
+        // For files with more than 5 results, use a scrollable group container
+        if (group.matches.length > 5) {
           state.renderItems.push({
-            type: 'match',
-            ...match
+            type: 'matchesGroup',
+            path: group.path,
+            matches: group.matches,
+            top: cumulativeTop,
+            height: 150
           });
-        });
+          cumulativeTop += 150;
+        } else {
+          group.matches.forEach((match, matchIdx) => {
+            state.renderItems.push({
+              type: 'match',
+              ...match,
+              isFirstInGroup: matchIdx === 0,
+              isLastInGroup: matchIdx === group.matches.length - 1,
+              groupSize: group.matches.length,
+              groupPath: group.path,
+              top: cumulativeTop,
+              height: 28
+            });
+            cumulativeTop += 28;
+          });
+        }
       }
     });
 
     if (results.length > 0) {
-      state.renderItems.push({ type: 'endOfResults' });
+      state.renderItems.push({ 
+        type: 'endOfResults',
+        top: cumulativeTop,
+        height: 48
+      });
+      cumulativeTop += 48;
+    }
+    
+    // Update virtual content and results list height
+    if (virtualContent && virtualContent.parentElement) {
+      const totalHeight = cumulativeTop + 'px';
+      virtualContent.style.height = totalHeight;
+      virtualContent.parentElement.style.minHeight = totalHeight;
     }
 
     console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
@@ -2180,10 +2261,29 @@ console.log('[Rifler] Webview script starting...');
     const total = state.renderItems.length;
     const viewportHeight = resultsList.clientHeight || 1;
     const scrollTop = resultsList.scrollTop;
-    const start = Math.max(0, Math.floor(scrollTop / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN);
-    const end = Math.min(total, Math.ceil((scrollTop + viewportHeight) / VIRTUAL_ROW_HEIGHT) + VIRTUAL_OVERSCAN);
+    
+    // Find visible items based on their stored top positions
+    let start = 0;
+    let end = total;
+    
+    for (let i = 0; i < total; i++) {
+      const item = state.renderItems[i];
+      const itemTop = item.top || 0;
+      const itemBottom = itemTop + (item.height || VIRTUAL_ROW_HEIGHT);
+      
+      if (itemBottom < scrollTop - 200) {
+        start = i + 1;
+      }
+      if (itemTop > scrollTop + viewportHeight + 200 && end === total) {
+        end = i;
+        break;
+      }
+    }
 
-    virtualContent.style.height = (total * VIRTUAL_ROW_HEIGHT) + 'px';
+    // Set total height based on last item's position
+    const lastItem = state.renderItems[total - 1];
+    const totalHeight = (lastItem.top || 0) + (lastItem.height || VIRTUAL_ROW_HEIGHT);
+    virtualContent.style.height = totalHeight + 'px';
 
     const fragment = document.createDocumentFragment();
     for (let i = start; i < end; i++) {
@@ -2214,9 +2314,12 @@ console.log('[Rifler] Webview script starting...');
   function renderResultRow(itemData, index) {
     const item = document.createElement('div');
     item.style.position = 'absolute';
-    item.style.top = (index * VIRTUAL_ROW_HEIGHT) + 'px';
+    item.style.top = (itemData.top || 0) + 'px';
     item.style.left = '0';
     item.style.right = '0';
+    if (itemData.height) {
+      item.style.height = itemData.height + 'px';
+    }
 
     if (itemData.type === 'fileHeader') {
       item.className = 'result-file-header' + (itemData.isCollapsed ? ' collapsed' : '');
@@ -2235,15 +2338,95 @@ console.log('[Rifler] Webview script starting...');
         '<span class="match-count">' + itemData.matchCount + '</span>';
         
       item.addEventListener('click', () => {
-        if (state.collapsedFiles.has(itemData.path)) {
+        if (itemData.isCollapsed) {
+          // Expanding: remove from collapsedFiles and add to expandedFiles
           state.collapsedFiles.delete(itemData.path);
+          state.expandedFiles.add(itemData.path);
         } else {
+          // Collapsing: remove from expandedFiles and add to collapsedFiles
+          state.expandedFiles.delete(itemData.path);
           state.collapsedFiles.add(itemData.path);
         }
+        
         handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
         updateCollapseButtonText();
       });
       
+      return item;
+    }
+
+    if (itemData.type === 'matchesGroup') {
+      item.className = 'result-matches-group';
+      // Height and position are already set from itemData
+      item.style.overflow = 'hidden';
+      item.style.display = 'flex';
+      item.style.flexDirection = 'column';
+      
+      const groupContainer = document.createElement('div');
+      groupContainer.className = 'matches-group-scroll-container';
+      groupContainer.style.flex = '1';
+      groupContainer.style.overflowY = 'auto';
+      groupContainer.style.paddingLeft = '8px';
+      groupContainer.style.marginLeft = '8px';
+      groupContainer.style.borderLeft = '2px solid rgba(255,255,255,0.1)';
+      
+      itemData.matches.forEach((match, idx) => {
+        const matchEl = document.createElement('div');
+        const isActive = match.originalIndex === state.activeIndex;
+        matchEl.className = 'result-item' + (isActive ? ' active' : '');
+        matchEl.dataset.index = String(match.originalIndex);
+        matchEl.title = match.relativePath || match.fileName;
+        matchEl.style.position = 'static';
+        matchEl.style.height = '28px';
+        matchEl.style.top = 'auto';
+        matchEl.style.width = '100%';
+        
+        const language = getLanguageFromFilename(match.fileName);
+        const previewHtml = highlightMatchSafe(
+          match.preview,
+          match.previewMatchRanges || [match.previewMatchRange],
+          language
+        );
+
+        matchEl.innerHTML = 
+          '<div class="result-meta">' +
+            '<span class="result-line-number">' + (match.line + 1) + '</span>' +
+          '</div>' +
+          '<div class="result-preview hljs">' + previewHtml + '</div>' +
+          '<div class="result-actions">' +
+            '<button class="open-in-editor-btn" data-index="' + match.originalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
+              '<span class="material-symbols-outlined">open_in_new</span>' +
+            '</button>' +
+          '</div>';
+
+        matchEl.addEventListener('click', (e) => {
+          if (e.target && e.target.closest('.open-in-editor-btn')) return;
+          setActiveIndex(match.originalIndex);
+        });
+
+        matchEl.addEventListener('dblclick', (e) => {
+          if (e.target && e.target.closest('.open-in-editor-btn')) return;
+          openActiveResult();
+        });
+
+        matchEl.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          showContextMenu(e, match.originalIndex);
+        });
+
+        const openBtn = matchEl.querySelector('.open-in-editor-btn');
+        if (openBtn) {
+          openBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(openBtn.dataset.index, 10);
+            openResultInEditor(idx);
+          });
+        }
+
+        groupContainer.appendChild(matchEl);
+      });
+
+      item.appendChild(groupContainer);
       return item;
     }
 

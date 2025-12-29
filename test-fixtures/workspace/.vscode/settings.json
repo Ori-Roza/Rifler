@@ -9,6 +9,7 @@
     "editor.wordWrap": "off",
     "editor.minimap.enabled": false
   },
-  "rifler.viewMode": "sidebar",
-  "rifler.panelLocation": "sidebar"
+  "rifler.viewMode": "tab",
+  "rifler.results.showCollapsed": true,
+  "rifler.panelLocation": "window"
 }

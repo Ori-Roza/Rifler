@@ -11,6 +11,7 @@ export class ViewManager {
   private _panelManager?: PanelManager;
   private _context: vscode.ExtensionContext;
   private _stateStore?: StateStore;
+  private _isSwitching = false; // Lock to prevent concurrent switches
 
   constructor(context: vscode.ExtensionContext) {
     this._context = context;
@@ -92,6 +93,21 @@ export class ViewManager {
   }
 
   public async switchView(): Promise<void> {
+    // Prevent concurrent switches - ignore if already switching
+    if (this._isSwitching) {
+      console.log('[Rifler] View switch already in progress, ignoring request');
+      return;
+    }
+    
+    this._isSwitching = true;
+    try {
+      await this._performSwitchView();
+    } finally {
+      this._isSwitching = false;
+    }
+  }
+
+  private async _performSwitchView(): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
     
     // Determine current location based on actual visibility/existence

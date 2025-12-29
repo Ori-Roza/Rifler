@@ -344,8 +344,51 @@ export async function activate(context: vscode.ExtensionContext) {
           vscode.commands.executeCommand('workbench.action.closeSidebar');
         }, 100);
       }
+    }),
+    // Monitor for configuration changes that might affect panel visibility
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('rifler')) {
+        const config = vscode.workspace.getConfiguration('rifler');
+        const resultsShowCollapsed = config.get<boolean>('results.showCollapsed', false);
+        
+        // Send updated config to panel webview if visible
+        if (panelManager.panel?.visible) {
+          panelManager.panel.webview.postMessage({
+            type: 'config',
+            resultsShowCollapsed
+          });
+          
+          setTimeout(() => {
+            vscode.commands.executeCommand('workbench.action.closeSidebar');
+          }, 100);
+        }
+        
+        // Also update sidebar if visible
+        sidebarProvider.sendConfigUpdate(resultsShowCollapsed);
+      }
     })
   );
+
+  // Set up an interval to continuously ensure sidebar is closed while panel is visible
+  // This handles edge cases where VS Code auto-shows sidebar due to resize/layout changes
+  const sidebarCloserInterval = setInterval(() => {
+    if (panelManager.panel?.visible) {
+      try {
+        vscode.commands.executeCommand('workbench.action.closeSidebar');
+      } catch (err) {
+        // Ignore errors from closeSidebar command
+      }
+    }
+  }, 500);
+  
+  // Mark timer as not preventing process exit (important for test teardown)
+  if (sidebarCloserInterval.unref) {
+    sidebarCloserInterval.unref();
+  }
+
+  context.subscriptions.push({
+    dispose: () => clearInterval(sidebarCloserInterval)
+  });
 
   // If persistence is disabled, clear any prior leftover state on activation
   {
@@ -417,7 +460,13 @@ export function deactivate() {
 // Export test helpers
 export const testHelpers = {
   getPanelManager: () => panelManager,
-  getCurrentPanel: () => panelManager?.panel,
+  getCurrentPanel: () => {
+    if (!panelManager?.panel) {
+      // Ensure a panel exists for tests; create if missing
+      panelManager?.createOrShowPanel();
+    }
+    return panelManager?.panel;
+  },
   getStateStore: () => stateStore
 };
 

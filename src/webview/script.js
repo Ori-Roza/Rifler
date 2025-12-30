@@ -267,6 +267,10 @@ console.log('[Rifler] Webview script starting...');
   if (clearSearchBtn) {
     clearSearchBtn.addEventListener('click', () => {
       queryInput.value = '';
+      if (fileMaskInput) {
+        fileMaskInput.value = '';
+        state.options.fileMask = '';
+      }
       state.results = [];
       state.activeIndex = -1;
       handleSearchResults([], { skipAutoLoad: true });
@@ -680,8 +684,8 @@ console.log('[Rifler] Webview script starting...');
           // Use a more accurate character width for monospace fonts
           // Most monospace fonts at 13px are ~8px per character
           const charWidth = 8;
-          const column = Math.floor(relativeX / charWidth);
-          const actualColumn = Math.min(Math.max(0, column), textContent.length);
+          const column = Math.max(0, Math.round(relativeX / charWidth) - 1);
+          const actualColumn = Math.min(column, textContent.length);
           
           enterEditMode(lineNumber, actualColumn);
         } else {
@@ -2224,6 +2228,7 @@ console.log('[Rifler] Webview script starting...');
 
     state.renderItems = [];
     let cumulativeTop = 0;
+    let isFirstFile = true;
     groups.forEach(group => {
       // Determine if group should be collapsed based on setting or user action
       // If user has explicitly toggled this file, use their preference
@@ -2234,8 +2239,10 @@ console.log('[Rifler] Webview script starting...');
       } else if (state.expandedFiles && state.expandedFiles.has(group.path)) {
         isCollapsed = false;
       } else {
-        isCollapsed = state.resultsShowCollapsed;
+        // Auto-expand first file, otherwise use global setting
+        isCollapsed = isFirstFile ? false : state.resultsShowCollapsed;
       }
+      isFirstFile = false;
       
       state.renderItems.push({
         type: 'fileHeader',
@@ -2314,8 +2321,12 @@ console.log('[Rifler] Webview script starting...');
 
     hidePlaceholder();
 
-    // Keep preview blank until a result is explicitly selected
-    if (hasResults && state.activeIndex >= 0) {
+    // Auto-load first result if available
+    if (hasResults && state.activeIndex < 0) {
+      state.activeIndex = 0;
+      applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: true });
+      setActiveIndex(0, { skipLoad: false });
+    } else if (hasResults && state.activeIndex >= 0) {
       applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: true });
       setActiveIndex(state.activeIndex, { skipLoad: !!options.skipAutoLoad });
     } else {

@@ -124,14 +124,14 @@ body.loaded {
 
   /* Existing Rifler Variables */
   --rifler-highlight: rgba(255, 213, 79, 0.35);
-  --rifler-highlight-strong: rgba(255, 213, 79, 0.5);
+  --rifler-highlight-strong: #E6E6B6;
   --rifler-highlight-muted: rgba(255, 213, 79, 0.15);
-  --rifler-highlight-border: rgba(224, 183, 0, 0.4);
+  --rifler-highlight-border: #FDD54F;
   --rifler-primary-dim: rgba(88, 166, 255, 0.15);
   --rifler-highlight-bg: #584c2e;
   --rifler-highlight-text: #E6E6B6;
   --rifler-match-bg: rgba(254, 240, 138, 0.3);
-  --rifler-match-active-bg: rgba(254, 240, 138, 0.5);
+  --rifler-match-active-bg: #f4d03f7e;
   --rifler-shadow: rgba(0, 0, 0, 0.3);
 }
 
@@ -525,7 +525,7 @@ body.loaded {
 }
 
 .scope-field {
-  flex: 0 0 140px;
+  flex: 0 0 160px;
 }
 
 .scope-dropdown {
@@ -808,7 +808,7 @@ body.loaded {
   height: 28px;
   box-sizing: border-box;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0;
 }
 
@@ -835,7 +835,7 @@ body.loaded {
 
 .result-meta {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-shrink: 0;
   width: 28px;
   justify-content: flex-end;
@@ -928,8 +928,9 @@ body.loaded {
   opacity: 0.6;
   flex-shrink: 0;
   text-align: right;
-  margin-top: 2px;
   user-select: none;
+  display: flex;
+  align-items: center;
 }
 
 .result-preview {
@@ -1217,15 +1218,15 @@ body.loaded {
 }
 
 .preview-actions button.primary {
-  background: var(--rifler-primary);
-  color: #0d1117;
+  background: var(--rifler-button-secondary-bg);
+  color: var(--rifler-primary);
   border-color: var(--rifler-primary);
-  box-shadow: 0 1px 6px rgba(88, 166, 255, 0.35);
 }
 
 .preview-actions button.primary:hover {
-  background: var(--rifler-primary-hover);
+  background: var(--rifler-button-secondary-hover);
   border-color: var(--rifler-primary-hover);
+  color: var(--rifler-primary-hover);
 }
 
 .preview-actions button.ghost {
@@ -1287,7 +1288,7 @@ body.loaded {
   min-height: 20px;
   white-space: pre;
   direction: ltr;
-  align-items: stretch;
+  align-items: center;
 }
 
 .pvLine:hover {
@@ -1295,14 +1296,14 @@ body.loaded {
 }
 
 /* Soft full-row highlight for hit lines (must cover BOTH columns) */
-.pvLine.isHit {
-  background-color: rgba(255, 213, 79, 0.12);
-}
+/* .pvLine.isHit {
+  border: 1px solid var(--rifler-primary);
+} */
 
 /* Active/current line (kept subtle; separate from hit highlight) */
 .pvLine.isActive {
-  background-color: var(--rifler-primary-dim);
-  outline: 1px solid var(--rifler-primary);
+  background-color: #f4d03f7e !important;
+  outline: 1px solid #FDD54F;
   outline-offset: -1px;
   z-index: 2;
 }
@@ -1315,6 +1316,9 @@ body.loaded {
   overflow: visible;
   direction: ltr;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  height: 100%;
 }
 
 .pvCode.hljs,
@@ -1333,6 +1337,9 @@ body.loaded {
   user-select: none;
   direction: ltr;
   unicode-bidi: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   border-right: 1px solid color-mix(
     in srgb,
     var(--rifler-border) 55%,
@@ -1347,12 +1354,12 @@ body.loaded {
 
 .pvLineNo.has-match {
   font-weight: bold !important;
-  color: var(--rifler-highlight-border) !important;
+  color: #E6E6B6 !important;
 }
 
 .pvLine.isActive .pvLineNo {
-  color: var(--rifler-primary) !important;
-  font-weight: 700 !important;
+  font-weight: bold !important;
+  color: #E6E6B6 !important;
 }
 
 .preview-content .pvLine:not(.isHit):not(.isActive) .pvCode {
@@ -1382,10 +1389,6 @@ body.loaded {
 .preview-content .match *,
 .result-preview .match * {
   color: inherit !important;
-}
-
-.pvLine.isActive .pvMatch {
-  background-color: var(--rifler-match-active-bg);
 }
 
 /* ===== Editor Container ===== */
@@ -1685,9 +1688,10 @@ body.loaded {
 }
 
 .match, .pvMatch {
-  background-color: var(--rifler-match-bg) !important;
+  background-color: var(--rifler-match-bg);
 }
 
+/* Selected line match highlighting - must come after blanket rule */
 .pvLine.isActive .pvMatch {
-  background-color: var(--rifler-match-active-bg) !important;
+  background-color: transparent !important;
 }

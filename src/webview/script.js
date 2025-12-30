@@ -2830,11 +2830,22 @@ console.log('[Rifler] Webview script starting...');
     if (state.activeIndex < 0) return;
     
     // Find the index in renderItems that corresponds to state.activeIndex
-    const renderIndex = state.renderItems.findIndex(item => item.type === 'match' && item.originalIndex === state.activeIndex);
+    // This can be either a direct 'match' type item or a match inside a 'matchesGroup'
+    let renderIndex = state.renderItems.findIndex(item => item.type === 'match' && item.originalIndex === state.activeIndex);
+    
+    // If not found as a direct match, find the matchesGroup that contains this match
+    if (renderIndex === -1) {
+      renderIndex = state.renderItems.findIndex(item => 
+        item.type === 'matchesGroup' && 
+        item.matches.some(m => m.originalIndex === state.activeIndex)
+      );
+    }
+    
     if (renderIndex === -1) return;
 
-    const top = renderIndex * VIRTUAL_ROW_HEIGHT;
-    const bottom = top + VIRTUAL_ROW_HEIGHT;
+    const renderItem = state.renderItems[renderIndex];
+    const top = renderItem.top;
+    const bottom = top + (renderItem.height || VIRTUAL_ROW_HEIGHT);
     const viewTop = resultsList.scrollTop;
     const viewBottom = viewTop + resultsList.clientHeight;
     if (top < viewTop) {

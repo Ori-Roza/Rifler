@@ -123,6 +123,11 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     console.log('Received webview diag ping');
   });
 
+  // Test-only: echo search completion back to webview so e2e hooks can resolve
+  handler.registerHandler('__test_searchCompleted', async (message) => {
+    deps.postMessage({ type: '__test_searchCompleted', results: (message as any).results });
+  });
+
   handler.registerHandler('executeCommand', async (message) => {
     const msg = message as { command: string; args?: unknown[] };
     await vscode.commands.executeCommand(msg.command, ...(msg.args || []));

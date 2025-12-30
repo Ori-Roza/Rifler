@@ -304,8 +304,7 @@ export async function activate(context: vscode.ExtensionContext) {
       },
       stateStore: stateStore
     });
-    // No-op handlers for test signals
-    handler.registerHandler('__test_searchCompleted', async () => {});
+    // Test signals are echoed in registerCommonHandlers; keep explicit registration for clarity
     handler.registerHandler('__test_searchResultsReceived', async () => {});
   });
 

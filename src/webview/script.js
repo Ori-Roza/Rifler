@@ -1758,6 +1758,36 @@ console.log('[Rifler] Webview script starting...');
              activeLineEl.offsetTop + activeLineEl.offsetHeight <= previewScrollTop + previewClientHeight) : false
         });
         break;
+      case '__test_getGroupScrollInfo': {
+        const containers = document.querySelectorAll('.matches-group-scroll-container');
+        const groups = Array.from(containers).map(el => {
+          const path = el.dataset.path || el.closest('.result-matches-group')?.dataset?.path || '';
+          return {
+            path,
+            scrollTop: el.scrollTop,
+            clientHeight: el.clientHeight,
+            scrollHeight: el.scrollHeight
+          };
+        });
+        vscode.postMessage({ type: '__test_groupScrollInfo', groups });
+        break;
+      }
+      case '__test_setGroupScrollTop': {
+        const path = message.path;
+        const value = message.scrollTop;
+        if (typeof path === 'string' && typeof value === 'number') {
+          const containers = document.querySelectorAll('.matches-group-scroll-container');
+          containers.forEach(el => {
+            const elPath = el.dataset.path || el.closest('.result-matches-group')?.dataset?.path;
+            if (elPath === path) {
+              el.scrollTop = value;
+              if (!state.groupScrollTops) state.groupScrollTops = {};
+              state.groupScrollTops[path] = value;
+            }
+          });
+        }
+        break;
+      }
       case '__test_simulateKeyboard':
         if (message.key === 'Enter' && message.ctrlKey) {
           openActiveResult();

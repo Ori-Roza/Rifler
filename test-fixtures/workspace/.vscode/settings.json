@@ -10,6 +10,5 @@
     "editor.minimap.enabled": false
   },
   "rifler.viewMode": "tab",
-  "rifler.results.showCollapsed": true,
-  "rifler.panelLocation": "window"
+  "rifler.results.showCollapsed": true
 }

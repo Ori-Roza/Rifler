@@ -1300,11 +1300,11 @@ body.loaded {
   border: 1px solid var(--rifler-primary);
 } */
 
-/* Active/current line (kept subtle; separate from hit highlight) */
+/* Active/current line (yellow outline, like VS Code find-result selection) */
 .pvLine.isActive {
-  background-color: #f4d03f7e !important;
-  outline: 1px solid #FDD54F;
-  outline-offset: -1px;
+  background-color: var(--rifler-highlight-bg) !important;
+  border-top: 1px solid var(--rifler-highlight-border);
+  border-bottom: 1px solid var(--rifler-highlight-border);
   z-index: 2;
 }
 
@@ -1358,8 +1358,12 @@ body.loaded {
 }
 
 .pvLine.isActive .pvLineNo {
-  font-weight: bold !important;
-  color: #E6E6B6 !important;
+  font-weight: normal;
+  color: color-mix(
+    in srgb,
+    var(--rifler-fg-muted) 70%,
+    var(--rifler-fg) 30%
+  );
 }
 
 .preview-content .pvLine:not(.isHit):not(.isActive) .pvCode {
@@ -1691,7 +1695,7 @@ body.loaded {
   background-color: var(--rifler-match-bg);
 }
 
-/* Selected line match highlighting - must come after blanket rule */
+/* Match highlights remain visible on active line */
 .pvLine.isActive .pvMatch {
-  background-color: transparent !important;
+  background-color: var(--rifler-match-bg);
 }

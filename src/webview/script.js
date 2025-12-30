@@ -3247,6 +3247,27 @@ console.log('[Rifler] Webview script starting...');
     });
   }
 
+  function ensureActiveVisibleInGroup() {
+    // Find and scroll within the matchesGroup container if the active match is inside one
+    const groupContainers = document.querySelectorAll('.matches-group-scroll-container');
+    groupContainers.forEach(groupContainer => {
+      const activeMatch = groupContainer.querySelector('.result-item.active');
+      if (activeMatch) {
+        // Scroll the match into view within the groupContainer
+        const matchTop = activeMatch.offsetTop;
+        const matchHeight = activeMatch.offsetHeight;
+        const scrollTop = groupContainer.scrollTop;
+        const containerHeight = groupContainer.clientHeight;
+        
+        if (matchTop < scrollTop) {
+          groupContainer.scrollTop = matchTop;
+        } else if (matchTop + matchHeight > scrollTop + containerHeight) {
+          groupContainer.scrollTop = matchTop + matchHeight - containerHeight;
+        }
+      }
+    });
+  }
+
   function setActiveIndex(index, { skipLoad = false } = {}) {
     if (index < 0 || index >= state.results.length) return;
 
@@ -3258,6 +3279,7 @@ console.log('[Rifler] Webview script starting...');
 
     renderResultsVirtualized();
     ensureActiveVisible();
+    ensureActiveVisibleInGroup();
 
     if (!skipLoad) {
       loadFileContent(state.results[index]);

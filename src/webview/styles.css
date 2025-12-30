@@ -1213,6 +1213,18 @@ body.loaded {
   transition: all 0.12s;
 }
 
+.preview-actions #replace-in-file-btn {
+  background: var(--rifler-bg);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-border);
+}
+
+.preview-actions #replace-in-file-btn:hover {
+  background: var(--rifler-list-hover);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-focus-border);
+}
+
 .preview-actions button:hover {
   background: var(--rifler-button-secondary-hover);
 }

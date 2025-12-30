@@ -125,7 +125,8 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
 
   // Test-only: echo search completion back to webview so e2e hooks can resolve
   handler.registerHandler('__test_searchCompleted', async (message) => {
-    deps.postMessage({ type: '__test_searchCompleted', results: (message as any).results });
+    const msg = message as { results?: unknown[] };
+    deps.postMessage({ type: '__test_searchCompleted', results: msg.results });
   });
 
   handler.registerHandler('executeCommand', async (message) => {

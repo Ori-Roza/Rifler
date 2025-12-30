@@ -140,7 +140,7 @@ async function searchInFileAsync(
   regex: RegExp,
   results: SearchResult[],
   maxResults: number,
-  perFileTimeBudgetMs: number
+  _perFileTimeBudgetMs: number
 ): Promise<void> {
   try {
     let content: string;
@@ -157,7 +157,6 @@ async function searchInFileAsync(
       content = new TextDecoder('utf-8').decode(contentBytes);
     }
 
-    const lines = content.split('\n');
     const fileName = path.basename(filePath);
     let relativePath = fileName;
     const workspaceFolders = vscode.workspace.workspaceFolders;

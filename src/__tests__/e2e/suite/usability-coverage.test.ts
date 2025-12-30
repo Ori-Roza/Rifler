@@ -339,7 +339,7 @@ suite('Rifler Usability Coverage E2E Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Get validation status
-      let validationPromise = new Promise<any>((resolve) => {
+      const validationPromise = new Promise<any>((resolve) => {
         const disposable = panel.webview.onDidReceiveMessage((message: any) => {
           if (message.type === '__test_validationStatus') {
             disposable.dispose();
@@ -350,7 +350,7 @@ suite('Rifler Usability Coverage E2E Tests', () => {
         setTimeout(() => resolve(null), 2000);
       });
 
-      let validation = await validationPromise;
+      const validation = await validationPromise;
       // Should show error for invalid regex (if validation is implemented)
 
       // Now set valid regex

@@ -444,14 +444,14 @@ body.loaded {
 }
 
 .replace-actions button.secondary {
-  background: var(--rifler-primary-dim);
-  color: var(--rifler-primary);
-  border-color: var(--rifler-primary-dim);
+  background: var(--rifler-button-bg);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-border);
 }
 
 .replace-actions button.secondary:hover {
-  background: rgba(88, 166, 255, 0.2);
-  border-color: rgba(88, 166, 255, 0.2);
+  background: var(--rifler-button-hover);
+  border-color: var(--rifler-border);
 }
 
 /* ===== Filters Section (Restructured for Issue #83) ===== */
@@ -778,12 +778,12 @@ body.loaded {
 }
 
 .result-file-header .file-path {
-  font-size: 10px;
-  color: var(--rifler-fg-muted);
+  font-size: 11px;
+  color: color-mix(in srgb, var(--rifler-fg-muted) 35%, var(--rifler-fg) 65%);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: 0.6;
+  opacity: 0.95;
   font-family: var(--rifler-font-mono);
   margin-top: 1px;
 }
@@ -837,9 +837,9 @@ body.loaded {
   display: flex;
   align-items: flex-start;
   flex-shrink: 0;
-  width: 32px;
+  width: 28px;
   justify-content: flex-end;
-  margin-right: 12px;
+  margin-right: 10px;
   height: 100%;
 }
 
@@ -922,7 +922,7 @@ body.loaded {
 }
 
 .result-line-number {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--rifler-fg-muted);
   font-family: var(--rifler-font-mono);
   opacity: 0.6;
@@ -942,6 +942,10 @@ body.loaded {
   color: var(--rifler-fg);
   opacity: 0.9;
   flex: 1;
+}
+
+.result-item:not(.active) .result-preview {
+  opacity: 0.82;
 }
 
 .result-preview.hljs {
@@ -1176,12 +1180,13 @@ body.loaded {
 }
 
 .preview-filepath {
-  font-size: 11px;
-  color: var(--rifler-fg-muted);
+  font-size: 12px;
+  color: color-mix(in srgb, var(--rifler-fg-muted) 35%, var(--rifler-fg) 65%);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: 0.7;
+  opacity: 1;
+  font-family: var(--rifler-font-mono);
 }
 
 .preview-info {
@@ -1212,13 +1217,33 @@ body.loaded {
 }
 
 .preview-actions button.primary {
-  background: var(--rifler-button-bg);
-  color: var(--rifler-button-fg);
-  border-color: var(--rifler-button-bg);
+  background: var(--rifler-primary);
+  color: #0d1117;
+  border-color: var(--rifler-primary);
+  box-shadow: 0 1px 6px rgba(88, 166, 255, 0.35);
 }
 
 .preview-actions button.primary:hover {
-  background: var(--rifler-button-hover);
+  background: var(--rifler-primary-hover);
+  border-color: var(--rifler-primary-hover);
+}
+
+.preview-actions button.ghost {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-color: var(--rifler-border);
+  color: var(--rifler-fg-muted);
+}
+
+.preview-actions button.ghost:hover {
+  background: var(--rifler-list-hover);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-focus-border);
 }
 
 .preview-body {
@@ -1266,13 +1291,13 @@ body.loaded {
 
 /* Soft full-row highlight for hit lines (must cover BOTH columns) */
 .pvLine.isHit {
-  background-color: rgba(255, 213, 79, 0.1);
+  background-color: rgba(255, 213, 79, 0.12);
 }
 
 /* Active/current line (kept subtle; separate from hit highlight) */
 .pvLine.isActive {
-  background-color: rgba(255, 213, 79, 0.15);
-  outline: 1px solid var(--rifler-highlight-border);
+  background-color: var(--rifler-primary-dim);
+  outline: 1px solid var(--rifler-primary);
   outline-offset: -1px;
   z-index: 2;
 }
@@ -1294,9 +1319,9 @@ body.loaded {
 
 /* Rightmost fixed-width line-number column */
 .pvLineNo {
-  flex: 0 0 56px;
-  width: 56px;
-  padding-right: 12px;
+  flex: 0 0 48px;
+  width: 48px;
+  padding-right: 8px;
   text-align: right;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -1318,6 +1343,23 @@ body.loaded {
 .pvLineNo.has-match {
   font-weight: bold !important;
   color: var(--rifler-highlight-border) !important;
+}
+
+.pvLine.isActive .pvLineNo {
+  color: var(--rifler-primary) !important;
+  font-weight: 700 !important;
+}
+
+.preview-content .pvLine:not(.isHit):not(.isActive) .pvCode {
+  opacity: 0.7;
+}
+
+.preview-content .pvLine.isHit .pvCode {
+  opacity: 0.92;
+}
+
+.preview-content .pvLine.isActive .pvCode {
+  opacity: 1;
 }
 
 /* Stronger token highlight than the row highlight + bold */
@@ -1370,7 +1412,7 @@ body.loaded {
 
 .editor-line-numbers {
   flex-shrink: 0;
-  width: 56px;
+  width: 48px;
   padding: 8px 0;
   text-align: right;
   font-family: var(--rifler-font-mono);
@@ -1390,7 +1432,7 @@ body.loaded {
 
 .editor-line-numbers div {
   height: 20px;
-  padding-right: 12px;
+  padding-right: 8px;
 }
 
 .editor-content-wrapper {
@@ -1538,14 +1580,14 @@ body.loaded {
 }
 
 .replace-widget button.secondary {
-  background: var(--rifler-primary-dim);
-  color: var(--rifler-primary);
-  border-color: var(--rifler-primary-dim);
+  background: var(--rifler-button-bg);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-border);
 }
 
 .replace-widget button.secondary:hover {
-  background: rgba(88, 166, 255, 0.2);
-  border-color: rgba(88, 166, 255, 0.2);
+  background: var(--rifler-button-hover);
+  border-color: var(--rifler-border);
 }
 
 /* Context Menu */

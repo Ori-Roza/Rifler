@@ -54,6 +54,7 @@ console.log('[Rifler] Webview script starting...');
       useRegex: false,
       fileMask: ''
     },
+    groupScrollTops: {}, // Persist scroll positions for grouped result containers
     loadingTimeout: null // Track loading overlay timeout
   };
 
@@ -373,7 +374,7 @@ console.log('[Rifler] Webview script starting...');
         allPaths.forEach(p => state.collapsedFiles.add(p));
       }
       
-      handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
+      handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex, preserveScroll: true });
       updateCollapseButtonText();
     });
   }
@@ -1670,7 +1671,7 @@ console.log('[Rifler] Webview script starting...');
           }
           
           if (s.results && s.results.length > 0) {
-            handleSearchResults(s.results, { skipAutoLoad: true, activeIndex: s.activeIndex });
+            handleSearchResults(s.results, { skipAutoLoad: true, activeIndex: s.activeIndex, preserveScroll: true });
           } else if (s.query && s.query.length >= 2) {
             runSearch();
           }
@@ -2015,7 +2016,7 @@ console.log('[Rifler] Webview script starting...');
           state.collapsedFiles.delete(firstPath);
           state.expandedFiles.add(firstPath);
           // Re-render
-          handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
+          handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex, preserveScroll: true });
         }
         break;
       case '__test_setSearchInput':
@@ -2194,7 +2195,7 @@ console.log('[Rifler] Webview script starting...');
     }
   }
 
-  function handleSearchResults(results, options = { skipAutoLoad: false, activeIndex: undefined }) {
+  function handleSearchResults(results, options = { skipAutoLoad: false, activeIndex: undefined, preserveScroll: false }) {
     const hasResults = results.length > 0;
     let resolvedActiveIndex;
 
@@ -2204,9 +2205,16 @@ console.log('[Rifler] Webview script starting...');
       resolvedActiveIndex = -1; // keep preview blank until user clicks
     }
 
+    const previousScrollTop = resultsList.scrollTop;
+
     state.results = results;
     state.activeIndex = resolvedActiveIndex;
-    resultsList.scrollTop = 0;
+    // Only reset scroll for new result sets unless preserveScroll is requested
+    if (!options.preserveScroll) {
+      resultsList.scrollTop = 0;
+    } else {
+      resultsList.scrollTop = previousScrollTop;
+    }
 
     if (state.searchStartTime > 0) {
       state.lastSearchDuration = (performance.now() - state.searchStartTime) / 1000;
@@ -2379,8 +2387,14 @@ console.log('[Rifler] Webview script starting...');
       fragment.appendChild(renderResultRow(state.renderItems[i], i));
     }
 
+    // Preserve grouped scroll positions before virtual DOM swap
+    captureGroupScrollTopsFromDom();
     virtualContent.innerHTML = '';
     virtualContent.appendChild(fragment);
+
+    // Restore grouped scroll positions after render
+    restoreGroupScrollTopsToDom();
+    requestAnimationFrame(restoreGroupScrollTopsToDom);
 
     measureRowHeightIfNeeded();
   }
@@ -2438,7 +2452,7 @@ console.log('[Rifler] Webview script starting...');
           state.collapsedFiles.add(itemData.path);
         }
         
-        handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
+        handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex, preserveScroll: true });
         updateCollapseButtonText();
 
         if (willExpand) {
@@ -2451,6 +2465,7 @@ console.log('[Rifler] Webview script starting...');
 
     if (itemData.type === 'matchesGroup') {
       item.className = 'result-matches-group';
+      item.dataset.path = itemData.path;
       // Height and position are already set from itemData
       item.style.overflow = 'hidden';
       item.style.display = 'flex';
@@ -2463,12 +2478,12 @@ console.log('[Rifler] Webview script starting...');
       groupContainer.style.paddingLeft = '8px';
       groupContainer.style.marginLeft = '8px';
       groupContainer.style.borderLeft = '2px solid rgba(255,255,255,0.1)';
-      
       itemData.matches.forEach((match, idx) => {
         const matchEl = document.createElement('div');
         const isActive = match.originalIndex === state.activeIndex;
         matchEl.className = 'result-item' + (isActive ? ' active' : '');
         matchEl.dataset.index = String(match.originalIndex);
+        matchEl.dataset.localIndex = String(idx);
         matchEl.title = match.relativePath || match.fileName;
         matchEl.style.position = 'static';
         matchEl.style.height = '28px';
@@ -2495,6 +2510,9 @@ console.log('[Rifler] Webview script starting...');
 
         matchEl.addEventListener('click', (e) => {
           if (e.target && e.target.closest('.open-in-editor-btn')) return;
+          // Preserve the current scroll position of this group before re-rendering
+          if (!state.groupScrollTops) state.groupScrollTops = {};
+          state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
           setActiveIndex(match.originalIndex);
         });
 
@@ -2518,6 +2536,24 @@ console.log('[Rifler] Webview script starting...');
         }
 
         groupContainer.appendChild(matchEl);
+      });
+
+      // Restore previous scroll position for this file's group if available (after children are added)
+      const restoreScroll = () => {
+        const saved = state.groupScrollTops && state.groupScrollTops[itemData.path];
+        if (typeof saved === 'number') {
+          groupContainer.scrollTop = saved;
+        }
+      };
+      restoreScroll();
+      requestAnimationFrame(restoreScroll);
+      requestAnimationFrame(() => requestAnimationFrame(restoreScroll));
+
+      // Persist scroll position on scroll so it survives re-renders
+      groupContainer.dataset.path = itemData.path;
+      groupContainer.addEventListener('scroll', () => {
+        if (!state.groupScrollTops) state.groupScrollTops = {};
+        state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
       });
 
       item.appendChild(groupContainer);
@@ -2844,13 +2880,20 @@ console.log('[Rifler] Webview script starting...');
     if (renderIndex === -1) return;
 
     const renderItem = state.renderItems[renderIndex];
+
+    // If the active item lives inside a matchesGroup, avoid adjusting the outer resultsList scroll.
+    // The inner group handler will manage its own scroll, and the user just clicked inside it.
+    if (renderItem.type === 'matchesGroup') return;
     const top = renderItem.top;
-    const bottom = top + (renderItem.height || VIRTUAL_ROW_HEIGHT);
+    const height = renderItem.height || VIRTUAL_ROW_HEIGHT;
+    const bottom = top + height;
     const viewTop = resultsList.scrollTop;
     const viewBottom = viewTop + resultsList.clientHeight;
-    if (top < viewTop) {
+
+    // Only scroll when the item is entirely above or below the viewport; leave partial overlap untouched
+    if (bottom < viewTop) {
       resultsList.scrollTop = top;
-    } else if (bottom > viewBottom) {
+    } else if (top > viewBottom) {
       resultsList.scrollTop = bottom - resultsList.clientHeight;
     }
   }
@@ -3247,25 +3290,61 @@ console.log('[Rifler] Webview script starting...');
     });
   }
 
-  function ensureActiveVisibleInGroup() {
-    // Find and scroll within the matchesGroup container if the active match is inside one
-    const groupContainers = document.querySelectorAll('.matches-group-scroll-container');
-    groupContainers.forEach(groupContainer => {
-      const activeMatch = groupContainer.querySelector('.result-item.active');
-      if (activeMatch) {
-        // Scroll the match into view within the groupContainer
-        const matchTop = activeMatch.offsetTop;
-        const matchHeight = activeMatch.offsetHeight;
-        const scrollTop = groupContainer.scrollTop;
-        const containerHeight = groupContainer.clientHeight;
-        
-        if (matchTop < scrollTop) {
-          groupContainer.scrollTop = matchTop;
-        } else if (matchTop + matchHeight > scrollTop + containerHeight) {
-          groupContainer.scrollTop = matchTop + matchHeight - containerHeight;
-        }
+  // Capture scroll positions of all grouped match containers currently in the DOM
+  function captureGroupScrollTopsFromDom() {
+    const containers = document.querySelectorAll('.matches-group-scroll-container');
+    if (!state.groupScrollTops) state.groupScrollTops = {};
+    containers.forEach(el => {
+      const path = el.dataset.path || el.closest('.result-matches-group')?.dataset?.path;
+      if (path) {
+        state.groupScrollTops[path] = el.scrollTop;
       }
     });
+  }
+
+  // Restore scroll positions to grouped match containers from cached state
+  function restoreGroupScrollTopsToDom() {
+    const containers = document.querySelectorAll('.matches-group-scroll-container');
+    containers.forEach(el => {
+      const path = el.dataset.path || el.closest('.result-matches-group')?.dataset?.path;
+      if (!path) return;
+      const saved = state.groupScrollTops && state.groupScrollTops[path];
+      if (typeof saved === 'number') {
+        el.scrollTop = saved;
+      }
+    });
+  }
+
+  function ensureActiveVisibleInGroup() {
+    // Find and scroll within the matchesGroup container if the active match is inside one
+    const doScroll = () => {
+      const groupContainers = document.querySelectorAll('.matches-group-scroll-container');
+      groupContainers.forEach(groupContainer => {
+        const groupPath = groupContainer.dataset.path || groupContainer.closest('.result-matches-group')?.dataset?.path || '';
+        const activeMatch = groupContainer.querySelector('.result-item.active');
+        if (!activeMatch) return;
+
+        const matchTop = activeMatch.offsetTop;
+        const matchBottom = matchTop + activeMatch.offsetHeight;
+        const viewTop = groupContainer.scrollTop;
+        const viewBottom = viewTop + groupContainer.clientHeight;
+
+        // Scroll only if active item is outside viewport
+        if (matchTop < viewTop) {
+          groupContainer.scrollTop = matchTop;
+        } else if (matchBottom > viewBottom) {
+          groupContainer.scrollTop = matchBottom - groupContainer.clientHeight;
+        }
+
+        // Persist the chosen scroll
+        if (!state.groupScrollTops) state.groupScrollTops = {};
+        state.groupScrollTops[groupPath] = groupContainer.scrollTop;
+      });
+    };
+
+    // Run immediately and again on next frame so the first click is captured after DOM update
+    doScroll();
+    requestAnimationFrame(doScroll);
   }
 
   function setActiveIndex(index, { skipLoad = false } = {}) {

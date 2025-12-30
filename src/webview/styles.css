@@ -1275,6 +1275,11 @@ body.loaded {
   width: fit-content;
 }
 
+.preview-content.hidden-for-edit {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ===== Preview Code Rows (Spec: code left, line number far right) ===== */
 .pvLine {
   display: flex;

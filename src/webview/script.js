@@ -139,6 +139,7 @@ console.log('[Rifler] Webview script starting...');
   // Keep backward compatibility - some may not exist in new design
   const previewActions = document.getElementById('preview-actions');
   const replaceInFileBtn = document.getElementById('replace-in-file-btn');
+  const openInEditorBtn = document.getElementById('open-in-editor-btn');
   const fileEditor = document.getElementById('file-editor');
   const editorContainer = document.getElementById('editor-container');
   const editorBackdrop = document.getElementById('editor-backdrop');
@@ -411,6 +412,12 @@ console.log('[Rifler] Webview script starting...');
 
   if (replaceInFileBtn) {
     replaceInFileBtn.addEventListener('click', triggerReplaceInFile);
+  }
+
+  if (openInEditorBtn) {
+    openInEditorBtn.addEventListener('click', () => {
+      openActiveResult();
+    });
   }
   
   if (localReplaceClose) {
@@ -692,7 +699,7 @@ console.log('[Rifler] Webview script starting...');
     const scrollTop = previewContent.scrollTop;
     
     isEditMode = true;
-    if (previewContent) previewContent.style.display = 'none'; // Hide preview immediately to prevent flicker
+    if (previewContent) previewContent.classList.add('hidden-for-edit');
     if (editorContainer) editorContainer.classList.add('visible');
     if (fileEditor) fileEditor.value = state.fileContent.content;
     updateHighlights();
@@ -741,6 +748,10 @@ console.log('[Rifler] Webview script starting...');
     saveFile();
     
     isEditMode = false;
+    if (previewContent) {
+      previewContent.classList.remove('hidden-for-edit');
+      previewContent.style.display = 'block';
+    }
     if (editorContainer) editorContainer.classList.remove('visible');
     
     if (!skipRender) {
@@ -2180,7 +2191,15 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function handleSearchResults(results, options = { skipAutoLoad: false, activeIndex: undefined }) {
-    const resolvedActiveIndex = options.activeIndex !== undefined ? options.activeIndex : (results.length > 0 ? 0 : -1);
+    const hasResults = results.length > 0;
+    let resolvedActiveIndex;
+
+    if (options.activeIndex !== undefined && options.activeIndex !== null) {
+      resolvedActiveIndex = options.activeIndex;
+    } else {
+      resolvedActiveIndex = -1; // keep preview blank until user clicks
+    }
+
     state.results = results;
     state.activeIndex = resolvedActiveIndex;
     resultsList.scrollTop = 0;
@@ -2294,15 +2313,23 @@ console.log('[Rifler] Webview script starting...');
     }
 
     hidePlaceholder();
-    renderResultsVirtualized();
-    
-    // Ensure preview panel is visible if we have results and an active index
-    if (state.activeIndex >= 0) {
+
+    // Keep preview blank until a result is explicitly selected
+    if (hasResults && state.activeIndex >= 0) {
       applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: true });
-    }
-    
-    if (!options.skipAutoLoad && state.activeIndex >= 0) {
-      loadFileContent(state.results[state.activeIndex]);
+      setActiveIndex(state.activeIndex, { skipLoad: !!options.skipAutoLoad });
+    } else {
+      if (previewContent) {
+        previewContent.innerHTML = '<div class="empty-state">Select a result to preview</div>';
+        previewContent.style.display = 'block';
+      }
+      if (previewFilename) previewFilename.textContent = '';
+      if (previewFilepath) previewFilepath.textContent = '';
+      if (previewActions) previewActions.style.display = 'none';
+      applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: hasResults });
+      if (previewPanelContainer) previewPanelContainer.style.display = hasResults ? 'flex' : 'none';
+      if (previewPanel) previewPanel.style.display = hasResults ? 'flex' : 'none';
+      renderResultsVirtualized();
     }
   }
 
@@ -2389,6 +2416,7 @@ console.log('[Rifler] Webview script starting...');
         '<span class="match-count">' + itemData.matchCount + '</span>';
         
       item.addEventListener('click', () => {
+        const willExpand = itemData.isCollapsed;
         if (itemData.isCollapsed) {
           // Expanding: remove from collapsedFiles and add to expandedFiles
           state.collapsedFiles.delete(itemData.path);
@@ -2401,6 +2429,10 @@ console.log('[Rifler] Webview script starting...');
         
         handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
         updateCollapseButtonText();
+
+        if (willExpand) {
+          activateFirstMatchForPath(itemData.path);
+        }
       });
       
       return item;
@@ -3116,8 +3148,11 @@ console.log('[Rifler] Webview script starting...');
     
     // Ensure previewContent is visible and populated
     previewContent.innerHTML = html;
-    previewContent.style.display = 'block';
-    previewContent.style.visibility = 'visible';
+    // Only restore visibility if not in hidden-for-edit mode
+    if (!previewContent.classList.contains('hidden-for-edit')) {
+      previewContent.style.display = 'block';
+      previewContent.style.visibility = 'visible';
+    }
     previewContent.style.opacity = '1';
     previewContent.style.zIndex = '1';
     
@@ -3190,7 +3225,7 @@ console.log('[Rifler] Webview script starting...');
     });
   }
 
-  function setActiveIndex(index) {
+  function setActiveIndex(index, { skipLoad = false } = {}) {
     if (index < 0 || index >= state.results.length) return;
 
     if (isEditMode) {
@@ -3202,8 +3237,18 @@ console.log('[Rifler] Webview script starting...');
     renderResultsVirtualized();
     ensureActiveVisible();
 
-    loadFileContent(state.results[index]);
+    if (!skipLoad) {
+      loadFileContent(state.results[index]);
+    }
   }
+
+  function activateFirstMatchForPath(path) {
+    const idx = state.results.findIndex(r => (r.relativePath || r.fileName) === path);
+    if (idx >= 0) {
+      setActiveIndex(idx);
+    }
+  }
+
 
   function navigateResults(delta) {
     if (state.results.length === 0) return;

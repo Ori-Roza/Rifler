@@ -1364,10 +1364,6 @@ body.loaded {
   );
 }
 
-.pvLineNo.has-match {
-  color: var(--rifler-primary) !important;
-}
-
 .pvLine.isActive .pvLineNo {
   position: relative;
   z-index: 1; /* keep tint and indicator above the row highlight */

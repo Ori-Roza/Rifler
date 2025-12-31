@@ -44,6 +44,13 @@
 				"$eslint-stylish"
 			],
 			"group": "build"
+		},
+		{
+			"label": "e2e tests (ad-hoc)",
+			"type": "shell",
+			"command": "npm run test:e2e",
+			"args": [],
+			"isBackground": false
 		}
 	]
 }

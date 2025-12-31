@@ -33,6 +33,10 @@ export interface ValidateFileMaskMessage {
   fileMask: string;
 }
 
+export interface GetWorkspaceInfoMessage {
+  type: 'getWorkspaceInfo';
+}
+
 export interface RunSearchMessage {
   type: 'runSearch';
   query: string;
@@ -107,6 +111,35 @@ export interface TestSearchResultsReceivedMessage {
   results: SearchResult[];
 }
 
+export interface TestResultsListStatusMessage {
+  type: '__test_resultsListStatus';
+  scrollbarVisible: boolean;
+  hasHorizontalOverflow: boolean;
+  tooltipsPresent: boolean;
+  resultHeadersCount: number;
+}
+
+export interface TestSetScopeMessage {
+  type: '__test_setScope';
+  scope: string;
+}
+
+export interface TestScopeInputStatusMessage {
+  type: '__test_scopeInputStatus';
+  currentScope: string;
+  pathLabel: string;
+  directoryInputVisible: boolean;
+  directoryInputReadOnly: boolean;
+  directoryInputPlaceholder: string;
+  directoryInputValue: string;
+  moduleSelectVisible: boolean;
+}
+
+export interface TestSetDirectoryInputMessage {
+  type: '__test_setDirectoryInput';
+  value: string;
+}
+
 export interface TestErrorMessage {
   type: 'error';
   message: string;
@@ -129,6 +162,7 @@ export type IncomingMessage =
   | OpenLocationMessage
   | GetModulesMessage
   | GetCurrentDirectoryMessage
+  | GetWorkspaceInfoMessage
   | GetFileContentMessage
   | ReplaceOneMessage
   | ReplaceAllMessage
@@ -139,6 +173,10 @@ export type IncomingMessage =
   | ValidateFileMaskMessage
   | TestSearchCompletedMessage
   | TestSearchResultsReceivedMessage
+  | TestResultsListStatusMessage
+  | TestSetScopeMessage
+  | TestScopeInputStatusMessage
+  | TestSetDirectoryInputMessage
   | TestErrorMessage
   | DiagPingMessage;
 
@@ -163,11 +201,18 @@ export interface CurrentDirectoryMessage {
   directory: string;
 }
 
+export interface WorkspaceInfoMessage {
+  type: 'workspaceInfo';
+  name: string;
+  path: string;
+}
+
 export interface FileContentMessage {
   type: 'fileContent';
   uri: string;
   content: string;
   fileName: string;
+  iconUri: string;
   matches: Array<{ line: number; start: number; end: number }>;
 }
 
@@ -224,6 +269,7 @@ export type OutgoingMessage =
   | SearchResultsMessage
   | ModulesListMessage
   | CurrentDirectoryMessage
+  | WorkspaceInfoMessage
   | FileContentMessage
   | ValidationResultMessage
   | ConfigMessage

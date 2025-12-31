@@ -208,11 +208,10 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
       await replaceAll(
         'test',
         'updated',
-        'file',
+        'project',
         { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
         undefined,
         undefined,
-        replaceTestFile,
         async () => {}
       );
 

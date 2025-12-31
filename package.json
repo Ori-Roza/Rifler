@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
@@ -204,6 +204,12 @@
           "minimum": 100,
           "markdownDescription": "Maximum number of search results to collect. With virtualized rendering, higher values are handled efficiently.",
           "order": 5
+        },
+        "rifler.results.showCollapsed": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show search results in a collapsed state by default. When enabled, file groups will be collapsed to show only match counts until expanded.",
+          "order": 6
         }
       }
     }
@@ -211,7 +217,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile && npm run copy-webview",
     "compile": "tsc -p ./",
-    "copy-webview": "mkdir -p out/webview && cp src/webview/index.html src/webview/script.js src/webview/styles.css out/webview/",
+    "copy-webview": "mkdir -p out/webview && cp src/webview/index.html src/webview/script.js src/webview/styles.css src/webview/seti-icons.css src/webview/seti.woff out/webview/ && cp node_modules/@vscode/codicons/dist/codicon.css node_modules/@vscode/codicons/dist/codicon.ttf out/webview/",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
     "test": "jest",
@@ -238,16 +244,19 @@
     "@typescript-eslint/parser": "^6.13.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^2.24.0",
     "eslint": "^8.55.0",
     "glob": "^10.3.10",
     "jest": "^29.7.0",
     "mocha": "^11.7.5",
+    "react": "^19.2.3",
     "standard-version": "^9.5.0",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.3.0",
-    "@vscode/vsce": "^2.24.0"
+    "typescript": "^5.3.0"
   },
   "dependencies": {
+    "@vscode/codicons": "^0.0.44",
+    "@vscode/webview-ui-toolkit": "^1.4.0",
     "highlight.js": "^11.11.1"
   },
   "overrides": {

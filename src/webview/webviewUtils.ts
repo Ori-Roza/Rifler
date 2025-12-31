@@ -16,22 +16,33 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
   const scriptUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'script.js')
   );
+  const toolkitUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, 'node_modules', '@vscode/webview-ui-toolkit', 'dist', 'toolkit.js')
+  );
+  const codiconsUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'codicon.css')
+  );
+  const setiIconsUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'seti-icons.css')
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; style-src ${webview.cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; style-src ${webview.cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src ${webview.cspSource} https://fonts.gstatic.com; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- TODO: Consider bundling highlight.js locally or add SRI -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet" crossorigin="anonymous">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="${codiconsUri}">
+  <link rel="stylesheet" href="${setiIconsUri}">
   <link rel="stylesheet" href="${stylesUri}">
 </head>
 <body>
 ${cachedBodyHtml}
 <!-- TODO: Add integrity attribute with SRI hash or bundle locally -->
 <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" crossorigin="anonymous"></script>
+<script nonce="${nonce}" type="module" src="${toolkitUri}"></script>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

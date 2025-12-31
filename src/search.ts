@@ -6,6 +6,7 @@ import {
   SearchScope,
   buildSearchRegex,
   matchesFileMask,
+  searchInContent,
   EXCLUDE_DIRS,
   BINARY_EXTENSIONS,
   Limiter,
@@ -19,7 +20,6 @@ export async function performSearch(
   options: SearchOptions,
   directoryPath?: string,
   modulePath?: string,
-  filePath?: string,
   maxResults: number = 10000
 ): Promise<SearchResult[]> {
   if (!query.trim() || query.length < 2) {
@@ -53,9 +53,7 @@ export async function performSearch(
   const limiter = new Limiter(100);
   const perFileTimeBudgetMs = 2500;
 
-  if (scope === 'file' && filePath) {
-    await searchInFileAsync(filePath, regex, results, effectiveMaxResults, perFileTimeBudgetMs);
-  } else if (scope === 'directory') {
+  if (scope === 'directory') {
     const searchPath = (directoryPath || '').trim();
     try {
       if (searchPath) {
@@ -142,7 +140,7 @@ async function searchInFileAsync(
   regex: RegExp,
   results: SearchResult[],
   maxResults: number,
-  perFileTimeBudgetMs: number
+  _perFileTimeBudgetMs: number
 ): Promise<void> {
   try {
     let content: string;
@@ -159,7 +157,6 @@ async function searchInFileAsync(
       content = new TextDecoder('utf-8').decode(contentBytes);
     }
 
-    const lines = content.split('\n');
     const fileName = path.basename(filePath);
     let relativePath = fileName;
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -175,33 +172,8 @@ async function searchInFileAsync(
       }
     }
 
-    const startTime = Date.now();
-    for (let lineIndex = 0; lineIndex < lines.length && results.length < maxResults; lineIndex++) {
-      if (Date.now() - startTime > perFileTimeBudgetMs) break;
-      const line = lines[lineIndex];
-      let match: RegExpExecArray | null;
-      regex.lastIndex = 0;
-      while ((match = regex.exec(line)) !== null) {
-        if (results.length >= maxResults) break;
-        const leadingWhitespace = line.length - line.trimStart().length;
-        const adjustedStart = match.index - leadingWhitespace;
-        const adjustedEnd = match.index + match[0].length - leadingWhitespace;
-        results.push({
-          uri: vscode.Uri.file(filePath).toString(),
-          fileName,
-          relativePath,
-          line: lineIndex,
-          character: match.index,
-          length: match[0].length,
-          preview: line.trim(),
-          previewMatchRange: {
-            start: Math.max(0, adjustedStart),
-            end: Math.max(0, adjustedEnd)
-          }
-        });
-        if (match[0].length === 0) regex.lastIndex++;
-      }
-    }
+    const fileResults = searchInContent(content, regex, filePath, maxResults - results.length, relativePath);
+    results.push(...fileResults);
   } catch {
     // Skip files that can't be read
   }

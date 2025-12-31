@@ -1,13 +1,13 @@
-// JavaScript test file
+// JavaScript updated file
 function javascriptFunction() {
-  const search = 'test search';
+  const search = 'updated search';
   console.log(search);
 }
 
-class JSTestClass {
+class JSupdatedClass {
   method() {
     return 'javascript method';
   }
 }
 
-module.exports = { javascriptFunction, JSTestClass };
+module.exports = { javascriptFunction, JSupdatedClass };

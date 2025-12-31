@@ -24,10 +24,11 @@ export interface SearchResult {
     start: number;
     end: number;
   };
+  previewMatchRanges?: Array<{ start: number; end: number }>;
 }
 
 /** Scope options for search */
-export type SearchScope = 'project' | 'directory' | 'module' | 'file';
+export type SearchScope = 'project' | 'directory' | 'module';
 
 // ============================================================================
 // Search Utilities
@@ -97,7 +98,7 @@ export function matchesFileMask(fileName: string, fileMask: string): boolean {
   return matchesInclude && !matchesExclude; // Excludes always win
 }
 
-/** * Find modules in the workspace (directories in node_modules)
+/** * Find modules in the workspace (directories with package.json, tsconfig.json, etc.)
  */
 export async function findWorkspaceModules(): Promise<{ name: string; path: string }[]> {
   const modules: { name: string; path: string }[] = [];
@@ -107,28 +108,100 @@ export async function findWorkspaceModules(): Promise<{ name: string; path: stri
     return modules;
   }
 
+  // Module detection patterns - files that indicate a module/project
+  const moduleIndicators = [
+    'package.json',
+    'tsconfig.json',
+    'pyproject.toml',
+    'setup.py',
+    'Cargo.toml',
+    'go.mod',
+    'composer.json',
+    'Gemfile',
+    'requirements.txt',
+    '.git'
+  ];
+
   for (const folder of workspaceFolders) {
     try {
-      const nodeModulesUri = vscode.Uri.joinPath(folder.uri, 'node_modules');
-      const stat = await vscode.workspace.fs.stat(nodeModulesUri);
-
-      if (stat.type === vscode.FileType.Directory) {
-        const entries = await vscode.workspace.fs.readDirectory(nodeModulesUri);
-        for (const [name, type] of entries) {
-          if (type === vscode.FileType.Directory && !name.startsWith('.')) {
-            modules.push({
-              name,
-              path: vscode.Uri.joinPath(nodeModulesUri, name).fsPath
-            });
-          }
-        }
+      // First check if the workspace root itself is a module
+      const hasModuleIndicators = await checkForModuleIndicators(folder.uri, moduleIndicators);
+      if (hasModuleIndicators) {
+        modules.push({
+          name: folder.name,
+          path: folder.uri.fsPath
+        });
       }
-    } catch {
-      // If node_modules doesn't exist, continue
+
+      // Then check subdirectories for modules
+      await findModulesInDirectory(folder.uri, modules, moduleIndicators, 2); // Max depth of 2
+    } catch (error) {
+      console.error('Error finding modules in workspace:', error);
     }
   }
 
   return modules;
+}
+
+/**
+ * Recursively find modules in a directory
+ */
+async function findModulesInDirectory(
+  dirUri: vscode.Uri,
+  modules: { name: string; path: string }[],
+  moduleIndicators: string[],
+  maxDepth: number,
+  currentDepth = 0
+): Promise<void> {
+  if (currentDepth >= maxDepth) {
+    return;
+  }
+
+  try {
+    const entries = await vscode.workspace.fs.readDirectory(dirUri);
+
+    for (const [name, type] of entries) {
+      if (type === vscode.FileType.Directory &&
+          !name.startsWith('.') &&
+          !EXCLUDE_DIRS.has(name)) {
+
+        const subDirUri = vscode.Uri.joinPath(dirUri, name);
+
+        // Check if this subdirectory is a module
+        const hasModuleIndicators = await checkForModuleIndicators(subDirUri, moduleIndicators);
+        if (hasModuleIndicators) {
+          modules.push({
+            name,
+            path: subDirUri.fsPath
+          });
+        } else if (currentDepth < maxDepth - 1) {
+          // Continue searching deeper, but avoid going too deep
+          await findModulesInDirectory(subDirUri, modules, moduleIndicators, maxDepth, currentDepth + 1);
+        }
+      }
+    }
+  } catch (error) {
+    // Directory might not be accessible, skip it
+  }
+}
+
+/**
+ * Check if a directory contains module indicator files
+ */
+async function checkForModuleIndicators(dirUri: vscode.Uri, indicators: string[]): Promise<boolean> {
+  try {
+    const entries = await vscode.workspace.fs.readDirectory(dirUri);
+
+    for (const [name] of entries) {
+      if (indicators.includes(name)) {
+        return true;
+      }
+    }
+  } catch {
+    // Directory not accessible
+  }
+
+  return false;
 }
 
 /** * Set of directories to exclude from search
@@ -170,11 +243,13 @@ export function searchInContent(
   content: string,
   regex: RegExp,
   filePath: string,
-  maxResults: number = 5000
+  maxResults: number = 5000,
+  relativePath?: string
 ): SearchResult[] {
   const results: SearchResult[] = [];
   const lines = content.split('\n');
   const fileName = path.basename(filePath);
+  const finalRelativePath = relativePath || filePath;
 
   for (let lineIndex = 0; lineIndex < lines.length && results.length < maxResults; lineIndex++) {
     const line = lines[lineIndex];
@@ -183,30 +258,40 @@ export function searchInContent(
     // Reset regex for each line
     regex.lastIndex = 0;
 
+    const lineMatches: Array<{ start: number; end: number; rawStart: number; rawLength: number }> = [];
     while ((match = regex.exec(line)) !== null) {
-      if (results.length >= maxResults) break;
-
       // Calculate the leading whitespace that will be trimmed
       const leadingWhitespace = line.length - line.trimStart().length;
       const adjustedStart = match.index - leadingWhitespace;
       const adjustedEnd = match.index + match[0].length - leadingWhitespace;
 
-      results.push({
-        uri: `file://${filePath}`,
-        fileName,
-        relativePath: filePath,
-        line: lineIndex,
-        character: match.index,
-        length: match[0].length,
-        preview: line.trim(),
-        previewMatchRange: {
-          start: Math.max(0, adjustedStart),
-          end: Math.max(0, adjustedEnd)
-        }
+      lineMatches.push({
+        start: Math.max(0, adjustedStart),
+        end: Math.max(0, adjustedEnd),
+        rawStart: match.index,
+        rawLength: match[0].length
       });
 
       // Prevent infinite loop for zero-length matches
       if (match[0].length === 0) regex.lastIndex++;
+    }
+
+    if (lineMatches.length > 0) {
+      const firstMatch = lineMatches[0];
+      results.push({
+        uri: `file://${filePath}`,
+        fileName,
+        relativePath: finalRelativePath,
+        line: lineIndex,
+        character: firstMatch.rawStart,
+        length: firstMatch.rawLength,
+        preview: line.trim(),
+        previewMatchRange: {
+          start: firstMatch.start,
+          end: firstMatch.end
+        },
+        previewMatchRanges: lineMatches.map(m => ({ start: m.start, end: m.end }))
+      });
     }
   }
 

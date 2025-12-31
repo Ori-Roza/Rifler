@@ -5,21 +5,6 @@
   <div class="spinner"></div>
 </div>
 
-<!-- Header -->
-<header class="rifler-header">
-  <div class="header-left">
-    <h1 class="header-title">SEARCH</h1>
-  </div>
-  <div class="header-right">
-    <button class="header-btn" id="replace-toggle-btn" title="Toggle Replace (Alt+Shift+F)" aria-label="Replace">
-      <span class="material-symbols-outlined">swap_horiz</span>
-    </button>
-    <button class="header-btn" id="close-search" title="Close (Esc)" aria-label="Close">
-      <span class="material-symbols-outlined">close</span>
-    </button>
-  </div>
-</header>
-
 <!-- Search Input Section -->
 <section class="search-section">
   <div class="search-box">
@@ -28,14 +13,28 @@
       <input type="text" id="query" class="search-input" placeholder="Search..." autofocus />
       <div id="query-validation-message" class="validation-message"></div>
       <div class="search-options">
-        <button type="button" class="option-btn" id="match-case" title="Match Case (Alt+C)" data-option="case">TT</button>
-        <button type="button" class="option-btn" id="whole-word" title="Match Whole Word (Alt+W)" data-option="word">ab</button>
-        <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">*</button>
+        <button type="button" class="option-btn" id="match-case" title="Match Case (Alt+C)" data-option="case">
+          <span class="material-symbols-outlined">format_size</span>
+        </button>
+        <button type="button" class="option-btn" id="whole-word" title="Match Whole Word (Alt+W)" data-option="word">
+          <span class="material-symbols-outlined">match_word</span>
+        </button>
+        <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">
+          <span class="material-symbols-outlined">regular_expression</span>
+        </button>
       </div>
     </div>
-    <button class="icon-btn" id="filter-btn" title="Toggle Filters">
-      <span class="material-symbols-outlined">filter_alt</span>
-    </button>
+    <div class="search-controls">
+      <button class="icon-btn" id="replace-toggle-btn" title="Toggle Replace (Alt+Shift+F)" aria-label="Replace">
+        <span class="material-symbols-outlined">swap_horiz</span>
+      </button>
+      <button class="icon-btn" id="filter-btn" title="Toggle Filters">
+        <span class="material-symbols-outlined filled">tune</span>
+      </button>
+      <button class="icon-btn" id="clear-search-btn" title="Clear Search (Ctrl+L)" aria-label="Clear Search">
+        <span class="material-symbols-outlined">clear</span>
+      </button>
+    </div>
   </div>
 
   <!-- Replace Row (hidden by default) -->
@@ -43,8 +42,8 @@
     <span class="material-symbols-outlined replace-icon">swap_horiz</span>
     <input type="text" id="replace-input" class="replace-input" placeholder="Replace with..." />
     <div class="replace-actions">
-      <button id="replace-btn" title="Replace (Enter)">Replace</button>
-      <button id="replace-all-btn" class="primary" title="Replace All (Cmd+Enter)">All</button>
+      <button id="replace-btn" class="secondary" title="Replace (Enter)">Replace</button>
+      <button id="replace-all-btn" class="secondary" title="Replace All (Cmd+Enter)">All</button>
     </div>
   </div>
 
@@ -52,29 +51,28 @@
   <div class="filters-container hidden" id="filters-container">
     <div class="filter-row" id="scope-path-row">
       <div class="filter-field path-field">
-        <span class="filter-label" id="path-label">Project:</span>
+        <span class="material-symbols-outlined filter-icon">folder_open</span>
         <div class="filter-input-wrapper">
           <input type="text" id="directory-input" class="path-input" placeholder="src/components/" />
+          <div id="directory-validation-message" class="validation-message"></div>
           <select id="module-select" class="path-input" style="display: none;">
             <option value="">Select module...</option>
           </select>
-          <input type="text" id="file-input" class="path-input" placeholder="File path..." readonly style="display: none;" />
         </div>
       </div>
       <div class="filter-field scope-field">
-        <span class="filter-label">Module:</span>
+        <span class="filter-label" id="path-label" style="display: none;">Directory:</span>
         <select id="scope-select" class="scope-dropdown">
-          <option value="project">Project</option>
+          <option value="project">In Project</option>
           <option value="module">Module</option>
           <option value="directory" selected>Directory</option>
-          <option value="file">File</option>
         </select>
       </div>
     </div>
 
     <div class="filter-row" id="file-mask-row">
       <div class="filter-field">
-        <span class="filter-label">Filter:</span>
+        <span class="material-symbols-outlined filter-icon">filter_alt</span>
         <input type="text" id="file-mask" class="mask-input" placeholder="*.ts, *.js" />
       </div>
     </div>
@@ -96,7 +94,7 @@
 
   <!-- Results Panel -->
   <div class="results-panel" id="results-panel">
-    <div class="results-list scrollbar-hide" id="results-list">
+    <div class="results-list" id="results-list">
       <div class="empty-state">Type to search...</div>
     </div>
   </div>
@@ -105,6 +103,9 @@
   <div class="preview-panel-container" id="preview-panel-container">
     <!-- Drag Handle -->
     <div class="drag-handle" id="drag-handle">
+      <button class="preview-toggle-btn" id="preview-toggle-btn" title="Toggle Preview Panel (Ctrl+Shift+P)">
+        <span class="material-symbols-outlined">remove</span>
+      </button>
       <div class="drag-handle-bar"></div>
     </div>
 
@@ -112,17 +113,25 @@
     <div class="preview-panel" id="preview-panel">
       <div class="preview-header">
         <div class="preview-title-group">
-          <span class="material-symbols-outlined file-icon">description</span>
-          <span class="preview-filename" id="preview-filename">Select a result to preview</span>
-          <span class="preview-filepath" id="preview-filepath"></span>
+          <span class="seti-icon seti-default" id="file-icon"></span>
+          <div class="preview-info">
+            <span class="preview-filename" id="preview-filename">Select a result to preview</span>
+            <span class="preview-filepath" id="preview-filepath"></span>
+          </div>
         </div>
         <div class="preview-actions" id="preview-actions" style="display: none;">
-          <button id="replace-in-file-btn" class="primary" title="Replace in this file (Cmd+Shift+R)">Replace</button>
+          <button id="replace-in-file-btn" class="secondary" title="Replace in this file (Cmd+Shift+R)">Replace</button>
+          <button id="open-in-editor-btn" class="ghost" title="Open file in editor (Ctrl+Enter)">
+            <span class="material-symbols-outlined">open_in_full</span>
+          </button>
         </div>
       </div>
       
       <div class="preview-body">
-        <div class="preview-content" id="preview-content">
+        <div class="preview-loading-overlay" id="preview-loading-overlay">
+          <div class="spinner"></div>
+        </div>
+        <div class="preview-content hljs" id="preview-content">
           <div class="empty-state">Select a result to preview file</div>
         </div>
         
@@ -130,7 +139,7 @@
           <div class="editor-wrapper">
             <div class="editor-line-numbers" id="editor-line-numbers"></div>
             <div class="editor-content-wrapper">
-              <div id="editor-backdrop"></div>
+              <div id="editor-backdrop" class="hljs"></div>
               <textarea id="file-editor" spellcheck="false"></textarea>
             </div>
           </div>
@@ -151,8 +160,8 @@
               <input type="text" id="local-replace-input" placeholder="Replace with...">
             </div>
             <div class="replace-widget-actions">
-              <button id="local-replace-btn" title="Replace next (Enter)">Replace</button>
-              <button id="local-replace-all-btn" class="primary" title="Replace All (Cmd+Enter)">Replace All</button>
+              <button id="local-replace-btn" class="secondary" title="Replace next (Enter)">Replace</button>
+              <button id="local-replace-all-btn" class="secondary" title="Replace All (Cmd+Enter)">Replace All</button>
               <button id="local-replace-close" title="Close (Esc)">
                 <span class="material-symbols-outlined">close</span>
               </button>

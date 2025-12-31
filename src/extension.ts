@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import {
   SearchOptions,
-  findWorkspaceModules
+  findWorkspaceModules,
+  buildSearchRegex
 } from './utils';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
@@ -51,6 +52,28 @@ function sendCurrentDirectory(panel: vscode.WebviewPanel): void {
   });
 }
 
+function sendWorkspaceInfo(panel: vscode.WebviewPanel): void {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  let name = '';
+  let path = '';
+
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    const workspaceFolder = workspaceFolders[0];
+    name = workspaceFolder.name;
+    path = workspaceFolder.uri.fsPath;
+  } else {
+    // Fallback for single file mode or no workspace
+    name = 'No workspace';
+    path = '';
+  }
+
+  panel.webview.postMessage({
+    type: 'workspaceInfo',
+    name,
+    path
+  });
+}
+
 async function sendFileContent(
   panel: vscode.WebviewPanel,
   uriString: string,
@@ -59,34 +82,44 @@ async function sendFileContent(
 ): Promise<void> {
   try {
     const uri = vscode.Uri.parse(uriString);
-    const fileContent = new TextDecoder().decode(
-      await vscode.workspace.fs.readFile(uri)
-    );
+    // Prefer open document content (unsaved edits) before disk
+    const openDoc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uriString);
+    let fileContent: string;
+    if (openDoc) {
+      fileContent = openDoc.getText();
+    } else {
+      fileContent = new TextDecoder().decode(
+        await vscode.workspace.fs.readFile(uri)
+      );
+    }
     const fileName = uri.path.split('/').pop() || '';
     const relativePath = vscode.workspace.asRelativePath(uri);
 
-    // Find matches in the file
-    const regex = new RegExp(
-      options.useRegex
-        ? query
-        : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-      `g${options.matchCase ? '' : 'i'}`
-    );
+    // Get language ID for icon
+    const languageId = getLanguageIdFromFilename(fileName);
+    const iconUri = `vscode-icon://file_type_${languageId}`;
+
+    // Find matches in the file using buildSearchRegex from utils
+    const regex = buildSearchRegex(query, options);
 
     const matches: Array<{ line: number; start: number; end: number }> = [];
     const lines = fileContent.split('\n');
 
-    for (let lineNo = 0; lineNo < lines.length; lineNo++) {
-      const line = lines[lineNo];
-      let match;
-      regex.lastIndex = 0;
+    if (regex) {
+      for (let lineNo = 0; lineNo < lines.length; lineNo++) {
+        const line = lines[lineNo];
+        let match;
+        regex.lastIndex = 0;
 
-      while ((match = regex.exec(line)) !== null) {
-        matches.push({
-          line: lineNo,
-          start: match.index,
-          end: match.index + match[0].length
-        });
+        while ((match = regex.exec(line)) !== null) {
+          matches.push({
+            line: lineNo,
+            start: match.index,
+            end: match.index + match[0].length
+          });
+          // Prevent infinite loop for zero-length matches
+          if (match[0].length === 0) regex.lastIndex++;
+        }
       }
     }
 
@@ -96,6 +129,7 @@ async function sendFileContent(
       content: fileContent,
       fileName,
       relativePath,
+      iconUri,
       matches
     });
   } catch (error) {
@@ -105,26 +139,52 @@ async function sendFileContent(
       uri: uriString,
       content: '',
       fileName: '',
+      iconUri: 'vscode-icon://file_type_default',
       matches: []
     });
   }
 }
 
-async function saveFile(
-  panel: vscode.WebviewPanel,
-  uriString: string,
-  content: string
-): Promise<void> {
-  try {
-    const uri = vscode.Uri.parse(uriString);
-    await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(content));
-  } catch (error) {
-    console.error('Error saving file:', error);
-    panel.webview.postMessage({
-      type: 'error',
-      message: `Failed to save file: ${error}`
-    });
-  }
+function getLanguageIdFromFilename(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  const langMap: { [key: string]: string } = {
+    'js': 'javascript',
+    'jsx': 'javascriptreact',
+    'ts': 'typescript',
+    'tsx': 'typescriptreact',
+    'py': 'python',
+    'java': 'java',
+    'c': 'c',
+    'cpp': 'cpp',
+    'h': 'c',
+    'hpp': 'cpp',
+    'cs': 'csharp',
+    'php': 'php',
+    'rb': 'ruby',
+    'go': 'go',
+    'rs': 'rust',
+    'swift': 'swift',
+    'kt': 'kotlin',
+    'kts': 'kotlin',
+    'scala': 'scala',
+    'html': 'html',
+    'htm': 'html',
+    'xml': 'xml',
+    'css': 'css',
+    'scss': 'scss',
+    'less': 'less',
+    'json': 'json',
+    'yaml': 'yaml',
+    'yml': 'yaml',
+    'md': 'markdown',
+    'sh': 'shellscript',
+    'bash': 'shellscript',
+    'zsh': 'shellscript',
+    'sql': 'sql',
+    'vue': 'vue',
+    'svelte': 'svelte'
+  };
+  return langMap[ext || ''] || 'file';
 }
 
 async function openLocation(
@@ -148,6 +208,7 @@ async function openLocation(
 let stateStore: StateStore;
 let viewManager: ViewManager;
 let panelManager: PanelManager;
+let panelActivePreview: { uri: string; query: string; options: SearchOptions } | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('Rifler extension is now active');
@@ -217,19 +278,31 @@ export async function activate(context: vscode.ExtensionContext) {
         if (!panel) return;
         sendCurrentDirectory(panel);
       },
+      sendWorkspaceInfo: () => {
+        const panel = panelManager.panel;
+        if (!panel) return;
+        sendWorkspaceInfo(panel);
+      },
       sendFileContent: async (uri, query, options, _activeIndex) => {
+        panelActivePreview = { uri, query, options };
         const panel = panelManager.panel;
         if (!panel) return;
         await sendFileContent(panel, uri, query, options);
       },
-      saveFile: async (uri, content) => {
-        const panel = panelManager.panel;
-        if (!panel) return;
-        await saveFile(panel, uri, content);
-      }
+      applyEdits: async (uri, content) => {
+        // For panel (full-window mode), just save to disk
+        // (panel mode is less interactive than sidebar edit mode)
+        try {
+          const uriObj = vscode.Uri.parse(uri);
+          const encoder = new TextEncoder();
+          await vscode.workspace.fs.writeFile(uriObj, encoder.encode(content));
+        } catch (error) {
+          console.error('Error saving file from panel:', error);
+        }
+      },
+      stateStore: stateStore
     });
-    // No-op handlers for test signals
-    handler.registerHandler('__test_searchCompleted', async () => {});
+    // Test signals are echoed in registerCommonHandlers; keep explicit registration for clarity
     handler.registerHandler('__test_searchResultsReceived', async () => {});
   });
 
@@ -244,6 +317,59 @@ export async function activate(context: vscode.ExtensionContext) {
       stateStore.onSidebarVisibilityChange(callback);
     }
   });
+
+  // Set up loop prevention: ignore onDidChangeTextDocument events when we're applying from webview
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      // Skip if this change came from applying edits from the webview
+      if (sidebarProvider.isApplyingFromWebview(e.document.uri)) {
+        return;
+      }
+
+      const panel = panelManager.panel;
+      if (!panel || !panel.visible || !panelActivePreview) return;
+
+      if (e.document.uri.toString() !== panelActivePreview.uri) return;
+
+      // Use unsaved text from the document
+      const fileName = e.document.uri.path.split('/').pop() || '';
+      const relativePath = vscode.workspace.asRelativePath(e.document.uri);
+      const languageId = getLanguageIdFromFilename(fileName);
+      const iconUri = `vscode-icon://file_type_${languageId}`;
+
+      const fileContent = e.document.getText();
+      const regex = buildSearchRegex(panelActivePreview.query, panelActivePreview.options);
+
+      const matches: Array<{ line: number; start: number; end: number }> = [];
+      const lines = fileContent.split('\n');
+
+      if (regex) {
+        for (let lineNo = 0; lineNo < lines.length; lineNo++) {
+          const line = lines[lineNo];
+          regex.lastIndex = 0;
+          let match: RegExpExecArray | null;
+          while ((match = regex.exec(line)) !== null) {
+            matches.push({
+              line: lineNo,
+              start: match.index,
+              end: match.index + match[0].length
+            });
+            if (match[0].length === 0) regex.lastIndex++;
+          }
+        }
+      }
+
+      panel.webview.postMessage({
+        type: 'fileContent',
+        uri: panelActivePreview.uri,
+        content: fileContent,
+        fileName,
+        relativePath,
+        iconUri,
+        matches
+      });
+    })
+  );
 
   // Safety net: close sidebar if Rifler tab is active or visible
   // This handles cases like dragging the tab or switching tab groups
@@ -268,8 +394,51 @@ export async function activate(context: vscode.ExtensionContext) {
           vscode.commands.executeCommand('workbench.action.closeSidebar');
         }, 100);
       }
+    }),
+    // Monitor for configuration changes that might affect panel visibility
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('rifler')) {
+        const config = vscode.workspace.getConfiguration('rifler');
+        const resultsShowCollapsed = config.get<boolean>('results.showCollapsed', false);
+        
+        // Send updated config to panel webview if visible
+        if (panelManager.panel?.visible) {
+          panelManager.panel.webview.postMessage({
+            type: 'config',
+            resultsShowCollapsed
+          });
+          
+          setTimeout(() => {
+            vscode.commands.executeCommand('workbench.action.closeSidebar');
+          }, 100);
+        }
+        
+        // Also update sidebar if visible
+        sidebarProvider.sendConfigUpdate(resultsShowCollapsed);
+      }
     })
   );
+
+  // Set up an interval to continuously ensure sidebar is closed while panel is visible
+  // This handles edge cases where VS Code auto-shows sidebar due to resize/layout changes
+  const sidebarCloserInterval = setInterval(() => {
+    if (panelManager.panel?.visible) {
+      try {
+        vscode.commands.executeCommand('workbench.action.closeSidebar');
+      } catch (err) {
+        // Ignore errors from closeSidebar command
+      }
+    }
+  }, 500);
+  
+  // Mark timer as not preventing process exit (important for test teardown)
+  if (sidebarCloserInterval.unref) {
+    sidebarCloserInterval.unref();
+  }
+
+  context.subscriptions.push({
+    dispose: () => clearInterval(sidebarCloserInterval)
+  });
 
   // If persistence is disabled, clear any prior leftover state on activation
   {

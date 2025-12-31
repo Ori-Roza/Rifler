@@ -21,15 +21,24 @@ console.log('[Rifler] Webview script starting...');
 })();
 
 (function() {
-  console.log('[Rifler] IIFE initialization started');
+  console.log('[Rifler] IIFE initialization started. hljs available:', typeof hljs !== 'undefined');
+  if (typeof hljs !== 'undefined') {
+    console.log('[Rifler] hljs version:', hljs.versionString);
+    console.log('[Rifler] hljs languages:', hljs.listLanguages().join(', '));
+  }
   
   const state = {
     results: [],
     renderItems: [],
     activeIndex: -1,
+    activeGroupPath: null, // Track which file group is active
+    activeIndexInGroup: -1, // Track index within the current group
+    activeGroupId: null, // Track the group container element ID or data attribute
     currentScope: 'project',
     modules: [],
     currentDirectory: '',
+    workspaceName: '',
+    workspacePath: '',
     currentQuery: '',
     fileContent: null,
     lastPreview: null,
@@ -39,12 +48,17 @@ console.log('[Rifler] Webview script starting...');
     replaceKeybinding: 'ctrl+shift+r',
     maxResultsCap: 10000,
     collapsedFiles: new Set(),
+    expandedFiles: new Set(), // Track files explicitly expanded by user
+    previewPanelCollapsed: false, // Track preview panel state
+    resultsShowCollapsed: false, // Show results collapsed by default if enabled in settings
     options: {
       matchCase: false,
       wholeWord: false,
       useRegex: false,
       fileMask: ''
-    }
+    },
+    groupScrollTops: {}, // Persist scroll positions for grouped result containers
+    loadingTimeout: null // Track loading overlay timeout
   };
 
   const vscode = acquireVsCodeApi();
@@ -92,16 +106,16 @@ console.log('[Rifler] Webview script starting...');
   const replaceInput = document.getElementById('replace-input');
   const replaceBtn = document.getElementById('replace-btn');
   const replaceAllBtn = document.getElementById('replace-all-btn');
-  const closeSearchBtn = document.getElementById('close-search');
+  const clearSearchBtn = document.getElementById('clear-search-btn');
   const resultsList = document.getElementById('results-list');
   const previewContent = document.getElementById('preview-content');
   const previewFilename = document.getElementById('preview-filename');
   const previewFilepath = document.getElementById('preview-filepath');
+  const previewLoadingOverlay = document.getElementById('preview-loading-overlay');
   
   // Updated for new layout
   const directoryInput = document.getElementById('directory-input');
   const moduleSelect = document.getElementById('module-select');
-  const fileInput = document.getElementById('file-input');
   const scopeSelect = document.getElementById('scope-select');
   const pathLabel = document.getElementById('path-label');
   
@@ -129,6 +143,7 @@ console.log('[Rifler] Webview script starting...');
   // Keep backward compatibility - some may not exist in new design
   const previewActions = document.getElementById('preview-actions');
   const replaceInFileBtn = document.getElementById('replace-in-file-btn');
+  const openInEditorBtn = document.getElementById('open-in-editor-btn');
   const fileEditor = document.getElementById('file-editor');
   const editorContainer = document.getElementById('editor-container');
   const editorBackdrop = document.getElementById('editor-backdrop');
@@ -138,7 +153,7 @@ console.log('[Rifler] Webview script starting...');
   const previewPanel = document.getElementById('preview-panel');
   const mainContent = document.querySelector('.main-content');
 
-  let VIRTUAL_ROW_HEIGHT = 28;
+  let VIRTUAL_ROW_HEIGHT = 40;
   const VIRTUAL_OVERSCAN = 8;
   let measuredRowHeight = 0;
   const virtualContent = document.createElement('div');
@@ -175,48 +190,6 @@ console.log('[Rifler] Webview script starting...');
     filtersContainer: !!filtersContainer
   });
 
-  function getLanguageFromFilename(filename) {
-    const ext = (filename || '').split('.').pop().toLowerCase();
-    const langMap = {
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'py': 'python',
-      'java': 'java',
-      'c': 'c',
-      'cpp': 'cpp',
-      'h': 'c',
-      'hpp': 'cpp',
-      'cs': 'csharp',
-      'php': 'php',
-      'rb': 'ruby',
-      'go': 'go',
-      'rs': 'rust',
-      'swift': 'swift',
-      'kt': 'kotlin',
-      'kts': 'kotlin',
-      'scala': 'scala',
-      'html': 'xml',
-      'htm': 'xml',
-      'xml': 'xml',
-      'css': 'css',
-      'scss': 'scss',
-      'less': 'less',
-      'json': 'json',
-      'yaml': 'yaml',
-      'yml': 'yaml',
-      'md': 'markdown',
-      'sh': 'bash',
-      'bash': 'bash',
-      'zsh': 'bash',
-      'sql': 'sql',
-      'vue': 'xml',
-      'svelte': 'xml'
-    };
-    return langMap[ext] || null;
-  }
-
   var localMatches = [];
   var localMatchIndex = 0;
   var searchBoxFocusedOnStartup = false;
@@ -236,12 +209,15 @@ console.log('[Rifler] Webview script starting...');
         queryInput.focus();
         searchBoxFocusedOnStartup = true;
       }
+
+      // Set up event listeners after DOM is ready
     });
   });
 
   vscode.postMessage({ type: 'webviewReady' });
   vscode.postMessage({ type: 'getModules' });
   vscode.postMessage({ type: 'getCurrentDirectory' });
+  vscode.postMessage({ type: 'getWorkspaceInfo' });
   
   // Initialize results count display
   clearResultsCountDisplay();
@@ -251,8 +227,6 @@ console.log('[Rifler] Webview script starting...');
       const isVisible = replaceRow.classList.contains('visible');
       const newState = typeof forceState === 'boolean' ? forceState : !isVisible;
       
-      console.log('[Rifler] toggleReplace called. forceState:', forceState, 'isVisible:', isVisible, 'newState:', newState);
-
       replaceRow.classList.toggle('visible', newState);
       replaceRow.style.display = newState ? 'flex' : 'none';
       
@@ -264,6 +238,12 @@ console.log('[Rifler] Webview script starting...');
       if (newState && replaceInput) {
         replaceInput.focus();
       }
+      
+      // Update highlights when replace mode changes
+      if (isEditMode) {
+        updateHighlights();
+      }
+      
       vscode.postMessage({
         type: 'toggleReplace',
         state: newState
@@ -277,11 +257,24 @@ console.log('[Rifler] Webview script starting...');
       e.preventDefault();
       toggleReplace();
     }
+    
+    // Toggle preview panel on Ctrl+Shift+P
+    if (e.ctrlKey && e.shiftKey && e.code === 'KeyP') {
+      e.preventDefault();
+      const previewToggleBtn = document.getElementById('preview-toggle-btn');
+      if (previewToggleBtn) {
+        previewToggleBtn.click();
+      }
+    }
   });
 
-  if (closeSearchBtn) {
-    closeSearchBtn.addEventListener('click', () => {
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
       queryInput.value = '';
+      if (fileMaskInput) {
+        fileMaskInput.value = '';
+        state.options.fileMask = '';
+      }
       state.results = [];
       state.activeIndex = -1;
       handleSearchResults([], { skipAutoLoad: true });
@@ -306,6 +299,36 @@ console.log('[Rifler] Webview script starting...');
     });
   }
 
+  // Preview panel toggle functionality
+  const previewToggleBtn = document.getElementById('preview-toggle-btn');
+  if (previewToggleBtn) {
+    previewToggleBtn.addEventListener('click', () => {
+      const previewPanel = document.getElementById('preview-panel-container');
+      if (previewPanel) {
+        state.previewPanelCollapsed = !state.previewPanelCollapsed;
+        
+        if (state.previewPanelCollapsed) {
+          // Collapse to minimum height
+          applyPreviewHeight(PREVIEW_MIN_HEIGHT, { persist: true });
+        } else {
+          // Expand to last expanded height or default
+          const targetHeight = lastExpandedHeight || getDefaultPreviewHeight();
+          applyPreviewHeight(targetHeight, { persist: true });
+        }
+        
+        previewToggleBtn.innerHTML = state.previewPanelCollapsed ? 
+          '<span class="material-symbols-outlined">add</span>' : 
+          '<span class="material-symbols-outlined">remove</span>';
+        
+        // Send message to extension to save preference
+        vscode.postMessage({ 
+          type: 'previewPanelToggled', 
+          collapsed: state.previewPanelCollapsed 
+        });
+      }
+    });
+  }
+
   if (replaceBtn) {
     replaceBtn.addEventListener('click', replaceOne);
   }
@@ -314,23 +337,48 @@ console.log('[Rifler] Webview script starting...');
     replaceAllBtn.addEventListener('click', replaceAll);
   }
 
+  // Function to update collapse/expand button text based on current state
+  function updateCollapseButtonText() {
+    if (!collapseAllBtn || state.results.length === 0) return;
+    
+    const allPaths = new Set();
+    state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
+    
+    const allCollapsed = Array.from(allPaths).every(p => state.collapsedFiles.has(p));
+    
+    if (allCollapsed) {
+      collapseAllBtn.innerHTML = 'Expand All <span class="material-symbols-outlined">unfold_more</span>';
+    } else {
+      collapseAllBtn.innerHTML = 'Collapse All <span class="material-symbols-outlined">unfold_less</span>';
+    }
+  }
+
   if (collapseAllBtn) {
     collapseAllBtn.addEventListener('click', () => {
       if (state.results.length === 0) return;
       
-      // If everything is already collapsed, expand all. Otherwise, collapse all.
       const allPaths = new Set();
       state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
       
-      const allCollapsed = Array.from(allPaths).every(p => state.collapsedFiles.has(p));
+      // Check if all files are currently collapsed
+      const allCurrentlyCollapsed = Array.from(allPaths).every(p => {
+        if (state.collapsedFiles.has(p)) return true;
+        if (state.expandedFiles.has(p)) return false;
+        return state.resultsShowCollapsed;
+      });
       
-      if (allCollapsed) {
+      if (allCurrentlyCollapsed) {
+        // All collapsed, expand all
         state.collapsedFiles.clear();
+        allPaths.forEach(p => state.expandedFiles.add(p));
       } else {
+        // Not all collapsed, collapse all
+        state.expandedFiles.clear();
         allPaths.forEach(p => state.collapsedFiles.add(p));
       }
       
-      handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
+      handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex, preserveScroll: true });
+      updateCollapseButtonText();
     });
   }
   
@@ -372,6 +420,12 @@ console.log('[Rifler] Webview script starting...');
 
   if (replaceInFileBtn) {
     replaceInFileBtn.addEventListener('click', triggerReplaceInFile);
+  }
+
+  if (openInEditorBtn) {
+    openInEditorBtn.addEventListener('click', () => {
+      openActiveResult();
+    });
   }
   
   if (localReplaceClose) {
@@ -525,6 +579,11 @@ console.log('[Rifler] Webview script starting...');
   function triggerLocalReplace() {
     if (localMatches.length === 0) return;
     
+    // Temporarily hide backdrop to prevent flickering during highlight update
+    if (editorBackdrop) {
+      editorBackdrop.style.visibility = 'hidden';
+    }
+    
     var match = localMatches[localMatchIndex];
     var content = fileEditor.value;
     var newContent = content.substring(0, match.start) + localReplaceInput.value + content.substring(match.end);
@@ -537,6 +596,11 @@ console.log('[Rifler] Webview script starting...');
     updateLocalMatches();
     updateHighlights();
     
+    // Show backdrop again after highlights are updated
+    if (editorBackdrop) {
+      editorBackdrop.style.visibility = 'visible';
+    }
+    
     if (localMatches.length > 0) {
       if (localMatchIndex >= localMatches.length) {
         localMatchIndex = 0;
@@ -547,6 +611,11 @@ console.log('[Rifler] Webview script starting...');
 
   function triggerLocalReplaceAll() {
     if (localMatches.length === 0) return;
+    
+    // Temporarily hide backdrop to prevent flickering during highlight update
+    if (editorBackdrop) {
+      editorBackdrop.style.visibility = 'hidden';
+    }
     
     var content = fileEditor.value;
     var searchTerm = localSearchInput.value;
@@ -585,40 +654,262 @@ console.log('[Rifler] Webview script starting...');
       updateLocalMatches();
       updateHighlights();
       
+      // Show backdrop again after highlights are updated
+      if (editorBackdrop) {
+        editorBackdrop.style.visibility = 'visible';
+      }
+      
       localMatchCount.textContent = 'Replaced ' + count;
     } catch (e) {
     }
   }
 
   let isEditMode = false;
-  let saveTimeout = null;
+  let applyEditsTimeout = null;
+  
+  // RAF throttling for backdrop sync to prevent flicker on arrow navigation
+  let pendingBackdropUpdate = false;
+  function scheduleBackdropSync() {
+    if (pendingBackdropUpdate) return;
+    pendingBackdropUpdate = true;
+    requestAnimationFrame(() => {
+      pendingBackdropUpdate = false;
+      updateHighlights();
+    });
+  }
+  
+  // Prevent scroll ping-pong between editor and preview
+  let isProgrammaticScroll = false;
+  
+  // Cache line elements to avoid querying on every arrow press
+  let lineEls = [];
+  let activeLineEl = null;
+  let activeLineIdx = 0;
+  
+  // RAF schedulers for active line and backdrop updates
+  let rafActiveScheduled = false;
+  let rafBackdropScheduled = false;
+  let pendingActiveIdx = 0;
+  
+  function scheduleActiveLineUpdate(idx) {
+    pendingActiveIdx = idx;
+    if (rafActiveScheduled) return;
+    rafActiveScheduled = true;
+    requestAnimationFrame(() => {
+      rafActiveScheduled = false;
+      applyActiveLineClass(pendingActiveIdx);
+      ensureLineVisible(pendingActiveIdx);
+    });
+  }
+  
+  function scheduleBackdropUpdateRAF() {
+    if (rafBackdropScheduled) return;
+    rafBackdropScheduled = true;
+    requestAnimationFrame(() => {
+      rafBackdropScheduled = false;
+      scheduleBackdropSync();
+    });
+  }
+  
+  function applyActiveLineClass(idx) {
+    // Touch only 2 line elements: remove from previous, add to next
+    if (activeLineEl) {
+      activeLineEl.classList.remove('isActive');
+    }
+    
+    activeLineEl = lineEls[idx] || null;
+    activeLineIdx = idx;
+    
+    if (activeLineEl) {
+      activeLineEl.classList.add('isActive');
+    }
+  }
+  
+  function ensureLineVisible(idx) {
+    if (!previewContent || idx < 0 || idx >= lineEls.length) return;
+    const lineEl = lineEls[idx];
+    if (lineEl) {
+      // Only assign scrollTop if element is outside viewport
+      const rect = lineEl.getBoundingClientRect();
+      const containerRect = previewContent.getBoundingClientRect();
+      
+      if (rect.top < containerRect.top) {
+        previewContent.scrollTop -= (containerRect.top - rect.top);
+      } else if (rect.bottom > containerRect.bottom) {
+        previewContent.scrollTop += (rect.bottom - containerRect.bottom);
+      }
+    }
+  }
+  
+  function rebuildLineElementCache() {
+    lineEls = Array.from(document.querySelectorAll('.pvLine'));
+    activeLineEl = lineEls[activeLineIdx] || null;
+  }
 
   if (previewContent) {
     previewContent.addEventListener('click', (e) => {
       if (e.target.tagName === 'BUTTON') return;
       
-      enterEditMode();
+      // Find the clicked line
+      const pvLine = e.target.closest('.pvLine');
+      if (pvLine) {
+        const lineNumber = parseInt(pvLine.getAttribute('data-line'), 10);
+        const pvCode = pvLine.querySelector('.pvCode');
+        
+        if (pvCode) {
+          // Use DOM caret APIs to get precise caret position
+          let clickedColumn = 0;
+          
+          try {
+            // Try caretRangeFromPoint first (Chrome, Safari)
+            let range = null;
+            if (document.caretRangeFromPoint) {
+              range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            } else if (document.caretPositionFromPoint) {
+              // Firefox
+              const position = document.caretPositionFromPoint(e.clientX, e.clientY);
+              if (position) {
+                range = document.createRange();
+                range.setStart(position.offsetNode, position.offset);
+              }
+            }
+            
+            if (range) {
+              // Find the closest .pvSeg element
+              let node = range.startContainer;
+              let pvSeg = null;
+              
+              if (node.nodeType === Node.TEXT_NODE) {
+                pvSeg = node.parentElement?.closest('.pvSeg');
+              } else if (node.nodeType === Node.ELEMENT_NODE) {
+                pvSeg = node.closest('.pvSeg');
+              }
+              
+              if (pvSeg) {
+                const segStart = parseInt(pvSeg.getAttribute('data-start') || '0', 10);
+                let offsetInSegText = 0;
+                
+                // Only use offset if the caret is in a text node within this seg
+                if (node.nodeType === Node.TEXT_NODE && pvSeg.contains(node)) {
+                  // Walk text nodes to compute offset
+                  const walker = document.createTreeWalker(pvSeg, NodeFilter.SHOW_TEXT);
+                  let textNode;
+                  let textOffset = 0;
+                  while ((textNode = walker.nextNode())) {
+                    if (textNode === node) {
+                      offsetInSegText = textOffset + range.startOffset;
+                      break;
+                    }
+                    textOffset += textNode.textContent.length;
+                  }
+                } else {
+                  // Fallback: use segStart only
+                  offsetInSegText = 0;
+                }
+                
+                clickedColumn = segStart + offsetInSegText;
+              }
+            }
+            
+            // Clamp column to raw line length
+            if (state.fileContent && state.fileContent.content) {
+              const lines = state.fileContent.content.split('\n');
+              const rawLine = lines[lineNumber] || '';
+              clickedColumn = Math.max(0, Math.min(clickedColumn, rawLine.length));
+            }
+          } catch (err) {
+            console.error('[Rifler] Click-to-cursor error:', err);
+            clickedColumn = 0;
+          }
+          
+          enterEditMode(lineNumber, clickedColumn);
+        } else {
+          enterEditMode(lineNumber);
+        }
+      } else {
+        enterEditMode();
+      }
     });
   }
 
-  function enterEditMode() {
+  function enterEditMode(clickedLineNumber, clickedColumn = 0) {
     if (!state.fileContent || isEditMode) return;
     
     const scrollTop = previewContent.scrollTop;
     
     isEditMode = true;
-    if (editorContainer) editorContainer.classList.add('visible');
-    if (fileEditor) fileEditor.value = state.fileContent.content;
-    updateHighlights();
     
+    // 1) POPULATE BEFORE ANY VISIBILITY CHANGES
+    // This prevents first-time blank frame
+    if (fileEditor) {
+      fileEditor.value = state.fileContent.content;
+    }
+    
+    // Cheap immediate backdrop paint to prevent blank
+    if (editorBackdrop) {
+      editorBackdrop.textContent = state.fileContent.content;
+    }
+    
+    // Update line numbers based on content
+    if (fileEditor && editorLineNumbers) {
+      const lines = state.fileContent.content.split('\n');
+      let html = '';
+      for (let i = 1; i <= lines.length; i++) {
+        html += '<div>' + i + '</div>';
+      }
+      editorLineNumbers.innerHTML = html;
+    }
+    
+    // Set caret position before showing editor
+    if (fileEditor && typeof clickedLineNumber === 'number' && clickedLineNumber >= 0) {
+      const content = state.fileContent.content;
+      const lineStarts = [0];
+      for (let i = 0; i < content.length; i++) {
+        if (content[i] === '\n') {
+          lineStarts.push(i + 1);
+        }
+      }
+      
+      const lineStart = lineStarts[clickedLineNumber] !== undefined ? lineStarts[clickedLineNumber] : content.length;
+      const lines = content.split('\n');
+      const lineLength = lines[clickedLineNumber]?.length || 0;
+      const clampedColumn = Math.min(clickedColumn, lineLength);
+      const charPosition = lineStart + clampedColumn;
+      fileEditor.setSelectionRange(charPosition, charPosition);
+    }
+    
+    // Sync initial scroll position
+    if (fileEditor) {
+      fileEditor.scrollTop = scrollTop;
+    }
+    if (editorBackdrop) {
+      editorBackdrop.scrollTop = scrollTop;
+    }
+    if (editorLineNumbers) {
+      editorLineNumbers.scrollTop = scrollTop;
+    }
+    
+    // 2) SHOW EDITOR FIRST
+    if (editorContainer) {
+      editorContainer.classList.add('visible');
+    }
+    
+    // 3) FOCUS IMMEDIATELY
+    if (fileEditor) {
+      fileEditor.focus({ preventScroll: true });
+    }
+    
+    // 4) HIDE PREVIEW ONLY AFTER PAINT (2 frames to be safe)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (fileEditor) {
-          fileEditor.scrollTop = scrollTop;
-          fileEditor.focus({ preventScroll: true });
+        if (previewContent) {
+          previewContent.classList.add('hidden-for-edit');
         }
-        if (editorBackdrop) editorBackdrop.scrollTop = scrollTop;
-        if (editorLineNumbers) editorLineNumbers.scrollTop = scrollTop;
+        
+        // 5) EXPENSIVE HIGHLIGHTING AFTER EDITOR VISIBLE
+        requestAnimationFrame(() => {
+          scheduleBackdropSync();
+        });
       });
     });
   }
@@ -627,22 +918,53 @@ console.log('[Rifler] Webview script starting...');
     if (!state.fileContent) return;
     
     const newContent = fileEditor.value;
-    vscode.postMessage({
-      type: 'saveFile',
-      uri: state.fileContent.uri,
-      content: newContent
-    });
     
+    // Update local state immediately
     state.fileContent.content = newContent;
+    
+    // Debounce sending applyEdits message (150-300ms for immediate feel)
+    if (applyEditsTimeout) clearTimeout(applyEditsTimeout);
+    applyEditsTimeout = setTimeout(() => {
+      vscode.postMessage({
+        type: 'applyEdits',
+        uri: state.fileContent.uri,
+        content: newContent,
+        source: 'rifler',
+        ts: Date.now()
+      });
+    }, 150);
   }
 
   function exitEditMode(skipRender = false) {
     if (!isEditMode) return;
     
-    saveFile();
+    // Flush any pending applyEdits
+    if (applyEditsTimeout) clearTimeout(applyEditsTimeout);
+    if (!state.fileContent) return;
+    
+    const finalContent = fileEditor.value;
+    vscode.postMessage({
+      type: 'applyEdits',
+      uri: state.fileContent.uri,
+      content: finalContent,
+      source: 'rifler',
+      ts: Date.now()
+    });
+    state.fileContent.content = finalContent;
     
     isEditMode = false;
-    if (editorContainer) editorContainer.classList.remove('visible');
+    
+    // SHOW PREVIEW FIRST
+    if (previewContent) {
+      previewContent.classList.remove('hidden-for-edit');
+    }
+    
+    // HIDE EDITOR ON NEXT PAINT
+    requestAnimationFrame(() => {
+      if (editorContainer) {
+        editorContainer.classList.remove('visible');
+      }
+    });
     
     if (!skipRender) {
       renderFilePreview(state.fileContent);
@@ -651,17 +973,27 @@ console.log('[Rifler] Webview script starting...');
 
   if (fileEditor) {
     fileEditor.addEventListener('input', () => {
-      updateHighlights();
-      if (saveTimeout) clearTimeout(saveTimeout);
-      saveTimeout = setTimeout(() => {
-        saveFile();
-      }, 1000);
+      // Use RAF-throttled update to prevent flicker during rapid typing/navigation
+      scheduleBackdropSync();
+      // Send applyEdits with debounce on input
+      saveFile();
     });
 
     fileEditor.addEventListener('blur', (e) => {
-      if (saveTimeout) clearTimeout(saveTimeout);
-      // Removed exitEditMode() on blur to prevent flickering and unwanted saves
-      // when switching focus to the replace widget or other UI elements.
+      if (applyEditsTimeout) clearTimeout(applyEditsTimeout);
+      
+      // Check if focus moved to something else in the editor container (like the replace widget)
+      const relatedTarget = e.relatedTarget;
+      if (relatedTarget && editorContainer && editorContainer.contains(relatedTarget)) {
+        return;
+      }
+      
+      // Use a small timeout as fallback for cases where relatedTarget is null but focus is still moving
+      setTimeout(() => {
+        if (isEditMode && editorContainer && !editorContainer.contains(document.activeElement)) {
+          exitEditMode();
+        }
+      }, 150);
     });
     fileEditor.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -696,15 +1028,27 @@ console.log('[Rifler] Webview script starting...');
     return ctrlMatch && shiftMatch && altMatch && metaMatch && keyMatch;
   }
   
-  fileEditor.addEventListener('scroll', () => {
-    if (editorBackdrop) {
-      editorBackdrop.scrollTop = fileEditor.scrollTop;
-      editorBackdrop.scrollLeft = fileEditor.scrollLeft;
-    }
-    if (editorLineNumbers) {
-      editorLineNumbers.scrollTop = fileEditor.scrollTop;
-    }
-  });
+  if (fileEditor) {
+    fileEditor.addEventListener('scroll', () => {
+      // Prevent scroll ping-pong during programmatic scroll
+      if (isProgrammaticScroll) return;
+      
+      isProgrammaticScroll = true;
+      
+      if (editorBackdrop) {
+        editorBackdrop.scrollTop = fileEditor.scrollTop;
+        editorBackdrop.scrollLeft = fileEditor.scrollLeft;
+      }
+      if (editorLineNumbers) {
+        editorLineNumbers.scrollTop = fileEditor.scrollTop;
+      }
+      
+      // Reset guard in next frame
+      requestAnimationFrame(() => {
+        isProgrammaticScroll = false;
+      });
+    });
+  }
   
   function updateHighlights() {
     if (!editorBackdrop || !fileEditor) return;
@@ -717,10 +1061,16 @@ console.log('[Rifler] Webview script starting...');
     
     let highlighted = '';
     
-    if (typeof hljs !== 'undefined' && language) {
+    // Re-enable syntax highlighting
+    if (typeof hljs !== 'undefined') {
       try {
-        highlighted = hljs.highlight(text, { language: language }).value;
+        if (language && hljs.getLanguage(language)) {
+          highlighted = hljs.highlight(text, { language }).value;
+        } else {
+          highlighted = hljs.highlightAuto(text).value;
+        }
       } catch (e) {
+        console.error('[Rifler] Highlight error in editor:', e);
         highlighted = text
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -759,9 +1109,8 @@ console.log('[Rifler] Webview script starting...');
                 fragment.appendChild(document.createTextNode(nodeText.substring(lastIndex, index)));
               }
               
-              const mark = document.createElement('mark');
-              mark.style.background = 'var(--rifler-highlight-strong)';
-              mark.style.color = 'inherit';
+              const mark = document.createElement('span');
+              mark.className = 'match';
               mark.textContent = nodeText.substring(index, index + searchQuery.length);
               fragment.appendChild(mark);
               
@@ -816,6 +1165,19 @@ console.log('[Rifler] Webview script starting...');
     const replaceText = replaceInput.value;
     const replacedUri = result.uri;
     
+    // Show loading overlay during replace operation
+    if (previewLoadingOverlay) {
+      previewLoadingOverlay.classList.add('visible');
+    }
+    
+    // Fallback: hide loading overlay after 3 seconds if file content doesn't update
+    state.loadingTimeout = setTimeout(() => {
+      if (previewLoadingOverlay) {
+        previewLoadingOverlay.classList.remove('visible');
+      }
+      state.loadingTimeout = null;
+    }, 3000);
+    
     vscode.postMessage({
       type: 'replaceOne',
       uri: result.uri,
@@ -863,7 +1225,9 @@ console.log('[Rifler] Webview script starting...');
       hidePlaceholder();
       renderResultsVirtualized();
       ensureActiveVisible();
-      if (state.activeIndex >= 0) {
+      // Only reload file content if the current preview file was modified
+      if (state.activeIndex >= 0 && state.fileContent && state.fileContent.uri === replacedUri) {
+        // Reload immediately since this file is currently being previewed
         loadFileContent(state.results[state.activeIndex]);
       }
     }
@@ -883,8 +1247,7 @@ console.log('[Rifler] Webview script starting...');
       scope: state.currentScope,
       options: state.options,
       directoryPath: state.currentScope === 'directory' ? directoryInput.value.trim() : undefined,
-      modulePath: state.currentScope === 'module' ? moduleSelect.value : undefined,
-      filePath: state.currentScope === 'file' ? fileInput.value.trim() : undefined
+      modulePath: state.currentScope === 'module' ? moduleSelect.value : undefined
     });
   }
 
@@ -894,6 +1257,8 @@ console.log('[Rifler] Webview script starting...');
     const messageElement = document.getElementById(messageElementId);
     if (!messageElement) return;
 
+    console.log('[Rifler] Updating validation message:', { fieldId, messageElementId, message, type });
+
     if (message) {
       messageElement.textContent = message;
       messageElement.className = 'validation-message visible ' + type;
@@ -901,6 +1266,29 @@ console.log('[Rifler] Webview script starting...');
       messageElement.className = 'validation-message';
       messageElement.textContent = '';
     }
+  }
+
+  function validateDirectory() {
+    if (state.currentScope !== 'directory') return;
+    
+    const directoryPath = directoryInput.value.trim();
+    const container = directoryInput.closest('.filter-field');
+    
+    console.log('[Rifler] Validating directory:', directoryPath);
+
+    if (!directoryPath) {
+      updateValidationMessage('directory-input', 'directory-validation-message', '', 'error');
+      directoryInput.classList.remove('error');
+      if (container) container.classList.remove('error');
+      return;
+    }
+
+    // Send message to extension to check if directory exists
+    console.log('[Rifler] Sending validateDirectory message:', directoryPath);
+    vscode.postMessage({
+      type: 'validateDirectory',
+      directoryPath: directoryPath
+    });
   }
 
   function updateSearchButtonState() {
@@ -1059,7 +1447,6 @@ console.log('[Rifler] Webview script starting...');
         scope: state.currentScope,
         directoryPath: directoryInput.value,
         modulePath: moduleSelect.value,
-        filePath: fileInput.value,
         options: state.options,
         showReplace: replaceRow.classList.contains('visible'),
         results: state.results,
@@ -1088,11 +1475,17 @@ console.log('[Rifler] Webview script starting...');
 
   function applyPreviewHeight(height, { updateLastExpanded = true, persist = false, visible = true } = {}) {
     const containerHeight = getContainerHeight();
-    if (containerHeight <= 0) return; // Don't apply if we don't know the container height
-
-    const maxPreviewHeight = Math.max(PREVIEW_MIN_HEIGHT, containerHeight - MIN_PANEL_HEIGHT);
-    const clamped = Math.min(Math.max(PREVIEW_MIN_HEIGHT, height), maxPreviewHeight);
-    const newResultsHeight = Math.max(MIN_PANEL_HEIGHT, containerHeight - clamped);
+    
+    // Always set visibility, even if we can't apply height yet
+    if (previewPanelContainer) {
+      previewPanelContainer.style.display = visible ? 'flex' : 'none';
+    }
+    
+    // If we can't determine container height yet, use a reasonable default
+    const effectiveContainerHeight = containerHeight > 0 ? containerHeight : 600; // Assume 600px default
+    const maxPreviewHeight = Math.max(PREVIEW_MIN_HEIGHT, effectiveContainerHeight - MIN_PANEL_HEIGHT);
+    const clamped = Math.min(Math.max(PREVIEW_MIN_HEIGHT, height || getDefaultPreviewHeight()), maxPreviewHeight);
+    const newResultsHeight = Math.max(MIN_PANEL_HEIGHT, effectiveContainerHeight - clamped);
     
     if (resultsPanel) {
       resultsPanel.style.flex = '1';
@@ -1102,9 +1495,6 @@ console.log('[Rifler] Webview script starting...');
     if (previewPanelContainer) {
       previewPanelContainer.style.flex = 'none';
       previewPanelContainer.style.height = (clamped + RESIZER_HEIGHT) + 'px';
-      previewPanelContainer.style.display = visible ? 'flex' : 'none';
-    }
-    if (previewPanel) {
       previewPanel.style.height = clamped + 'px';
     }
     
@@ -1223,6 +1613,12 @@ console.log('[Rifler] Webview script starting...');
   if (dragHandle) {
     dragHandle.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      
+      // Don't start dragging if clicking on the preview toggle button
+      if (e.target.closest('#preview-toggle-btn')) {
+        return;
+      }
+      
       beginResize(e.clientY);
       try {
         dragHandle.setPointerCapture(e.pointerId);
@@ -1273,6 +1669,7 @@ console.log('[Rifler] Webview script starting...');
     directoryInput.addEventListener('input', () => {
       clearTimeout(state.searchTimeout);
       state.searchTimeout = setTimeout(() => {
+        validateDirectory();
         runSearch();
       }, 500);
     });
@@ -1297,10 +1694,10 @@ console.log('[Rifler] Webview script starting...');
       toggleReplace();
     } else if (e.key === 'ArrowDown' && !isInEditor) {
       e.preventDefault();
-      navigateResults(1);
+      moveSelection(1); // Navigate down (flat list, no groups)
     } else if (e.key === 'ArrowUp' && !isInEditor) {
       e.preventDefault();
-      navigateResults(-1);
+      moveSelection(-1); // Navigate up (flat list, no groups)
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isInEditor) {
       e.preventDefault();
       openActiveResult();
@@ -1332,10 +1729,129 @@ console.log('[Rifler] Webview script starting...');
       if (dragHandle && dragHandle.contains(e.target)) {
         return;
       }
+
+      // Don't exit if clicking the global replace row or its children
+      if (replaceRow && (replaceRow === e.target || replaceRow.contains(e.target))) {
+        return;
+      }
+
+      // Don't exit if clicking the replace toggle button
+      if (replaceToggleBtn && (replaceToggleBtn === e.target || replaceToggleBtn.contains(e.target))) {
+        return;
+      }
+      
+      // Don't exit if clicking the conflict banner
+      const conflictBanner = document.getElementById('edit-conflict-banner');
+      if (conflictBanner && (conflictBanner === e.target || conflictBanner.contains(e.target))) {
+        return;
+      }
       
       exitEditMode();
     }
   });
+
+  function showEditConflictBanner(uri, reason) {
+    if (!editorContainer) return;
+    
+    // Create or get existing banner
+    let banner = document.getElementById('edit-conflict-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'edit-conflict-banner';
+      banner.className = 'conflict-banner';
+      banner.style.cssText = `
+        background: #f8d7da;
+        border: 1px solid #f5c2c7;
+        border-radius: 4px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto);
+        font-size: 13px;
+        color: #664d03;
+        z-index: 1000;
+      `;
+      
+      editorContainer.insertBefore(banner, editorContainer.firstChild);
+    }
+    
+    const fileName = uri.split('/').pop() || 'file';
+    const message = reason === 'vsCodeDirtyOrDiverged'
+      ? `This file changed in VS Code while editing in Rifler`
+      : `Conflict: cannot apply edit to ${fileName}`;
+    
+    banner.innerHTML = `
+      <span>${message}</span>
+      <div style="display: flex; gap: 8px;">
+        <button class="conflict-action-btn" data-action="overwrite" style="
+          background: #dc3545;
+          color: white;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+        ">Overwrite VS Code</button>
+        <button class="conflict-action-btn" data-action="reload" style="
+          background: #6c757d;
+          color: white;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+        ">Reload from VS Code</button>
+        <button class="conflict-action-btn" data-action="dismiss" style="
+          background: transparent;
+          color: #664d03;
+          border: 1px solid #664d03;
+          padding: 6px 12px;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+        ">Dismiss</button>
+      </div>
+    `;
+    
+    // Attach event handlers to buttons
+    banner.querySelectorAll('.conflict-action-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.getAttribute('data-action');
+        
+        if (action === 'overwrite') {
+          // Overwrite VS Code with current Rifler content
+          if (state.fileContent) {
+            const content = fileEditor.value;
+            vscode.postMessage({
+              type: 'applyEdits',
+              uri: uri,
+              content: content,
+              source: 'rifler',
+              ts: Date.now()
+            });
+            state.fileContent.content = content;
+          }
+          banner.style.display = 'none';
+        } else if (action === 'reload') {
+          // Reload from VS Code (discard Rifler edits)
+          vscode.postMessage({
+            type: 'getFileContent',
+            uri: uri,
+            query: state.currentQuery,
+            options: state.options
+          });
+          banner.style.display = 'none';
+        } else if (action === 'dismiss') {
+          // Just hide the banner
+          banner.style.display = 'none';
+        }
+      });
+    });
+    
+    banner.style.display = 'flex';
+  }
 
   window.addEventListener('message', (event) => {
     const message = event.data;
@@ -1356,8 +1872,15 @@ console.log('[Rifler] Webview script starting...');
       case 'currentDirectory':
         handleCurrentDirectory(message.directory);
         break;
+      case 'workspaceInfo':
+        handleWorkspaceInfo(message.name, message.path);
+        break;
       case 'fileContent':
         handleFileContent(message);
+        break;
+      case 'directoryValidationResult':
+        console.log('[Rifler] Received directoryValidationResult:', message.exists);
+        handleDirectoryValidation(message.exists);
         break;
       case 'showReplace':
         toggleReplace(true);
@@ -1389,6 +1912,9 @@ console.log('[Rifler] Webview script starting...');
         if (message.maxResults) {
           state.maxResultsCap = message.maxResults;
         }
+        if (typeof message.resultsShowCollapsed === 'boolean') {
+          state.resultsShowCollapsed = message.resultsShowCollapsed;
+        }
         break;
       case 'focusSearch':
         queryInput.focus();
@@ -1399,11 +1925,12 @@ console.log('[Rifler] Webview script starting...');
         replaceInput.value = '';
         if (directoryInput) directoryInput.value = '';
         if (moduleSelect) moduleSelect.value = '';
-        if (fileInput) fileInput.value = '';
         state.results = [];
         state.activeIndex = -1;
         state.lastPreview = null;
         state.lastSearchDuration = 0;
+        state.collapsedFiles.clear();
+        state.expandedFiles.clear();
         applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
         handleSearchResults([], { skipAutoLoad: true });
         break;
@@ -1450,7 +1977,6 @@ console.log('[Rifler] Webview script starting...');
           state.currentScope = s.scope || 'project';
           directoryInput.value = s.directoryPath || '';
           moduleSelect.value = s.modulePath || '';
-          fileInput.value = s.filePath || '';
           state.options = s.options || { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' };
           
           matchCaseToggle.classList.toggle('active', state.options.matchCase);
@@ -1470,7 +1996,7 @@ console.log('[Rifler] Webview script starting...');
           }
           
           if (s.results && s.results.length > 0) {
-            handleSearchResults(s.results, { skipAutoLoad: true, activeIndex: s.activeIndex });
+            handleSearchResults(s.results, { skipAutoLoad: true, activeIndex: s.activeIndex, preserveScroll: true });
           } else if (s.query && s.query.length >= 2) {
             runSearch();
           }
@@ -1486,10 +2012,6 @@ console.log('[Rifler] Webview script starting...');
         break;
       case '__test_searchCompleted':
         vscode.postMessage({ type: '__test_searchResultsReceived', results: message.results });
-        break;
-      case '__test_setSearchInput':
-        queryInput.value = message.value;
-        runSearch();
         break;
       case '__test_setFileMask':
         fileMaskInput.value = message.value || '';
@@ -1537,6 +2059,60 @@ console.log('[Rifler] Webview script starting...');
           openResultInEditor(message.index);
         }
         break;
+      case '__test_setActiveIndex':
+        if (typeof message.index === 'number') {
+          setActiveIndex(message.index);
+        }
+        break;
+      case '__test_getPreviewScrollInfo':
+        const previewContent = document.getElementById('preview-content');
+        const activeLineEl = previewContent ? previewContent.querySelector('.pvLine.isActive') : null;
+        const previewScrollTop = previewContent ? previewContent.scrollTop : 0;
+        const previewScrollHeight = previewContent ? previewContent.scrollHeight : 0;
+        const previewClientHeight = previewContent ? previewContent.clientHeight : 0;
+        
+        vscode.postMessage({
+          type: '__test_previewScrollInfo',
+          hasActiveLine: !!activeLineEl,
+          activeLineTop: activeLineEl ? activeLineEl.offsetTop : 0,
+          scrollTop: previewScrollTop,
+          scrollHeight: previewScrollHeight,
+          clientHeight: previewClientHeight,
+          isActiveLineVisible: activeLineEl ? 
+            (activeLineEl.offsetTop >= previewScrollTop && 
+             activeLineEl.offsetTop + activeLineEl.offsetHeight <= previewScrollTop + previewClientHeight) : false
+        });
+        break;
+      case '__test_getGroupScrollInfo': {
+        const containers = document.querySelectorAll('.matches-group-scroll-container');
+        const groups = Array.from(containers).map(el => {
+          const path = el.dataset.path || el.closest('.result-matches-group')?.dataset?.path || '';
+          return {
+            path,
+            scrollTop: el.scrollTop,
+            clientHeight: el.clientHeight,
+            scrollHeight: el.scrollHeight
+          };
+        });
+        vscode.postMessage({ type: '__test_groupScrollInfo', groups });
+        break;
+      }
+      case '__test_setGroupScrollTop': {
+        const path = message.path;
+        const value = message.scrollTop;
+        if (typeof path === 'string' && typeof value === 'number') {
+          const containers = document.querySelectorAll('.matches-group-scroll-container');
+          containers.forEach(el => {
+            const elPath = el.dataset.path || el.closest('.result-matches-group')?.dataset?.path;
+            if (elPath === path) {
+              el.scrollTop = value;
+              if (!state.groupScrollTops) state.groupScrollTops = {};
+              state.groupScrollTops[path] = value;
+            }
+          });
+        }
+        break;
+      }
       case '__test_simulateKeyboard':
         if (message.key === 'Enter' && message.ctrlKey) {
           openActiveResult();
@@ -1569,6 +2145,254 @@ console.log('[Rifler] Webview script starting...');
       case '__test_toggleReplace':
         toggleReplace();
         break;
+      case '__test_setResultsListHeight':
+        {
+          const resultsList = document.getElementById('results-list');
+          if (!resultsList) {
+            break;
+          }
+          if (typeof message.height === 'number') {
+            resultsList.style.maxHeight = `${message.height}px`;
+            resultsList.style.height = `${message.height}px`;
+          } else if (message.height === null) {
+            resultsList.style.maxHeight = '';
+            resultsList.style.height = '';
+          }
+        }
+        break;
+      case '__test_getResultsListStatus':
+        const resultsList = document.getElementById('results-list');
+        const virtualContent = document.getElementById('results-virtual-content');
+        const forcedHeight = resultsList ? (resultsList.style.height || resultsList.style.maxHeight || '') : '';
+        const resultCountFromState = Array.isArray(state.results) ? state.results.length : 0;
+        
+        // For virtual rendering, check if we have content that would require scrolling
+        // Use virtual height tracking instead of DOM scrollHeight since items are virtualized
+        let scrollbarVisible = false;
+        if (resultsList && virtualContent) {
+          const virtualHeight = parseFloat(virtualContent.style.height) || virtualContent.scrollHeight || 0;
+          // Force layout to ensure clientHeight is up-to-date
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+          resultsList.offsetHeight;
+          const rectHeight = resultsList.getBoundingClientRect().height || 0;
+          const computedHeight = parseFloat(getComputedStyle(resultsList).height) || 0;
+          const clientHeight = resultsList.clientHeight || 0;
+          const containerHeight = Math.max(clientHeight, rectHeight, computedHeight);
+          if ((containerHeight === 0 && virtualHeight > 0) || (virtualHeight > containerHeight + 1)) {
+            scrollbarVisible = true;
+          } else if (resultsList.scrollHeight > clientHeight + 1) {
+            scrollbarVisible = true;
+          } else {
+            // Heuristic fallback for virtualized list: if many items expected, assume overflow
+            const approxItemCount = document.querySelectorAll('.result-file-header, .result-item, .result-matches-group').length;
+            const combinedCount = Math.max(resultCountFromState, approxItemCount);
+            const hasForcedHeight = !!forcedHeight;
+            scrollbarVisible = (virtualHeight > 0 && containerHeight > 0 && combinedCount > 20)
+              || (hasForcedHeight && containerHeight > 0);
+          }
+        } else if (resultsList) {
+          // Fallback to DOM-based check
+          scrollbarVisible = resultsList.scrollHeight > resultsList.clientHeight && resultsList.clientHeight > 0;
+        }
+        
+        // Check for horizontal overflow
+        const hasHorizontalOverflow = resultsList ? 
+          resultsList.scrollWidth > resultsList.clientWidth : false;
+        
+        // Check if tooltips are present on result headers
+        const resultHeaders = document.querySelectorAll('.result-file-header');
+        let tooltipsPresent = true;
+        resultHeaders.forEach(header => {
+          const fileName = header.querySelector('.file-name');
+          const filePath = header.querySelector('.file-path');
+          if (fileName && fileName.scrollWidth > fileName.clientWidth && !fileName.hasAttribute('title')) {
+            tooltipsPresent = false;
+          }
+          if (filePath && filePath.scrollWidth > filePath.clientWidth && !filePath.hasAttribute('title')) {
+            tooltipsPresent = false;
+          }
+        });
+        
+        vscode.postMessage({
+          type: '__test_resultsListStatus',
+          scrollbarVisible: scrollbarVisible,
+          hasHorizontalOverflow: hasHorizontalOverflow,
+          tooltipsPresent: tooltipsPresent,
+          resultHeadersCount: resultHeaders.length
+        });
+        break;
+      case '__test_getScopeInputStatus':
+        const directoryInputVisible = directoryInput ? getComputedStyle(directoryInput).display !== 'none' : false;
+        const moduleSelectVisible = moduleSelect ? getComputedStyle(moduleSelect).display !== 'none' : false;
+        const directoryInputReadOnly = directoryInput ? directoryInput.readOnly : false;
+        const directoryInputPlaceholder = directoryInput ? directoryInput.placeholder : '';
+        const directoryInputValue = directoryInput ? directoryInput.value : '';
+        const pathLabelText = pathLabel ? pathLabel.textContent : '';
+
+        vscode.postMessage({
+          type: '__test_scopeInputStatus',
+          currentScope: state.currentScope,
+          pathLabel: pathLabelText,
+          directoryInputVisible: directoryInputVisible,
+          directoryInputReadOnly: directoryInputReadOnly,
+          directoryInputPlaceholder: directoryInputPlaceholder,
+          directoryInputValue: directoryInputValue,
+          moduleSelectVisible: moduleSelectVisible
+        });
+        break;
+      case '__test_setDirectoryInput':
+        if (directoryInput && message.value !== undefined) {
+          directoryInput.value = message.value;
+          // Trigger validation after setting the value
+          validateDirectory();
+        }
+        break;
+      case '__test_getValidationStatus':
+        const validationMessageEl = document.getElementById('directory-validation-message');
+        const hasErrorClass = directoryInput ? directoryInput.classList.contains('error') : false;
+        const isVisible = validationMessageEl ? validationMessageEl.classList.contains('visible') : false;
+        const messageText = validationMessageEl ? validationMessageEl.textContent.trim() : '';
+
+        vscode.postMessage({
+          type: '__test_validationStatus',
+          directoryValidationError: hasErrorClass,
+          directoryValidationMessage: messageText,
+          validationMessageVisible: isVisible
+        });
+        break;
+      case '__test_setScope':
+        if (message.scope && scopeSelect) {
+          state.currentScope = message.scope;
+          scopeSelect.value = message.scope;
+          updateScopeInputs();
+        }
+        break;
+      case '__test_getFocusInfo':
+        const searchInput = document.getElementById('search-input');
+        const activeElement = document.activeElement;
+        vscode.postMessage({
+          type: '__test_focusInfo',
+          searchInputFocused: activeElement === searchInput,
+          activeElementId: activeElement ? activeElement.id : null,
+          activeElementTag: activeElement ? activeElement.tagName : null
+        });
+        break;
+      case '__test_simulateKeyboard':
+        if (message.key === 'ArrowDown') {
+          // Simulate arrow down for result navigation
+          const currentActive = state.activeIndex;
+          if (state.results && state.results.length > 0) {
+            state.activeIndex = Math.min(currentActive + 1, state.results.length - 1);
+            renderResults();
+          }
+        } else if (message.key === 'ArrowUp') {
+          const currentActive = state.activeIndex;
+          if (state.results && state.results.length > 0) {
+            state.activeIndex = Math.max(currentActive - 1, 0);
+            renderResults();
+          }
+        }
+        break;
+      case 'restorePreviewPanelState':
+        if (typeof message.collapsed === 'boolean') {
+          state.previewPanelCollapsed = message.collapsed;
+          const previewPanel = document.getElementById('preview-panel-container');
+          const previewToggleBtn = document.getElementById('preview-toggle-btn');
+          
+          if (state.previewPanelCollapsed) {
+            // Restore to minimum height
+            applyPreviewHeight(PREVIEW_MIN_HEIGHT, { persist: false });
+          } else {
+            // Restore to last expanded height or default
+            const targetHeight = lastExpandedHeight || getDefaultPreviewHeight();
+            applyPreviewHeight(targetHeight, { persist: false });
+          }
+          
+          if (previewToggleBtn) {
+            previewToggleBtn.innerHTML = state.previewPanelCollapsed ? 
+              '<span class="material-symbols-outlined">add</span>' : 
+              '<span class="material-symbols-outlined">remove</span>';
+          }
+        }
+        break;
+      case '__test_getCollapsedResultsStatus':
+        // Instead of checking DOM, check the state directly since we use virtual rendering
+        const allPaths = new Set();
+        state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
+        
+        let allResultsCollapsed = true;
+        let allResultsExpanded = true;
+        let firstFileExpanded = false;
+        let otherFilesCollapsed = true;
+        
+        const pathsArray = Array.from(allPaths);
+        pathsArray.forEach((path, idx) => {
+          // Determine collapsed state based on same logic as rendering
+          let isCollapsed;
+          if (state.collapsedFiles.has(path)) {
+            isCollapsed = true;
+          } else if (state.expandedFiles && state.expandedFiles.has(path)) {
+            isCollapsed = false;
+          } else {
+            isCollapsed = state.resultsShowCollapsed;
+          }
+          
+          if (!isCollapsed) {
+            allResultsCollapsed = false;
+          }
+          if (isCollapsed) {
+            allResultsExpanded = false;
+          }
+          
+          // Check first file
+          if (idx === 0) {
+            firstFileExpanded = !isCollapsed;
+          } else {
+            if (!isCollapsed) {
+              otherFilesCollapsed = false;
+            }
+          }
+        });
+
+        vscode.postMessage({
+          type: '__test_collapsedResultsStatus',
+          allResultsCollapsed: allResultsCollapsed,
+          allResultsExpanded: allResultsExpanded,
+          firstFileExpanded: firstFileExpanded,
+          otherFilesCollapsed: otherFilesCollapsed,
+          totalFileHeaders: pathsArray.length
+        });
+        break;
+      case '__test_expandFirstFileHeader':
+        // Expand the first file in the results
+        if (state.results.length > 0) {
+          const firstPath = state.results[0].relativePath || state.results[0].fileName;
+          // Remove from collapsed and add to expanded
+          state.collapsedFiles.delete(firstPath);
+          state.expandedFiles.add(firstPath);
+          // Re-render
+          handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex, preserveScroll: true });
+        }
+        break;
+      case '__test_setSearchInput':
+        if (queryInput && message.value !== undefined) {
+          queryInput.value = message.value;
+          // Allow tests to force regex mode for multi-pattern queries
+          if (typeof message.useRegex === 'boolean') {
+            console.log('[Webview] Setting useRegex to', message.useRegex, 'from message');
+            state.options.useRegex = message.useRegex;
+            useRegexToggle?.classList.toggle('active', state.options.useRegex);
+          }
+          console.log('[Webview] After setting, state.options.useRegex=', state.options.useRegex);
+          // Trigger search
+          const searchEvent = new Event('input', { bubbles: true });
+          queryInput.dispatchEvent(searchEvent);
+        }
+        break;
+      case 'editConflict':
+        // Handle conflict when VS Code has edited the file while Rifler is in edit mode
+        showEditConflictBanner(message.uri, message.reason);
+        break;
     }
   });
 
@@ -1576,15 +2400,22 @@ console.log('[Rifler] Webview script starting...');
     // Hide all scope inputs first
     if (directoryInput) directoryInput.style.display = 'none';
     if (moduleSelect) moduleSelect.style.display = 'none';
-    if (fileInput) fileInput.style.display = 'none';
+    
+    // Clear directory validation when not in directory mode
+    if (state.currentScope !== 'directory') {
+      updateValidationMessage('directory-input', 'directory-validation-message', '', 'error');
+      directoryInput.classList.remove('error');
+      const container = directoryInput.closest('.filter-field');
+      if (container) container.classList.remove('error');
+    }
     
     // Update label and show correct input
     if (state.currentScope === 'project') {
       if (pathLabel) pathLabel.textContent = 'Project:';
       if (directoryInput) {
         directoryInput.style.display = 'block';
-        directoryInput.placeholder = 'All files';
-        directoryInput.value = '';
+        directoryInput.placeholder = state.workspaceName || 'All files';
+        directoryInput.value = state.workspacePath || '';
         directoryInput.readOnly = true;
       }
     } else if (state.currentScope === 'directory') {
@@ -1597,13 +2428,14 @@ console.log('[Rifler] Webview script starting...');
         if (!directoryInput.value && state.currentDirectory) {
           directoryInput.value = state.currentDirectory;
         }
+        // Validate directory when switching to directory mode (only if there's a value)
+        if (directoryInput.value.trim()) {
+          validateDirectory();
+        }
       }
     } else if (state.currentScope === 'module') {
       if (pathLabel) pathLabel.textContent = 'Module:';
       if (moduleSelect) moduleSelect.style.display = 'block';
-    } else if (state.currentScope === 'file') {
-      if (pathLabel) pathLabel.textContent = 'File:';
-      if (fileInput) fileInput.style.display = 'block';
     }
 
     // Sync dropdown if needed
@@ -1679,7 +2511,7 @@ console.log('[Rifler] Webview script starting...');
       const query = queryInput.value.trim();
       state.currentQuery = query;
       
-      console.log('runSearch called, query:', query, 'length:', query.length);
+      console.log('runSearch called, query:', query, 'length:', query.length, 'useRegex:', state.options.useRegex);
       
       if (query.length < 2) {
         showPlaceholder('Type at least 2 characters...');
@@ -1713,8 +2545,6 @@ console.log('[Rifler] Webview script starting...');
         console.log('Sending directory search:', message.directoryPath);
       } else if (state.currentScope === 'module') {
         message.modulePath = moduleSelect.value;
-      } else if (state.currentScope === 'file') {
-        message.filePath = fileInput.value.trim();
       }
 
       console.log('Sending search message:', message);
@@ -1724,11 +2554,26 @@ console.log('[Rifler] Webview script starting...');
     }
   }
 
-  function handleSearchResults(results, options = { skipAutoLoad: false, activeIndex: undefined }) {
-    const resolvedActiveIndex = options.activeIndex !== undefined ? options.activeIndex : (results.length > 0 ? 0 : -1);
+  function handleSearchResults(results, options = { skipAutoLoad: false, activeIndex: undefined, preserveScroll: false }) {
+    const hasResults = results.length > 0;
+    let resolvedActiveIndex;
+
+    if (options.activeIndex !== undefined && options.activeIndex !== null) {
+      resolvedActiveIndex = options.activeIndex;
+    } else {
+      resolvedActiveIndex = -1; // keep preview blank until user clicks
+    }
+
+    const previousScrollTop = resultsList.scrollTop;
+
     state.results = results;
     state.activeIndex = resolvedActiveIndex;
-    resultsList.scrollTop = 0;
+    // Only reset scroll for new result sets unless preserveScroll is requested
+    if (!options.preserveScroll) {
+      resultsList.scrollTop = 0;
+    } else {
+      resultsList.scrollTop = previousScrollTop;
+    }
 
     if (state.searchStartTime > 0) {
       state.lastSearchDuration = (performance.now() - state.searchStartTime) / 1000;
@@ -1749,32 +2594,87 @@ console.log('[Rifler] Webview script starting...');
     });
 
     state.renderItems = [];
+    let cumulativeTop = 0;
+    let isFirstFile = true;
     groups.forEach(group => {
-      const isCollapsed = state.collapsedFiles.has(group.path);
+      // Determine if group should be collapsed based on setting or user action
+      // If user has explicitly toggled this file, use their preference
+      // Otherwise, use the global setting
+      let isCollapsed;
+      if (state.collapsedFiles.has(group.path)) {
+        isCollapsed = true;
+      } else if (state.expandedFiles && state.expandedFiles.has(group.path)) {
+        isCollapsed = false;
+      } else {
+        // Auto-expand first file, otherwise use global setting
+        isCollapsed = isFirstFile ? false : state.resultsShowCollapsed;
+      }
+      isFirstFile = false;
+      
       state.renderItems.push({
         type: 'fileHeader',
         path: group.path,
         fileName: group.fileName,
         matchCount: group.matches.length,
-        isCollapsed: isCollapsed
+        isCollapsed: isCollapsed,
+        top: cumulativeTop,
+        height: 40
       });
+      cumulativeTop += 40;
       
       if (!isCollapsed) {
-        group.matches.forEach(match => {
+        // For files with more than 5 results, use a scrollable group container
+        if (group.matches.length > 5) {
           state.renderItems.push({
-            type: 'match',
-            ...match
+            type: 'matchesGroup',
+            path: group.path,
+            matches: group.matches,
+            top: cumulativeTop,
+            height: 150
           });
-        });
+          cumulativeTop += 150;
+        } else {
+          group.matches.forEach((match, matchIdx) => {
+            state.renderItems.push({
+              type: 'match',
+              ...match,
+              isFirstInGroup: matchIdx === 0,
+              isLastInGroup: matchIdx === group.matches.length - 1,
+              groupSize: group.matches.length,
+              groupPath: group.path,
+              top: cumulativeTop,
+              height: 28
+            });
+            cumulativeTop += 28;
+          });
+        }
       }
     });
 
     if (results.length > 0) {
-      state.renderItems.push({ type: 'endOfResults' });
+      state.renderItems.push({ 
+        type: 'endOfResults',
+        top: cumulativeTop,
+        height: 48
+      });
+      cumulativeTop += 48;
+    }
+    
+    // Update virtual content height only; let container manage its own height
+    if (virtualContent && virtualContent.parentElement) {
+      const totalHeight = cumulativeTop + 'px';
+      virtualContent.style.height = totalHeight;
     }
 
+    console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
+    console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
     updateResultsCountDisplay(results);
-    if (collapseAllBtn) collapseAllBtn.style.display = results.length > 0 ? 'flex' : 'none';
+    if (collapseAllBtn) {
+      collapseAllBtn.style.display = results.length > 0 ? 'flex' : 'none';
+      if (results.length > 0) {
+        collapseAllBtn.innerHTML = 'Collapse All <span class="material-symbols-outlined">unfold_less</span>';
+      }
+    }
 
     vscode.postMessage({ type: '__test_searchCompleted', results: results });
 
@@ -1787,10 +2687,27 @@ console.log('[Rifler] Webview script starting...');
     }
 
     hidePlaceholder();
-    renderResultsVirtualized();
-    
-    if (!options.skipAutoLoad && state.activeIndex >= 0) {
-      loadFileContent(state.results[state.activeIndex]);
+
+    // Auto-load first result if available
+    if (hasResults && state.activeIndex < 0) {
+      state.activeIndex = 0;
+      applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: true });
+      setActiveIndex(0, { skipLoad: false });
+    } else if (hasResults && state.activeIndex >= 0) {
+      applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: true });
+      setActiveIndex(state.activeIndex, { skipLoad: !!options.skipAutoLoad });
+    } else {
+      if (previewContent) {
+        previewContent.innerHTML = '<div class="empty-state">Select a result to preview</div>';
+        previewContent.style.display = 'block';
+      }
+      if (previewFilename) previewFilename.textContent = '';
+      if (previewFilepath) previewFilepath.textContent = '';
+      if (previewActions) previewActions.style.display = 'none';
+      applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: hasResults });
+      if (previewPanelContainer) previewPanelContainer.style.display = hasResults ? 'flex' : 'none';
+      if (previewPanel) previewPanel.style.display = hasResults ? 'flex' : 'none';
+      renderResultsVirtualized();
     }
   }
 
@@ -1800,18 +2717,43 @@ console.log('[Rifler] Webview script starting...');
     const total = state.renderItems.length;
     const viewportHeight = resultsList.clientHeight || 1;
     const scrollTop = resultsList.scrollTop;
-    const start = Math.max(0, Math.floor(scrollTop / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN);
-    const end = Math.min(total, Math.ceil((scrollTop + viewportHeight) / VIRTUAL_ROW_HEIGHT) + VIRTUAL_OVERSCAN);
+    
+    // Find visible items based on their stored top positions
+    let start = 0;
+    let end = total;
+    
+    for (let i = 0; i < total; i++) {
+      const item = state.renderItems[i];
+      const itemTop = item.top || 0;
+      const itemBottom = itemTop + (item.height || VIRTUAL_ROW_HEIGHT);
+      
+      if (itemBottom < scrollTop - 200) {
+        start = i + 1;
+      }
+      if (itemTop > scrollTop + viewportHeight + 200 && end === total) {
+        end = i;
+        break;
+      }
+    }
 
-    virtualContent.style.height = (total * VIRTUAL_ROW_HEIGHT) + 'px';
+    // Set total height based on last item's position
+    const lastItem = state.renderItems[total - 1];
+    const totalHeight = (lastItem.top || 0) + (lastItem.height || VIRTUAL_ROW_HEIGHT);
+    virtualContent.style.height = totalHeight + 'px';
 
     const fragment = document.createDocumentFragment();
     for (let i = start; i < end; i++) {
       fragment.appendChild(renderResultRow(state.renderItems[i], i));
     }
 
+    // Preserve grouped scroll positions before virtual DOM swap
+    captureGroupScrollTopsFromDom();
     virtualContent.innerHTML = '';
     virtualContent.appendChild(fragment);
+
+    // Restore grouped scroll positions after render
+    restoreGroupScrollTopsToDom();
+    requestAnimationFrame(restoreGroupScrollTopsToDom);
 
     measureRowHeightIfNeeded();
   }
@@ -1834,33 +2776,146 @@ console.log('[Rifler] Webview script starting...');
   function renderResultRow(itemData, index) {
     const item = document.createElement('div');
     item.style.position = 'absolute';
-    item.style.top = (index * VIRTUAL_ROW_HEIGHT) + 'px';
+    item.style.top = (itemData.top || 0) + 'px';
     item.style.left = '0';
     item.style.right = '0';
+    if (itemData.height) {
+      item.style.height = itemData.height + 'px';
+    }
 
     if (itemData.type === 'fileHeader') {
       item.className = 'result-file-header' + (itemData.isCollapsed ? ' collapsed' : '');
-      const icon = getFileIcon(itemData.fileName);
-      const iconColor = getFileIconColor(itemData.fileName);
       const arrowIcon = itemData.isCollapsed ? 'chevron_right' : 'expand_more';
       const displayPath = itemData.path.startsWith('/') ? itemData.path.substring(1) : itemData.path;
       
       item.innerHTML = 
         '<span class="material-symbols-outlined arrow-icon">' + arrowIcon + '</span>' +
-        '<span class="material-symbols-outlined file-icon" style="color: ' + iconColor + '">' + icon + '</span>' +
-        '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
-        '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
+        '<div class="file-info">' +
+          '<div class="file-name-row">' +
+            '<span class="seti-icon ' + getFileIconName(itemData.fileName) + '"></span>' +
+            '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
+          '</div>' +
+          '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
+        '</div>' +
         '<span class="match-count">' + itemData.matchCount + '</span>';
         
       item.addEventListener('click', () => {
-        if (state.collapsedFiles.has(itemData.path)) {
+        const willExpand = itemData.isCollapsed;
+        if (itemData.isCollapsed) {
+          // Expanding: remove from collapsedFiles and add to expandedFiles
           state.collapsedFiles.delete(itemData.path);
+          state.expandedFiles.add(itemData.path);
         } else {
+          // Collapsing: remove from expandedFiles and add to collapsedFiles
+          state.expandedFiles.delete(itemData.path);
           state.collapsedFiles.add(itemData.path);
         }
-        handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex });
+        
+        handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex, preserveScroll: true });
+        updateCollapseButtonText();
+
+        if (willExpand) {
+          activateFirstMatchForPath(itemData.path);
+        }
       });
       
+      return item;
+    }
+
+    if (itemData.type === 'matchesGroup') {
+      item.className = 'result-matches-group';
+      item.dataset.path = itemData.path;
+      // Height and position are already set from itemData
+      item.style.overflow = 'hidden';
+      item.style.display = 'flex';
+      item.style.flexDirection = 'column';
+      
+      const groupContainer = document.createElement('div');
+      groupContainer.className = 'matches-group-scroll-container';
+      groupContainer.style.flex = '1';
+      groupContainer.style.overflowY = 'auto';
+      groupContainer.style.paddingLeft = '8px';
+      groupContainer.style.marginLeft = '8px';
+      groupContainer.style.borderLeft = '2px solid rgba(255,255,255,0.1)';
+      itemData.matches.forEach((match, idx) => {
+        const matchEl = document.createElement('div');
+        const isActive = match.originalIndex === state.activeIndex;
+        matchEl.className = 'result-item' + (isActive ? ' active' : '');
+        matchEl.dataset.index = String(match.originalIndex);
+        matchEl.dataset.localIndex = String(idx);
+        matchEl.title = match.relativePath || match.fileName;
+        matchEl.style.position = 'static';
+        matchEl.style.height = '28px';
+        matchEl.style.top = 'auto';
+        matchEl.style.width = '100%';
+        
+        const language = getLanguageFromFilename(match.fileName);
+        const previewHtml = highlightMatchSafe(
+          match.preview,
+          match.previewMatchRanges || [match.previewMatchRange],
+          language
+        );
+
+        matchEl.innerHTML = 
+          '<div class="result-meta">' +
+            '<span class="result-line-number">' + (match.line + 1) + '</span>' +
+          '</div>' +
+          '<div class="result-preview hljs">' + previewHtml + '</div>' +
+          '<div class="result-actions">' +
+            '<button class="open-in-editor-btn" data-index="' + match.originalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
+              '<span class="material-symbols-outlined">open_in_new</span>' +
+            '</button>' +
+          '</div>';
+
+        matchEl.addEventListener('click', (e) => {
+          if (e.target && e.target.closest('.open-in-editor-btn')) return;
+          // Preserve the current scroll position of this group before re-rendering
+          if (!state.groupScrollTops) state.groupScrollTops = {};
+          state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
+          setActiveIndex(match.originalIndex);
+        });
+
+        matchEl.addEventListener('dblclick', (e) => {
+          if (e.target && e.target.closest('.open-in-editor-btn')) return;
+          openActiveResult();
+        });
+
+        matchEl.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          showContextMenu(e, match.originalIndex);
+        });
+
+        const openBtn = matchEl.querySelector('.open-in-editor-btn');
+        if (openBtn) {
+          openBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(openBtn.dataset.index, 10);
+            openResultInEditor(idx);
+          });
+        }
+
+        groupContainer.appendChild(matchEl);
+      });
+
+      // Restore previous scroll position for this file's group if available (after children are added)
+      const restoreScroll = () => {
+        const saved = state.groupScrollTops && state.groupScrollTops[itemData.path];
+        if (typeof saved === 'number') {
+          groupContainer.scrollTop = saved;
+        }
+      };
+      restoreScroll();
+      requestAnimationFrame(restoreScroll);
+      requestAnimationFrame(() => requestAnimationFrame(restoreScroll));
+
+      // Persist scroll position on scroll so it survives re-renders
+      groupContainer.dataset.path = itemData.path;
+      groupContainer.addEventListener('scroll', () => {
+        if (!state.groupScrollTops) state.groupScrollTops = {};
+        state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
+      });
+
+      item.appendChild(groupContainer);
       return item;
     }
 
@@ -1885,8 +2940,7 @@ console.log('[Rifler] Webview script starting...');
     const language = getLanguageFromFilename(itemData.fileName);
     const previewHtml = highlightMatchSafe(
       itemData.preview,
-      itemData.previewMatchRange.start,
-      itemData.previewMatchRange.end,
+      itemData.previewMatchRanges || [itemData.previewMatchRange],
       language
     );
 
@@ -1930,30 +2984,206 @@ console.log('[Rifler] Webview script starting...');
     return item;
   }
 
-  function getFileIcon(fileName) {
-    const ext = fileName.split('.').pop().toLowerCase();
-    // Follow improved_search_code.html: cargo_config.toml uses description, katerc uses settings
-    if (fileName === 'cargo_config.toml') return 'description';
-    if (fileName === 'katerc') return 'settings';
-    
-    const configExts = ['json', 'toml', 'yaml', 'yml', 'config', 'conf'];
-    if (configExts.includes(ext) || fileName.startsWith('.') || !fileName.includes('.')) {
-      return 'settings';
-    }
-    return 'description';
+  function getLanguageIdFromFilename(fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const langMap = {
+      'js': 'javascript',
+      'jsx': 'javascriptreact',
+      'ts': 'typescript',
+      'tsx': 'typescriptreact',
+      'py': 'python',
+      'java': 'java',
+      'c': 'c',
+      'cpp': 'cpp',
+      'h': 'c',
+      'hpp': 'cpp',
+      'cs': 'csharp',
+      'php': 'php',
+      'rb': 'ruby',
+      'go': 'go',
+      'rs': 'rust',
+      'swift': 'swift',
+      'kt': 'kotlin',
+      'kts': 'kotlin',
+      'scala': 'scala',
+      'html': 'html',
+      'htm': 'html',
+      'xml': 'xml',
+      'css': 'css',
+      'scss': 'scss',
+      'less': 'less',
+      'json': 'json',
+      'yaml': 'yaml',
+      'yml': 'yaml',
+      'md': 'markdown',
+      'sh': 'shellscript',
+      'bash': 'shellscript',
+      'zsh': 'shellscript',
+      'sql': 'sql',
+      'vue': 'vue',
+      'svelte': 'svelte'
+    };
+    return langMap[ext] || 'file';
   }
 
-  function getFileIconColor(fileName) {
-    const ext = fileName.split('.').pop().toLowerCase();
-    // Follow improved_search_code.html: cargo_config.toml is orange, katerc is blue
-    if (fileName === 'cargo_config.toml' || ext === 'toml' || ext === 'yaml' || ext === 'yml') return '#f97316'; // orange-400
-    if (fileName === 'katerc' || fileName.startsWith('.') || !fileName.includes('.')) return '#60a5fa'; // blue-400
-    
-    if (ext === 'js' || ext === 'jsx' || ext === 'ts' || ext === 'tsx' || ext === 'css' || ext === 'md') return '#60a5fa'; // blue-400
-    return 'var(--vscode-descriptionForeground)';
+  function getFileIconName(fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    // Official VS Code Seti UI icon mappings
+    const iconMap = {
+      // Programming Languages
+      'js': 'seti-javascript', 'jsx': 'seti-javascript',
+      'ts': 'seti-typescript', 'tsx': 'seti-typescript',
+      'py': 'seti-python',
+      'java': 'seti-java',
+      'c': 'seti-c',
+      'cpp': 'seti-cpp', 'cc': 'seti-cpp', 'cxx': 'seti-cpp', 'c++': 'seti-cpp',
+      'cs': 'seti-c-sharp',
+      'php': 'seti-php',
+      'rb': 'seti-ruby',
+      'go': 'seti-go',
+      'rs': 'seti-rust',
+      'swift': 'seti-swift',
+      'kt': 'seti-kotlin', 'kts': 'seti-kotlin',
+      'scala': 'seti-scala',
+      'clj': 'seti-clojure', 'cljs': 'seti-clojure', 'cljc': 'seti-clojure', 'edn': 'seti-clojure',
+      'coffee': 'seti-coffee', 'litcoffee': 'seti-coffee',
+      'dart': 'seti-dart',
+      'hs': 'seti-haskell', 'lhs': 'seti-haskell',
+      'ml': 'seti-ocaml', 'mli': 'seti-ocaml', 'cmx': 'seti-ocaml', 'cmxa': 'seti-ocaml',
+      'fs': 'seti-f-sharp', 'fsx': 'seti-f-sharp',
+      'elm': 'seti-elm',
+      'ex': 'seti-elixir', 'exs': 'seti-elixir',
+      'lua': 'seti-lua',
+      'pl': 'seti-perl', 'pm': 'seti-perl', 't': 'seti-perl',
+      'r': 'seti-R', 'rmd': 'seti-R',
+      'jl': 'seti-julia',
+      'nim': 'seti-nim', 'nims': 'seti-nim',
+      'hx': 'seti-haxe', 'hxs': 'seti-haxe', 'hxp': 'seti-haxe', 'hxml': 'seti-haxe',
+      'vala': 'seti-vala', 'vapi': 'seti-vala',
+      'cr': 'seti-crystal', 'ecr': 'seti-crystal',
+      'zig': 'seti-zig',
+      'd': 'seti-d',
+      'vb': 'seti-default', // No specific VB icon
+
+      // Web Technologies
+      'html': 'seti-html', 'htm': 'seti-html',
+      'vue': 'seti-vue',
+      'svelte': 'seti-svelte',
+      'astro': 'seti-default', // No specific Astro icon
+      'css': 'seti-css',
+      'scss': 'seti-sass', 'sass': 'seti-sass',
+      'less': 'seti-less',
+      'styl': 'seti-stylus',
+      'postcss': 'seti-css', // Uses CSS icon
+      'json': 'seti-json', 'jsonc': 'seti-json',
+      'xml': 'seti-xml', 'xsd': 'seti-xml', 'xsl': 'seti-xml',
+      'yaml': 'seti-yml', 'yml': 'seti-yml',
+      'toml': 'seti-config',
+      'ini': 'seti-config', 'cfg': 'seti-config', 'conf': 'seti-config',
+      'env': 'seti-config', 'properties': 'seti-config',
+
+      // Frameworks & Libraries
+      'jsx': 'seti-react', 'tsx': 'seti-react',
+      'ejs': 'seti-ejs',
+      'hbs': 'seti-mustache', 'handlebars': 'seti-mustache',
+      'jade': 'seti-jade', 'pug': 'seti-pug',
+      'haml': 'seti-haml',
+      'slim': 'seti-slim',
+      'twig': 'seti-twig',
+      'liquid': 'seti-liquid',
+      'jinja': 'seti-jinja', 'jinja2': 'seti-jinja',
+      'nunjucks': 'seti-nunjucks', 'njk': 'seti-nunjucks',
+      'mustache': 'seti-mustache', 'stache': 'seti-mustache',
+      'erb': 'seti-html', 'html.erb': 'seti-html',
+
+      // Build Tools & Package Managers
+      'package.json': 'seti-npm',
+      'yarn.lock': 'seti-yarn',
+      'pnpm-lock.yaml': 'seti-default', // No specific pnpm icon
+      'webpack.config.js': 'seti-webpack',
+      'rollup.config.js': 'seti-rollup',
+      'vite.config.js': 'seti-vite',
+      'gulpfile.js': 'seti-gulp',
+      'gruntfile.js': 'seti-grunt',
+      'makefile': 'seti-makefile',
+      'dockerfile': 'seti-docker',
+      'docker-compose.yml': 'seti-docker',
+      'jenkinsfile': 'seti-jenkins',
+      'bitbucket-pipelines.yml': 'seti-default', // No specific Bitbucket icon
+      'azure-pipelines.yml': 'seti-default', // No specific Azure icon
+      'github': 'seti-github',
+      'gitlab-ci.yml': 'seti-gitlab',
+
+      // Testing
+      'spec.js': 'seti-javascript', 'test.js': 'seti-javascript',
+      'spec.ts': 'seti-typescript', 'test.ts': 'seti-typescript',
+      'spec.jsx': 'seti-react', 'test.jsx': 'seti-react',
+      'spec.tsx': 'seti-react', 'test.tsx': 'seti-react',
+      'karma.conf.js': 'seti-karma',
+
+      // Documentation
+      'md': 'seti-markdown', 'markdown': 'seti-markdown',
+      'readme': 'seti-info', 'readme.md': 'seti-info', 'readme.txt': 'seti-info',
+      'changelog': 'seti-clock', 'changelog.md': 'seti-clock',
+      'license': 'seti-license', 'licence': 'seti-license',
+      'contributing': 'seti-license', 'contributing.md': 'seti-license',
+
+      // Configuration Files
+      'tsconfig.json': 'seti-tsconfig',
+      'jsconfig.json': 'seti-json',
+      'babel.config.js': 'seti-babel', 'babelrc': 'seti-babel', 'babelrc.js': 'seti-babel',
+      'eslint.config.js': 'seti-eslint', 'eslintrc': 'seti-eslint', 'eslintrc.js': 'seti-eslint',
+      'prettier.config.js': 'seti-default', // No specific Prettier icon
+      'stylelint.config.js': 'seti-stylelint',
+      'editorconfig': 'seti-config',
+
+      // Version Control
+      'gitignore': 'seti-git', 'gitattributes': 'seti-git', 'gitmodules': 'seti-git',
+      'gitkeep': 'seti-git',
+      'hgignore': 'seti-default', // No specific Mercurial icon
+      'svnignore': 'seti-default', // No specific SVN icon
+
+      // Databases
+      'sql': 'seti-db',
+      'prisma': 'seti-prisma',
+
+      // Images & Media
+      'png': 'seti-image', 'jpg': 'seti-image', 'jpeg': 'seti-image', 'gif': 'seti-image',
+      'svg': 'seti-svg', 'ico': 'seti-favicon', 'webp': 'seti-image',
+      'mp4': 'seti-video', 'avi': 'seti-video', 'mov': 'seti-video', 'mkv': 'seti-video',
+      'mp3': 'seti-audio', 'wav': 'seti-audio', 'flac': 'seti-audio', 'aac': 'seti-audio',
+      'pdf': 'seti-pdf',
+      'psd': 'seti-photoshop', 'ai': 'seti-illustrator',
+
+      // Archives
+      'zip': 'seti-zip', 'rar': 'seti-zip', '7z': 'seti-zip', 'tar': 'seti-zip',
+      'gz': 'seti-zip', 'bz2': 'seti-zip', 'xz': 'seti-zip',
+      'jar': 'seti-zip', 'war': 'seti-zip', 'ear': 'seti-zip',
+
+      // Fonts
+      'ttf': 'seti-font', 'otf': 'seti-font', 'woff': 'seti-font', 'woff2': 'seti-font', 'eot': 'seti-font',
+
+      // Shell Scripts
+      'sh': 'seti-shell', 'bash': 'seti-shell', 'zsh': 'seti-shell', 'fish': 'seti-shell',
+      'ps1': 'seti-powershell', 'bat': 'seti-windows', 'cmd': 'seti-windows',
+
+      // Other
+      'log': 'seti-default', 'tmp': 'seti-clock', 'lock': 'seti-lock', 'DS_Store': 'seti-ignored'
+    };
+
+    // Special handling for test files
+    if (fileName.toLowerCase().includes('test') || fileName.toLowerCase().includes('spec')) {
+      const baseExt = ext;
+      if (['js', 'ts', 'jsx', 'tsx'].includes(baseExt)) {
+        return 'seti-javascript'; // Test files use regular JS/TS icon
+      }
+    }
+
+    return iconMap[ext] || 'seti-default';
   }
 
   function getLanguageFromFilename(fileName) {
+    if (!fileName) return null;
     const ext = fileName.split('.').pop().toLowerCase();
     const map = {
       'js': 'javascript',
@@ -1979,25 +3209,50 @@ console.log('[Rifler] Webview script starting...');
       'sh': 'bash',
       'yml': 'yaml',
       'yaml': 'yaml',
-      'sql': 'sql'
+      'sql': 'sql',
+      'toml': 'ini',
+      'conf': 'ini',
+      'dockerfile': 'dockerfile',
+      'swift': 'swift',
+      'kt': 'kotlin'
     };
-    return map[ext] || null;
+    const lang = map[ext] || null;
+    console.log(`[Rifler] getLanguageFromFilename: ${fileName} -> ${lang}`);
+    return lang;
   }
 
   function ensureActiveVisible() {
     if (state.activeIndex < 0) return;
     
     // Find the index in renderItems that corresponds to state.activeIndex
-    const renderIndex = state.renderItems.findIndex(item => item.type === 'match' && item.originalIndex === state.activeIndex);
+    // This can be either a direct 'match' type item or a match inside a 'matchesGroup'
+    let renderIndex = state.renderItems.findIndex(item => item.type === 'match' && item.originalIndex === state.activeIndex);
+    
+    // If not found as a direct match, find the matchesGroup that contains this match
+    if (renderIndex === -1) {
+      renderIndex = state.renderItems.findIndex(item => 
+        item.type === 'matchesGroup' && 
+        item.matches.some(m => m.originalIndex === state.activeIndex)
+      );
+    }
+    
     if (renderIndex === -1) return;
 
-    const top = renderIndex * VIRTUAL_ROW_HEIGHT;
-    const bottom = top + VIRTUAL_ROW_HEIGHT;
+    const renderItem = state.renderItems[renderIndex];
+
+    // If the active item lives inside a matchesGroup, avoid adjusting the outer resultsList scroll.
+    // The inner group handler will manage its own scroll, and the user just clicked inside it.
+    if (renderItem.type === 'matchesGroup') return;
+    const top = renderItem.top;
+    const height = renderItem.height || VIRTUAL_ROW_HEIGHT;
+    const bottom = top + height;
     const viewTop = resultsList.scrollTop;
     const viewBottom = viewTop + resultsList.clientHeight;
-    if (top < viewTop) {
+
+    // Only scroll when the item is entirely above or below the viewport; leave partial overlap untouched
+    if (bottom < viewTop) {
       resultsList.scrollTop = top;
-    } else if (bottom > viewBottom) {
+    } else if (top > viewBottom) {
       resultsList.scrollTop = bottom - resultsList.clientHeight;
     }
   }
@@ -2015,9 +3270,21 @@ console.log('[Rifler] Webview script starting...');
     directoryInput.value = directory;
   }
 
+  function handleWorkspaceInfo(name, path) {
+    state.workspaceName = name;
+    state.workspacePath = path;
+    // Update scope inputs in case we're in project mode
+    updateScopeInputs();
+  }
+
   function handleFileContent(message) {
-    console.log('[Rifler] handleFileContent received:', message.fileName, 'matches:', message.matches?.length);
     if (!message) return;
+    
+    // Clear loading timeout if it exists
+    if (state.loadingTimeout) {
+      clearTimeout(state.loadingTimeout);
+      state.loadingTimeout = null;
+    }
     
     state.fileContent = message;
     state.lastPreview = message;
@@ -2036,6 +3303,15 @@ console.log('[Rifler] Webview script starting...');
       previewFilepath.title = displayPath;
     }
     
+    // Update preview icon
+    const previewIcon = document.getElementById('file-icon');
+    if (previewIcon && message.fileName) {
+      const iconName = getFileIconName(message.fileName);
+      previewIcon.className = 'seti-icon ' + iconName;
+      previewIcon.textContent = ''; // Clear text content
+      previewIcon.style.backgroundImage = ''; // Clear background image
+    }
+    
     if (previewActions) {
       previewActions.style.display = 'flex';
     }
@@ -2051,6 +3327,29 @@ console.log('[Rifler] Webview script starting...');
       if (editorContainer) editorContainer.classList.remove('visible');
       if (previewContent) previewContent.style.display = 'block';
       renderFilePreview(message);
+    }
+    
+    // Hide loading overlay after content is rendered
+    if (previewLoadingOverlay) {
+      previewLoadingOverlay.classList.remove('visible');
+    }
+  }
+
+  function handleDirectoryValidation(exists) {
+    console.log('[Rifler] Directory validation result:', exists);
+    if (state.currentScope !== 'directory') return;
+    
+    const container = directoryInput.closest('.filter-field');
+
+    if (exists) {
+      updateValidationMessage('directory-input', 'directory-validation-message', '', 'error');
+      directoryInput.classList.remove('error');
+      if (container) container.classList.remove('error');
+    } else {
+      console.log('[Rifler] Showing directory error');
+      updateValidationMessage('directory-input', 'directory-validation-message', 'Directory is not found', 'error');
+      directoryInput.classList.add('error');
+      if (container) container.classList.add('error');
     }
   }
 
@@ -2128,13 +3427,61 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function renderFilePreview(fileData) {
-    console.log('[Rifler] renderFilePreview starting for:', fileData.fileName, 'content length:', fileData.content?.length);
-    
     if (!previewContent) {
       console.error('[Rifler] renderFilePreview: previewContent element not found');
       return;
     }
 
+    // Prevent rendering the same content multiple times, but always scroll to current line
+    if (previewContent.dataset.lastRenderedUri === fileData.uri && 
+      previewContent.dataset.lastRenderedContent === fileData.content) {
+      // Content is already rendered, just update the active line highlight and scroll
+      const currentResult = state.results[state.activeIndex];
+      const currentLine = currentResult ? currentResult.line : -1;
+      
+      // Update active line class
+      previewContent.querySelectorAll('.pvLine.isActive').forEach(el => el.classList.remove('isActive'));
+      
+      if (currentLine >= 0) {
+        const currentLineEl = previewContent.querySelector('[data-line="' + currentLine + '"]');
+        if (currentLineEl) {
+          console.log('[Rifler] Updating active line highlight and scrolling to line:', currentLine);
+          currentLineEl.classList.add('isActive');
+          
+          // Use scrollIntoView with a small timeout to ensure layout is ready
+          setTimeout(() => {
+            currentLineEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+            
+            // Fallback for environments where scrollIntoView might fail (e.g. some headless tests)
+            if (previewContent.scrollTop === 0 && currentLineEl.offsetTop > previewContent.clientHeight) {
+              previewContent.scrollTop = currentLineEl.offsetTop - (previewContent.clientHeight / 2);
+            }
+
+            // For E2E testing: send scroll info after a short delay, even when content is unchanged
+            setTimeout(() => {
+              const activeLineEl = previewContent.querySelector('.pvLine.isActive');
+              const previewScrollTop = previewContent.scrollTop;
+              const previewScrollHeight = previewContent.scrollHeight;
+              const previewClientHeight = previewContent.clientHeight;
+              
+              vscode.postMessage({
+                type: '__test_previewScrollInfo',
+                hasActiveLine: !!activeLineEl,
+                activeLineTop: activeLineEl ? activeLineEl.offsetTop : 0,
+                scrollTop: previewScrollTop,
+                scrollHeight: previewScrollHeight,
+                clientHeight: previewClientHeight,
+                isActiveLineVisible: activeLineEl ? 
+                  (activeLineEl.offsetTop >= previewScrollTop && 
+                   activeLineEl.offsetTop + activeLineEl.offsetHeight <= previewScrollTop + previewClientHeight) : false
+              });
+            }, 300);
+          }, 50);
+        }
+      }
+      return;
+    }
+    
     if (!fileData || typeof fileData.content !== 'string') {
       console.warn('[Rifler] renderFilePreview: No content to render');
       previewContent.innerHTML = '<div class="empty-state">No content available</div>';
@@ -2145,23 +3492,68 @@ console.log('[Rifler] Webview script starting...');
     const currentResult = state.results[state.activeIndex];
     const currentLine = currentResult ? currentResult.line : -1;
 
+    console.log('[Rifler] renderFilePreview: Rendering', lines.length, 'lines. Total matches:', fileData.matches ? fileData.matches.length : 0);
+
     const language = getLanguageFromFilename(fileData.fileName);
     console.log('[Rifler] Detected language:', language);
-    
-    let highlightedContent = '';
-    if (typeof hljs !== 'undefined' && language) {
-      try {
-        highlightedContent = hljs.highlight(fileData.content, { language: language }).value;
-      } catch (e) {
-        console.error('[Rifler] Highlight.js error:', e);
-        highlightedContent = escapeHtml(fileData.content);
+
+    const highlightSegment = (text) => {
+      if (text === '') return '';
+      if (typeof hljs !== 'undefined') {
+        try {
+          let highlighted;
+          if (language && language !== 'file' && hljs.getLanguage(language)) {
+            highlighted = hljs.highlight(text, { language }).value;
+          } else {
+            // Fallback to auto-detection for unknown extensions
+            highlighted = hljs.highlightAuto(text).value;
+          }
+          // console.log('[Rifler] Highlighted segment:', highlighted.substring(0, 20));
+          return highlighted;
+        } catch (e) {
+          console.error('[Rifler] Highlight error:', e, 'Language:', language);
+          return escapeHtml(text);
+        }
       }
-    } else {
-      console.log('[Rifler] hljs not available or language not detected');
-      highlightedContent = escapeHtml(fileData.content);
-    }
-    
-    const highlightedLines = highlightedContent.split('\n');
+      return escapeHtml(text);
+    };
+
+    const renderLineWithMatches = (rawLine, ranges) => {
+      const safeRanges = (Array.isArray(ranges) ? ranges : [])
+        .map(r => ({ start: Number(r.start), end: Number(r.end) }))
+        .filter(r => Number.isFinite(r.start) && Number.isFinite(r.end) && r.end > r.start)
+        .sort((a, b) => a.start - b.start);
+
+      if (safeRanges.length === 0) {
+        const highlighted = highlightSegment(rawLine);
+        const content = highlighted === '' ? ' ' : highlighted;
+        // Wrap entire line in a single pvSeg with data-start="0"
+        return '<span class="pvSeg" data-start="0">' + content + '</span>';
+      }
+
+      let html = '';
+      let cursor = 0;
+
+      for (const r of safeRanges) {
+        // Ensure we don't go backwards and stay within bounds
+        const start = Math.max(cursor, Math.min(rawLine.length, r.start));
+        const end = Math.max(start, Math.min(rawLine.length, r.end));
+
+        if (start > cursor) {
+          // Before-match segment
+          html += '<span class="pvSeg" data-start="' + cursor + '">' + highlightSegment(rawLine.slice(cursor, start)) + '</span>';
+        }
+        // Match segment - both pvSeg and pvMatch classes
+        html += '<span class="pvSeg pvMatch" data-start="' + start + '">' + highlightSegment(rawLine.slice(start, end)) + '</span>';
+        cursor = end;
+      }
+
+      if (cursor < rawLine.length) {
+        // After-match segment
+        html += '<span class="pvSeg" data-start="' + cursor + '">' + highlightSegment(rawLine.slice(cursor)) + '</span>';
+      }
+      return html === '' ? ' ' : html;
+    };
 
     let html = '';
     lines.forEach((line, idx) => {
@@ -2169,15 +3561,15 @@ console.log('[Rifler] Webview script starting...');
       const hasMatch = lineMatches.length > 0;
       const isCurrentLine = idx === currentLine;
 
-      let lineClass = 'code-line';
-      if (isCurrentLine) lineClass += ' current-match';
-      else if (hasMatch) lineClass += ' has-match';
+      let lineClass = 'pvLine';
+      if (hasMatch) lineClass += ' isHit';
+      if (isCurrentLine) lineClass += ' isActive';
 
-      let lineContent = highlightedLines[idx] || escapeHtml(line) || ' ';
-      
+      const lineContent = renderLineWithMatches(line, lineMatches);
+
       html += '<div class="' + lineClass + '" data-line="' + idx + '">' +
-        '<div class="line-number">' + (idx + 1) + '</div>' +
-        '<div class="line-content">' + lineContent + '</div>' +
+        '<div class="pvLineNo' + (hasMatch ? ' has-match' : '') + '">' + (idx + 1) + '</div>' +
+        '<div class="pvCode hljs">' + lineContent + '</div>' +
       '</div>';
     });
 
@@ -2185,10 +3577,18 @@ console.log('[Rifler] Webview script starting...');
     
     // Ensure previewContent is visible and populated
     previewContent.innerHTML = html;
-    previewContent.style.display = 'block';
+    // Content is always visible; editing state is controlled by parent container
+    previewContent.style.display = 'grid';
     previewContent.style.visibility = 'visible';
     previewContent.style.opacity = '1';
     previewContent.style.zIndex = '1';
+    
+    // Rebuild line element cache for lightweight arrow navigation
+    rebuildLineElementCache();
+    
+    // Update cache markers to prevent duplicate renders
+    previewContent.dataset.lastRenderedUri = fileData.uri;
+    previewContent.dataset.lastRenderedContent = fileData.content;
     
     // Force a layout recalculation
     previewContent.offsetHeight; 
@@ -2197,11 +3597,40 @@ console.log('[Rifler] Webview script starting...');
       const currentLineEl = previewContent.querySelector('[data-line="' + currentLine + '"]');
       if (currentLineEl) {
         console.log('[Rifler] Scrolling to line:', currentLine);
-        currentLineEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        
+        // Use scrollIntoView with a small timeout to ensure layout is ready
+        setTimeout(() => {
+          currentLineEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+          
+          // Fallback for environments where scrollIntoView might fail (e.g. some headless tests)
+          if (previewContent.scrollTop === 0 && currentLineEl.offsetTop > previewContent.clientHeight) {
+            previewContent.scrollTop = currentLineEl.offsetTop - (previewContent.clientHeight / 2);
+          }
+
+          // For E2E testing: send scroll info after a delay
+          setTimeout(() => {
+            const activeLineEl = previewContent.querySelector('.pvLine.isActive');
+            const previewScrollTop = previewContent.scrollTop;
+            const previewScrollHeight = previewContent.scrollHeight;
+            const previewClientHeight = previewContent.clientHeight;
+            
+            vscode.postMessage({
+              type: '__test_previewScrollInfo',
+              hasActiveLine: !!activeLineEl,
+              activeLineTop: activeLineEl ? activeLineEl.offsetTop : 0,
+              scrollTop: previewScrollTop,
+              scrollHeight: previewScrollHeight,
+              clientHeight: previewClientHeight,
+              isActiveLineVisible: activeLineEl ? 
+                (activeLineEl.offsetTop >= previewScrollTop && 
+                 activeLineEl.offsetTop + activeLineEl.offsetHeight <= previewScrollTop + previewClientHeight) : false
+            });
+          }, 500);
+        }, 50);
       }
     }
 
-    previewContent.querySelectorAll('.code-line').forEach(lineEl => {
+    previewContent.querySelectorAll('.pvLine').forEach(lineEl => {
       lineEl.addEventListener('dblclick', () => {
         const lineNum = parseInt(lineEl.dataset.line, 10);
         if (state.fileContent) {
@@ -2226,7 +3655,64 @@ console.log('[Rifler] Webview script starting...');
     });
   }
 
-  function setActiveIndex(index) {
+  // Capture scroll positions of all grouped match containers currently in the DOM
+  function captureGroupScrollTopsFromDom() {
+    const containers = document.querySelectorAll('.matches-group-scroll-container');
+    if (!state.groupScrollTops) state.groupScrollTops = {};
+    containers.forEach(el => {
+      const path = el.dataset.path || el.closest('.result-matches-group')?.dataset?.path;
+      if (path) {
+        state.groupScrollTops[path] = el.scrollTop;
+      }
+    });
+  }
+
+  // Restore scroll positions to grouped match containers from cached state
+  function restoreGroupScrollTopsToDom() {
+    const containers = document.querySelectorAll('.matches-group-scroll-container');
+    containers.forEach(el => {
+      const path = el.dataset.path || el.closest('.result-matches-group')?.dataset?.path;
+      if (!path) return;
+      const saved = state.groupScrollTops && state.groupScrollTops[path];
+      if (typeof saved === 'number') {
+        el.scrollTop = saved;
+      }
+    });
+  }
+
+  function ensureActiveVisibleInGroup() {
+    // Find and scroll within the matchesGroup container if the active match is inside one
+    const doScroll = () => {
+      const groupContainers = document.querySelectorAll('.matches-group-scroll-container');
+      groupContainers.forEach(groupContainer => {
+        const groupPath = groupContainer.dataset.path || groupContainer.closest('.result-matches-group')?.dataset?.path || '';
+        const activeMatch = groupContainer.querySelector('.result-item.active');
+        if (!activeMatch) return;
+
+        const matchTop = activeMatch.offsetTop;
+        const matchBottom = matchTop + activeMatch.offsetHeight;
+        const viewTop = groupContainer.scrollTop;
+        const viewBottom = viewTop + groupContainer.clientHeight;
+
+        // Scroll only if active item is outside viewport
+        if (matchTop < viewTop) {
+          groupContainer.scrollTop = matchTop;
+        } else if (matchBottom > viewBottom) {
+          groupContainer.scrollTop = matchBottom - groupContainer.clientHeight;
+        }
+
+        // Persist the chosen scroll
+        if (!state.groupScrollTops) state.groupScrollTops = {};
+        state.groupScrollTops[groupPath] = groupContainer.scrollTop;
+      });
+    };
+
+    // Run immediately and again on next frame so the first click is captured after DOM update
+    doScroll();
+    requestAnimationFrame(doScroll);
+  }
+
+  function setActiveIndex(index, { skipLoad = false, skipRender = false } = {}) {
     if (index < 0 || index >= state.results.length) return;
 
     if (isEditMode) {
@@ -2235,18 +3721,246 @@ console.log('[Rifler] Webview script starting...');
 
     state.activeIndex = index;
 
-    renderResultsVirtualized();
-    ensureActiveVisible();
+    // Only rebuild results list if we're not using lightweight navigation
+    if (!skipRender) {
+      renderResultsVirtualized();
+    }
+    
+    // After render, apply active styling and ensure visibility
+    requestAnimationFrame(() => {
+      const activeEl = document.querySelector(`.result-item[data-index="${index}"]`);
+      if (activeEl) {
+        document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
+        activeEl.classList.add('active');
+        activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      
+      ensureActiveVisible();
+      ensureActiveVisibleInGroup();
+    });
 
-    loadFileContent(state.results[index]);
+    if (!skipLoad) {
+      loadFileContent(state.results[index]);
+    }
   }
 
-  function navigateResults(delta) {
-    if (state.results.length === 0) return;
-    let newIndex = state.activeIndex + delta;
-    if (newIndex < 0) newIndex = state.results.length - 1;
-    if (newIndex >= state.results.length) newIndex = 0;
-    setActiveIndex(newIndex);
+  function activateFirstMatchForPath(path) {
+    const idx = state.results.findIndex(r => (r.relativePath || r.fileName) === path);
+    if (idx >= 0) {
+      setActiveIndex(idx);
+    }
+  }
+
+
+  // === Flat-List Navigation (Robust, No Group Assumptions) ===
+
+  /**
+   * Check if an element is visible in the DOM
+   */
+  function isElementVisible(el) {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  /**
+   * Get all navigable result items in visual order (flat list)
+   * Scope to results list container, never include preview clones
+   */
+  function getNavigableItems() {
+    // Use the actual results list element (virtualized container)
+    const root = resultsList;
+    if (!root) return [];
+
+    // Only result rows (match rows), not headers/end-of-results
+    const items = Array.from(root.querySelectorAll('.result-item'));
+    return items.filter(isElementVisible);
+  }
+
+  /**
+   * Get file path for a result index
+   */
+  function getPathForResultIndex(resultIndex) {
+    const r = state.results[resultIndex];
+    return (r?.relativePath || r?.fileName) || null;
+  }
+
+  /**
+   * Get all unique file paths in renderItems order (fileHeader items)
+   */
+  function getAllGroupPathsInOrder() {
+    return state.renderItems
+      .filter(it => it.type === 'fileHeader')
+      .map(it => it.path);
+  }
+
+  /**
+   * Check if a group is collapsed
+   */
+  function isGroupCollapsed(path) {
+    if (state.collapsedFiles.has(path)) return true;
+    if (state.expandedFiles.has(path)) return false;
+
+    // Fallback: check renderItems header state
+    const header = state.renderItems.find(it => it.type === 'fileHeader' && it.path === path);
+    return header ? !!header.isCollapsed : false;
+  }
+
+  /**
+   * Expand a collapsed group and re-render
+   */
+  function expandGroup(path) {
+    state.collapsedFiles.delete(path);
+    state.expandedFiles.add(path);
+
+    // Rebuild renderItems without losing scroll or active selection
+    handleSearchResults(state.results, {
+      skipAutoLoad: true,
+      activeIndex: state.activeIndex,
+      preserveScroll: true
+    });
+  }
+
+  /**
+   * Find first result index for a given file path
+   */
+  function findFirstResultIndexInPath(path) {
+    return state.results.findIndex(r => (r.relativePath || r.fileName) === path);
+  }
+
+  /**
+   * Find last result index for a given file path
+   */
+  function findLastResultIndexInPath(path) {
+    for (let i = state.results.length - 1; i >= 0; i--) {
+      const r = state.results[i];
+      if ((r.relativePath || r.fileName) === path) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Robustly find the currently active result item
+   * Handles cases where active element is lost or on a child
+   */
+  function getCurrentActiveItem(navigableItems) {
+    if (!navigableItems || navigableItems.length === 0) return null;
+
+    // Try to find .result-item.active within resultsList scope
+    const domActive = resultsList ? resultsList.querySelector('.result-item.active') : null;
+    if (domActive && navigableItems.includes(domActive)) return domActive;
+
+    // Try state.activeIndex
+    if (state.activeIndex >= 0 && state.activeIndex < state.results.length) {
+      const targetItem = document.querySelector(`.result-item[data-index="${state.activeIndex}"]`);
+      if (targetItem && navigableItems.includes(targetItem)) return targetItem;
+    }
+
+    // Fallback to first item
+    return navigableItems[0] || null;
+  }
+
+  /**
+   * Move selection up or down with cross-group navigation
+   * - Within visible items: move normally
+   * - At boundaries: jump to next/prev group (auto-expand if needed)
+   * - No wrap-around
+   */
+  function moveSelection(delta) {
+    const navigableItems = getNavigableItems();
+    if (!navigableItems.length) return;
+
+    const currentItem = getCurrentActiveItem(navigableItems);
+    if (!currentItem) return;
+
+    const currentIdx = navigableItems.indexOf(currentItem);
+    if (currentIdx === -1) return;
+
+    const nextIdx = currentIdx + delta;
+
+    // Normal case: move within visible items
+    if (nextIdx >= 0 && nextIdx < navigableItems.length) {
+      setActiveResult(navigableItems[nextIdx], { reason: 'keyboard' });
+      return;
+    }
+
+    // Edge case: at boundary of visible items -> cross-group navigation
+    if (state.activeIndex < 0 || state.activeIndex >= state.results.length) return;
+
+    const currentPath = getPathForResultIndex(state.activeIndex);
+    if (!currentPath) return;
+
+    const paths = getAllGroupPathsInOrder();
+    const groupIdx = paths.indexOf(currentPath);
+    if (groupIdx === -1) return;
+
+    if (delta > 0) {
+      // ArrowDown at boundary: go to next group
+      const nextPath = paths[groupIdx + 1];
+      if (!nextPath) return; // Already last group -> stop
+
+      if (isGroupCollapsed(nextPath)) {
+        expandGroup(nextPath);
+      }
+
+      const firstIdx = findFirstResultIndexInPath(nextPath);
+      if (firstIdx >= 0) {
+        setActiveIndex(firstIdx);
+      }
+    } else {
+      // ArrowUp at boundary: go to previous group
+      const prevPath = paths[groupIdx - 1];
+      if (!prevPath) return; // Already first group -> stop
+
+      if (isGroupCollapsed(prevPath)) {
+        expandGroup(prevPath);
+      }
+
+      const lastIdx = findLastResultIndexInPath(prevPath);
+      if (lastIdx >= 0) {
+        setActiveIndex(lastIdx);
+      }
+    }
+  }
+  
+  /**
+   * Set the active result: updates state, DOM, preview, and ensures visibility
+   * IDEMPOTENT: safe to call multiple times with same or different items
+   * Handles virtualization by re-rendering to ensure target item is in DOM
+   */
+  function setActiveResult(itemEl, meta) {
+    const item = itemEl?.closest('.result-item');
+    if (!item) return;
+
+    const resultIndex = parseInt(item.dataset.index, 10);
+    if (isNaN(resultIndex) || resultIndex < 0 || resultIndex >= state.results.length) return;
+
+    // Update state: just track the active index (no group logic needed)
+    state.activeIndex = resultIndex;
+
+    // Re-render virtual list so the active item is guaranteed to exist in DOM
+    renderResultsVirtualized();
+
+    // After render, re-select the actual DOM element for this index and apply .active
+    requestAnimationFrame(() => {
+      const fresh = document.querySelector(`.result-item[data-index="${resultIndex}"]`);
+      if (fresh) {
+        document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
+        fresh.classList.add('active');
+        fresh.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      
+      // Ensure visibility in both main list and group containers
+      ensureActiveVisible();
+      ensureActiveVisibleInGroup();
+    });
+
+    // Load file content for preview (same as mouse click selection)
+    if (!isEditMode) {
+      loadFileContent(state.results[resultIndex]);
+    }
   }
 
   function openActiveResult() {
@@ -2276,35 +3990,84 @@ console.log('[Rifler] Webview script starting...');
     return html.substring(0, start) + '<span class="match">' + html.substring(start, end) + '</span>' + html.substring(end);
   }
 
-  function highlightMatchSafe(rawText, start, end, language = null) {
-    if (start < 0 || end <= start || start >= rawText.length) {
-      if (language && typeof hljs !== 'undefined') {
+  function highlightMatchSafe(rawText, ranges, language = null) {
+    // Normalize ranges to an array
+    let matchRanges = [];
+    if (Array.isArray(ranges)) {
+      matchRanges = ranges;
+    } else if (ranges && typeof ranges.start === 'number' && typeof ranges.end === 'number') {
+      matchRanges = [ranges];
+    }
+
+    // Filter and sort ranges
+    matchRanges = matchRanges
+      .filter(r => r && typeof r.start === 'number' && typeof r.end === 'number' && r.start >= 0 && r.end > r.start && r.start < rawText.length)
+      .sort((a, b) => a.start - b.start);
+
+    if (matchRanges.length === 0) {
+      if (typeof hljs !== 'undefined') {
         try {
-          return hljs.highlight(rawText, { language }).value;
+          if (language && language !== 'file' && hljs.getLanguage(language)) {
+            const res = hljs.highlight(rawText, { language }).value;
+            if (rawText.length > 0 && !res.includes('class="hljs-')) {
+              console.warn(`[Rifler] highlightMatchSafe: No hljs classes found in result for ${language}. Input: ${rawText.substring(0, 20)}`);
+            }
+            return res;
+          } else {
+            return hljs.highlightAuto(rawText).value;
+          }
         } catch (e) {
-          return escapeHtml(rawText);
+          console.error('[Rifler] highlightMatchSafe error:', e);
         }
       }
       return escapeHtml(rawText);
     }
-    
-    end = Math.min(end, rawText.length);
-    const before = rawText.substring(0, start);
-    const match = rawText.substring(start, end);
-    const after = rawText.substring(end);
 
-    if (language && typeof hljs !== 'undefined') {
-      try {
-        // Highlight parts separately to keep the match span
-        const hBefore = hljs.highlight(before, { language }).value;
-        const hMatch = hljs.highlight(match, { language }).value;
-        const hAfter = hljs.highlight(after, { language }).value;
-        return hBefore + '<span class="match">' + hMatch + '</span>' + hAfter;
-      } catch (e) {
-        // Fallback to basic escaping
+    let result = '';
+    let lastIndex = 0;
+
+    for (const range of matchRanges) {
+      const start = range.start;
+      const end = Math.min(range.end, rawText.length);
+
+      if (start < lastIndex) continue; // Skip overlapping ranges
+
+      const before = rawText.substring(lastIndex, start);
+      const match = rawText.substring(start, end);
+
+      if (typeof hljs !== 'undefined') {
+        try {
+          if (language && language !== 'file' && hljs.getLanguage(language)) {
+            result += hljs.highlight(before, { language }).value;
+            result += '<span class="match">' + hljs.highlight(match, { language }).value + '</span>';
+          } else {
+            result += hljs.highlightAuto(before).value;
+            result += '<span class="match">' + hljs.highlightAuto(match).value + '</span>';
+          }
+        } catch (e) {
+          result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
+        }
+      } else {
+        result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
       }
+      lastIndex = end;
     }
 
-    return escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>' + escapeHtml(after);
+    const remaining = rawText.substring(lastIndex);
+    if (typeof hljs !== 'undefined') {
+      try {
+        if (language && language !== 'file' && hljs.getLanguage(language)) {
+          result += hljs.highlight(remaining, { language }).value;
+        } else {
+          result += hljs.highlightAuto(remaining).value;
+        }
+      } catch (e) {
+        result += escapeHtml(remaining);
+      }
+    } else {
+      result += escapeHtml(remaining);
+    }
+
+    return result;
   }
 })();

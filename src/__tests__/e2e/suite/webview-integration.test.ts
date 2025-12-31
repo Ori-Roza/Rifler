@@ -88,7 +88,7 @@ const findMe = "unique_search_term_12345";
     let attempts = 0;
     while (Date.now() - start < timeout) {
       attempts++;
-      const results = await performSearch(query, scope, options, directoryPath, modulePath, filePath);
+      const results = await performSearch(query, scope, options, directoryPath, modulePath);
       if (results.length >= expectedCount) {
         if (attempts > 1) {
           log(`   ⏳ Found after ${attempts} attempts (${Date.now() - start}ms)`);
@@ -98,7 +98,7 @@ const findMe = "unique_search_term_12345";
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     log(`   ❌ Failed after ${attempts} attempts (${Date.now() - start}ms)`);
-    return await performSearch(query, scope, options, directoryPath, modulePath, filePath);
+    return await performSearch(query, scope, options, directoryPath, modulePath);
   }
 
   after(async () => {
@@ -179,11 +179,8 @@ const findMe = "unique_search_term_12345";
 
     const caseSensitiveResults = await performSearch(
       'TestClass',
-      'file',
-      { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Found ${caseSensitiveResults.length} result(s)`);
@@ -193,11 +190,8 @@ const findMe = "unique_search_term_12345";
 
     const wrongCaseResults = await performSearch(
       'testclass',
-      'file',
-      { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Found ${wrongCaseResults.length} result(s)`);
@@ -240,11 +234,8 @@ const findMe = "unique_search_term_12345";
 
     const results = await performSearch(
       'this_text_definitely_does_not_exist_xyz789',
-      'file',
-      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Found ${results.length} result(s)`);
@@ -398,11 +389,10 @@ const c = "word_to_replace";`;
       await replaceAll(
         'word_to_replace',
         'new_word',
-        'file',
+        'project',
         { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
         undefined,
         undefined,
-        replaceAllTestFilePath,
         mockRefresh
       );
 
@@ -564,11 +554,8 @@ const c = "word_to_replace";`;
 
     const results = await performSearch(
       '',
-      'file',
-      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Results: ${results.length}`);
@@ -584,11 +571,8 @@ const c = "word_to_replace";`;
 
     const results = await performSearch(
       'a',
-      'file',
-      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
     );
 
     log(`   📊 Results: ${results.length}`);
@@ -604,11 +588,8 @@ const c = "word_to_replace";`;
 
     const results = await performSearch(
       '[invalid(regex',
-      'file',
-      { matchCase: false, wholeWord: false, useRegex: true, fileMask: '' },
-      undefined,
-      undefined,
-      testFilePath
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: true, fileMask: '' }
     );
 
     log(`   📊 Results: ${results.length}`);
@@ -1428,7 +1409,14 @@ class AutomationTestClass {
     await vscode.commands.executeCommand('__test_ensurePanelOpen');
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const currentPanel = testHelpers.getCurrentPanel();
+    let currentPanel = testHelpers.getCurrentPanel();
+    // If panel wasn't created, try one more time
+    if (!currentPanel) {
+      await vscode.commands.executeCommand('rifler.open');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      currentPanel = testHelpers.getCurrentPanel();
+    }
+    
     if (!currentPanel) {
       throw new Error('Rifler panel was not created');
     }
@@ -1664,5 +1652,140 @@ suite('Rifler Virtualization Tests', () => {
       'maxResults should be positive or use default');
     
     log('   ✅ maxResults configuration is accessible');
+  });
+
+  // ============================================================================
+  // Preview Scrolling Tests
+  // ============================================================================
+
+  test('Preview should scroll to show active result line', async function() {
+    this.timeout(30000);
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('__test_ensurePanelOpen');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const currentPanel = testHelpers.getCurrentPanel();
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Setting up message listener for search and scroll verification');
+    let searchCompleted = false;
+    let results: any[] = [];
+    let testPhase = 0; // 0: waiting for search, 1: testing first result, 2: testing middle, 3: testing last
+
+    const scrollTestPromise = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`Timeout waiting for scroll test completion. SearchCompleted: ${searchCompleted}, ResultsCount: ${results.length}`));
+      }, 20000);
+
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          searchCompleted = true;
+          results = message.results;
+          log(`   ✅ Search completed with ${results.length} results`);
+          
+          // If we have at least 3 results, proceed with scroll testing
+          if (results.length >= 3) {
+            testPhase = 1;
+            // Test scrolling to first result
+            setTimeout(() => {
+              currentPanel.webview.postMessage({
+                type: '__test_setActiveIndex',
+                index: 0
+              });
+            }, 1000);
+          } else {
+            clearTimeout(timeout);
+            disposable.dispose();
+            reject(new Error(`Need at least 3 results for scroll test, got ${results.length}`));
+          }
+        } else if (message.type === '__test_previewScrollInfo') {
+          if (testPhase === 1) {
+            // First scroll check (index 0)
+            if (message.hasActiveLine && message.isActiveLineVisible) {
+              log(`   ✅ First result line is visible in preview (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`);
+              
+              // Now test scrolling to a different result (middle one)
+              testPhase = 2;
+              const middleIndex = Math.floor(results.length / 2);
+              setTimeout(() => {
+                currentPanel.webview.postMessage({
+                  type: '__test_setActiveIndex',
+                  index: middleIndex
+                });
+              }, 1000);
+            } else {
+              clearTimeout(timeout);
+              disposable.dispose();
+              reject(new Error(`First result line should be visible but is not (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`));
+            }
+          } else if (testPhase === 2) {
+            // Second scroll check (middle result)
+            if (message.hasActiveLine && message.isActiveLineVisible) {
+              log(`   ✅ Middle result line is visible in preview (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`);
+              
+              // Test scrolling to last result
+              testPhase = 3;
+              setTimeout(() => {
+                currentPanel.webview.postMessage({
+                  type: '__test_setActiveIndex',
+                  index: results.length - 1
+                });
+              }, 1000);
+            } else {
+              clearTimeout(timeout);
+              disposable.dispose();
+              reject(new Error(`Middle result line should be visible but is not (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`));
+            }
+          } else if (testPhase === 3) {
+            // Third scroll check (last result)
+            if (message.hasActiveLine && message.isActiveLineVisible) {
+              log(`   ✅ Last result line is visible in preview (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`);
+              clearTimeout(timeout);
+              disposable.dispose();
+              resolve();
+            } else {
+              clearTimeout(timeout);
+              disposable.dispose();
+              reject(new Error(`Last result line should be visible but is not (scrollTop: ${message.scrollTop}, activeLineTop: ${message.activeLineTop})`));
+            }
+          }
+        }
+      });
+    });
+
+    await step('Triggering search for multiple results');
+    let searchAttempts = 0;
+    const attemptSearch = () => {
+      searchAttempts++;
+      log(`   Attempt ${searchAttempts} to search for matches`);
+      // Try regex pattern first, fall back to simple "function" if empty
+      const query = searchAttempts === 1 ? 'function|class|const' : 'function';
+      const useRegex = searchAttempts === 1;
+      log(`   Searching for "${query}" (regex: ${useRegex})`);
+      currentPanel.webview.postMessage({
+        type: '__test_setSearchInput',
+        value: query,
+        useRegex: useRegex
+      });
+    };
+    
+    attemptSearch();
+    
+    // If search doesn't complete after 6 seconds, retry with simple query
+    const retryTimer = setTimeout(() => {
+      if (!searchCompleted && searchAttempts < 2) {
+        log(`   ⚠️ Search not completing, retrying with simple 'function' query...`);
+        attemptSearch();
+      }
+    }, 6000);
+
+    await step('Waiting for scroll test completion');
+    await scrollTestPromise;
+    clearTimeout(retryTimer);
+    
+    log('   ✅ Preview scrolling test passed');
   });
 });

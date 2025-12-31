@@ -50,21 +50,34 @@ export class PanelManager {
   createOrShowPanel(options: PanelOptions = {}): void {
     const { showReplace = false, restoreState, initialQuery } = options;
 
-    // If panel already exists, reveal it and send messages as needed
+    // If panel already exists, check if it's still valid before using it
     if (this.currentPanel) {
-      this.currentPanel.reveal(vscode.ViewColumn.Two);
-      if (showReplace) {
-        this.currentPanel.webview.postMessage({ type: 'showReplace' });
+      try {
+        // Check if webview is still valid
+        if (!this.currentPanel.webview) {
+          // Panel was disposed, clear the reference and create a new one
+          this.currentPanel = undefined;
+        } else {
+          // Panel is still valid, reveal it and send messages as needed
+          this.currentPanel.reveal(vscode.ViewColumn.Two);
+          if (showReplace) {
+            this.currentPanel.webview.postMessage({ type: 'showReplace' });
+          }
+          if (initialQuery) {
+            this.currentPanel.webview.postMessage({
+              type: 'setSearchQuery',
+              query: initialQuery
+            });
+          }
+          // Ensure sidebar is closed when the panel is revealed
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+          return;
+        }
+      } catch (error) {
+        // If there's an error, panel might be disposed
+        console.error('[Rifler] Error accessing existing panel:', error);
+        this.currentPanel = undefined;
       }
-      if (initialQuery) {
-        this.currentPanel.webview.postMessage({
-          type: 'setSearchQuery',
-          query: initialQuery
-        });
-      }
-      // Ensure sidebar is closed when the panel is revealed
-      vscode.commands.executeCommand('workbench.action.closeSidebar');
-      return;
     }
 
     // If no restore state provided, try to load from StateStore
@@ -91,16 +104,27 @@ export class PanelManager {
     );
 
     // Ensure sidebar is closed when the panel is visible
+    // Use multiple delayed attempts to handle async sidebar show/hide operations
     this.currentPanel.onDidChangeViewState(e => {
       if (e.webviewPanel.visible) {
+        // Close sidebar immediately
+        vscode.commands.executeCommand('workbench.action.closeSidebar');
+        // Close again after short delay (for async operations)
         setTimeout(() => {
           vscode.commands.executeCommand('workbench.action.closeSidebar');
-        }, 100);
+        }, 50);
+        // And once more after longer delay to handle resize/layout changes
+        setTimeout(() => {
+          vscode.commands.executeCommand('workbench.action.closeSidebar');
+        }, 200);
       }
     });
 
-    // Also close sidebar immediately after creation
+    // Also close sidebar immediately after creation with multiple attempts
     vscode.commands.executeCommand('workbench.action.closeSidebar');
+    setTimeout(() => {
+      vscode.commands.executeCommand('workbench.action.closeSidebar');
+    }, 50);
 
     // Create unified message handler for the panel and configure common handlers
     this._messageHandler = new MessageHandler(this.currentPanel);
@@ -255,11 +279,17 @@ export class PanelManager {
     const config = vscode.workspace.getConfiguration('rifler');
     const replaceKeybinding = config.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
     const maxResults = config.get<number>('maxResults', 10000);
-
+    const resultsShowCollapsed = config.get<boolean>('results.showCollapsed', false);
+    console.log('[Rifler] Initializing webview with config:', {
+      replaceKeybinding,
+      maxResults,
+      resultsShowCollapsed
+    });
     this.currentPanel.webview.postMessage({
       type: 'config',
       replaceKeybinding,
-      maxResults
+      maxResults,
+      resultsShowCollapsed
     });
 
     if (shouldShowReplace) {
@@ -285,6 +315,12 @@ export class PanelManager {
     } else {
       this.currentPanel.webview.postMessage({ type: 'focusSearch' });
     }
+
+    // Send preview panel state
+    this.currentPanel.webview.postMessage({
+      type: 'restorePreviewPanelState',
+      collapsed: this.stateStore.getPreviewPanelCollapsed()
+    });
   }
 }
 

@@ -212,7 +212,8 @@ describe('searchInContent', () => {
     const regex = /test/gi;
     const results = searchInContent(content, regex, '/path/to/file.ts');
     
-    expect(results).toHaveLength(3);
+    expect(results).toHaveLength(1);
+    expect(results[0].previewMatchRanges).toHaveLength(3);
   });
 
   test('should find matches across multiple lines', () => {

@@ -675,20 +675,72 @@ console.log('[Rifler] Webview script starting...');
         const pvCode = pvLine.querySelector('.pvCode');
         
         if (pvCode) {
-          // Calculate column position within the code area
-          const rect = pvCode.getBoundingClientRect();
-          const relativeX = Math.max(0, e.clientX - rect.left);
+          // Use DOM caret APIs to get precise caret position
+          let clickedColumn = 0;
           
-          // Get the text content
-          const textContent = pvCode.textContent || '';
+          try {
+            // Try caretRangeFromPoint first (Chrome, Safari)
+            let range = null;
+            if (document.caretRangeFromPoint) {
+              range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            } else if (document.caretPositionFromPoint) {
+              // Firefox
+              const position = document.caretPositionFromPoint(e.clientX, e.clientY);
+              if (position) {
+                range = document.createRange();
+                range.setStart(position.offsetNode, position.offset);
+              }
+            }
+            
+            if (range) {
+              // Find the closest .pvSeg element
+              let node = range.startContainer;
+              let pvSeg = null;
+              
+              if (node.nodeType === Node.TEXT_NODE) {
+                pvSeg = node.parentElement?.closest('.pvSeg');
+              } else if (node.nodeType === Node.ELEMENT_NODE) {
+                pvSeg = node.closest('.pvSeg');
+              }
+              
+              if (pvSeg) {
+                const segStart = parseInt(pvSeg.getAttribute('data-start') || '0', 10);
+                let offsetInSegText = 0;
+                
+                // Only use offset if the caret is in a text node within this seg
+                if (node.nodeType === Node.TEXT_NODE && pvSeg.contains(node)) {
+                  // Walk text nodes to compute offset
+                  const walker = document.createTreeWalker(pvSeg, NodeFilter.SHOW_TEXT);
+                  let textNode;
+                  let textOffset = 0;
+                  while ((textNode = walker.nextNode())) {
+                    if (textNode === node) {
+                      offsetInSegText = textOffset + range.startOffset;
+                      break;
+                    }
+                    textOffset += textNode.textContent.length;
+                  }
+                } else {
+                  // Fallback: use segStart only
+                  offsetInSegText = 0;
+                }
+                
+                clickedColumn = segStart + offsetInSegText;
+              }
+            }
+            
+            // Clamp column to raw line length
+            if (state.fileContent && state.fileContent.content) {
+              const lines = state.fileContent.content.split('\n');
+              const rawLine = lines[lineNumber] || '';
+              clickedColumn = Math.max(0, Math.min(clickedColumn, rawLine.length));
+            }
+          } catch (err) {
+            console.error('[Rifler] Click-to-cursor error:', err);
+            clickedColumn = 0;
+          }
           
-          // Use a more accurate character width for monospace fonts
-          // Most monospace fonts at 13px are ~8px per character
-          const charWidth = 8;
-          const column = Math.max(0, Math.round(relativeX / charWidth) - 1);
-          const actualColumn = Math.min(column, textContent.length);
-          
-          enterEditMode(lineNumber, actualColumn);
+          enterEditMode(lineNumber, clickedColumn);
         } else {
           enterEditMode(lineNumber);
         }
@@ -716,13 +768,24 @@ console.log('[Rifler] Webview script starting...');
           
           // Set cursor position if a line was clicked
           if (typeof clickedLineNumber === 'number' && clickedLineNumber >= 0) {
-            const lines = state.fileContent.content.split('\n');
-            let charPosition = 0;
-            for (let i = 0; i < clickedLineNumber && i < lines.length; i++) {
-              charPosition += lines[i].length + 1; // +1 for newline
+            // Build line start offsets by scanning for actual \n positions (CRLF safe)
+            const content = state.fileContent.content;
+            const lineStarts = [0];
+            for (let i = 0; i < content.length; i++) {
+              if (content[i] === '\n') {
+                lineStarts.push(i + 1);
+              }
             }
-            // Add column offset within the line
-            charPosition += Math.min(clickedColumn, lines[clickedLineNumber]?.length || 0);
+            
+            // Global cursor offset = line start + clicked column
+            const lineStart = lineStarts[clickedLineNumber] !== undefined ? lineStarts[clickedLineNumber] : content.length;
+            
+            // Clamp column to line length
+            const lines = content.split('\n');
+            const lineLength = lines[clickedLineNumber]?.length || 0;
+            const clampedColumn = Math.min(clickedColumn, lineLength);
+            
+            const charPosition = lineStart + clampedColumn;
             fileEditor.setSelectionRange(charPosition, charPosition);
           }
           
@@ -3197,7 +3260,9 @@ console.log('[Rifler] Webview script starting...');
 
       if (safeRanges.length === 0) {
         const highlighted = highlightSegment(rawLine);
-        return highlighted === '' ? ' ' : highlighted;
+        const content = highlighted === '' ? ' ' : highlighted;
+        // Wrap entire line in a single pvSeg with data-start="0"
+        return '<span class="pvSeg" data-start="0">' + content + '</span>';
       }
 
       let html = '';
@@ -3209,14 +3274,17 @@ console.log('[Rifler] Webview script starting...');
         const end = Math.max(start, Math.min(rawLine.length, r.end));
 
         if (start > cursor) {
-          html += highlightSegment(rawLine.slice(cursor, start));
+          // Before-match segment
+          html += '<span class="pvSeg" data-start="' + cursor + '">' + highlightSegment(rawLine.slice(cursor, start)) + '</span>';
         }
-        html += '<span class="pvMatch">' + highlightSegment(rawLine.slice(start, end)) + '</span>';
+        // Match segment - both pvSeg and pvMatch classes
+        html += '<span class="pvSeg pvMatch" data-start="' + start + '">' + highlightSegment(rawLine.slice(start, end)) + '</span>';
         cursor = end;
       }
 
       if (cursor < rawLine.length) {
-        html += highlightSegment(rawLine.slice(cursor));
+        // After-match segment
+        html += '<span class="pvSeg" data-start="' + cursor + '">' + highlightSegment(rawLine.slice(cursor)) + '</span>';
       }
       return html === '' ? ' ' : html;
     };

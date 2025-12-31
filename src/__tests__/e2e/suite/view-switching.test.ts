@@ -96,4 +96,59 @@ suite('View Switching E2E Tests', () => {
     // 5. Cleanup
     await vscode.commands.executeCommand('rifler._closeWindowInternal');
   });
+
+  test('Toggling sidebar returns to previous container', async function() {
+    this.timeout(40000);
+
+    const config = vscode.workspace.getConfiguration('rifler');
+    await config.update('panelLocation', 'sidebar', vscode.ConfigurationTarget.Workspace);
+    await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
+
+    // Ensure an editor is open with no selection (so toggle path is hit)
+    const doc = await vscode.workspace.openTextDocument({ content: 'toggle-return-test', language: 'plaintext' });
+    const editor = await vscode.window.showTextDocument(doc);
+    editor.selections = [new vscode.Selection(new vscode.Position(0, 0), new vscode.Position(0, 0))];
+
+    // Start from a non-Rifler container (SCM) to verify restoration target
+    await vscode.commands.executeCommand('workbench.view.scm');
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    const initialContainer = await getActiveViewletId();
+    assert.ok(initialContainer);
+    assert.notStrictEqual(initialContainer, 'workbench.view.extension.rifler-sidebar');
+
+    // Open Rifler via toggle command (should record previous container)
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    await retryAssert(async () => {
+      const active = await getActiveViewletId();
+      assert.strictEqual(active, 'workbench.view.extension.rifler-sidebar', 'Rifler sidebar should be active after open');
+    });
+
+    // Toggle again with no selection: should return to previous container (SCM)
+    await vscode.commands.executeCommand('rifler.open');
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    await retryAssert(async () => {
+      const active = await getActiveViewletId();
+      assert.strictEqual(
+        active,
+        initialContainer,
+        'Toggling Rifler should restore the previous sidebar container'
+      );
+    });
+
+    // Cleanup: return to Explorer to avoid leaving SCM active
+    await vscode.commands.executeCommand('workbench.view.explorer');
+    await new Promise(resolve => setTimeout(resolve, 500));
+  });
+
+  async function getActiveViewletId(): Promise<string | undefined> {
+    try {
+      return await vscode.commands.executeCommand<string>('vscode.getContextKeyValue', 'activeViewlet');
+    } catch {
+      return undefined;
+    }
+  }
 });

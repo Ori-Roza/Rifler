@@ -12,9 +12,16 @@ export class ViewManager {
   private _context: vscode.ExtensionContext;
   private _stateStore?: StateStore;
   private _isSwitching = false; // Lock to prevent concurrent switches
+  private _lastNonRiflerSidebarCommand: string;
+
+  private static readonly PREV_SIDEBAR_KEY = 'rifler.prevSidebarCommand';
+  private static readonly RIFLER_VIEWLET_ID = 'workbench.view.extension.rifler-sidebar';
+  private static readonly DEFAULT_SIDEBAR_COMMAND = 'workbench.view.explorer';
 
   constructor(context: vscode.ExtensionContext) {
     this._context = context;
+    this._lastNonRiflerSidebarCommand =
+      context.workspaceState.get<string>(ViewManager.PREV_SIDEBAR_KEY) ?? ViewManager.DEFAULT_SIDEBAR_COMMAND;
   }
 
   public setStateStore(stateStore: StateStore): void {
@@ -53,17 +60,21 @@ export class ViewManager {
     }
 
     if (panelLocation === 'sidebar') {
-      this._openSidebar(options);
+      await this._openSidebar(options);
     } else {
       await this._openWindow(options);
     }
   }
 
-  private _openSidebar(options: { showReplace?: boolean; initialQuery?: string; initialQueryFocus?: boolean }): void {
+  private async _openSidebar(options: { showReplace?: boolean; initialQuery?: string; initialQueryFocus?: boolean }): Promise<void> {
     if (this._sidebarProvider) {
-      // Reveal the sidebar view container first
-      vscode.commands.executeCommand('workbench.view.extension.rifler-sidebar');
-      
+      // Wait for any lingering tab to close before focusing the sidebar
+      await this._waitForPanelClosure();
+
+      await this._rememberPreviousSidebarContainer();
+      await vscode.commands.executeCommand('workbench.action.focusSideBar');
+      await vscode.commands.executeCommand(ViewManager.RIFLER_VIEWLET_ID);
+
       // Then show the sidebar provider view
       this._sidebarProvider.show();
       
@@ -92,6 +103,13 @@ export class ViewManager {
     });
   }
 
+  private async _waitForPanelClosure(): Promise<void> {
+    const deadline = Date.now() + 500;
+    while (this._panelManager?.panel && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+
   public async switchView(): Promise<void> {
     // Prevent concurrent switches - ignore if already switching
     if (this._isSwitching) {
@@ -107,6 +125,27 @@ export class ViewManager {
     }
   }
 
+  public async openInTab(): Promise<void> {
+    await this.openView({ forcedLocation: 'window' });
+  }
+
+  public async openInSidebar(): Promise<void> {
+    await this.openView({ forcedLocation: 'sidebar' });
+  }
+
+  public async restorePreviousSidebarOrFallback(): Promise<void> {
+    const previous =
+      this._lastNonRiflerSidebarCommand ||
+      this._context.workspaceState.get<string>(ViewManager.PREV_SIDEBAR_KEY) ||
+      ViewManager.DEFAULT_SIDEBAR_COMMAND;
+
+    try {
+      await vscode.commands.executeCommand(previous);
+    } catch (err) {
+      console.warn('[Rifler] Failed to restore previous sidebar, falling back to Explorer', err);
+      await vscode.commands.executeCommand(ViewManager.DEFAULT_SIDEBAR_COMMAND);
+    }
+  }
   private async _performSwitchView(): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
     
@@ -179,5 +218,22 @@ export class ViewManager {
     
     // Open in new location
     await this.openView({ forcedLocation: newLocation });
+  }
+
+  private async _rememberPreviousSidebarContainer(): Promise<void> {
+    const activeViewlet = await this._getActiveViewletId();
+    if (activeViewlet && activeViewlet !== ViewManager.RIFLER_VIEWLET_ID) {
+      this._lastNonRiflerSidebarCommand = activeViewlet;
+      await this._context.workspaceState.update(ViewManager.PREV_SIDEBAR_KEY, activeViewlet);
+    }
+  }
+
+  private async _getActiveViewletId(): Promise<string | undefined> {
+    try {
+      // VS Code internal helper that returns the active sidebar container id (e.g., workbench.view.explorer)
+      return await vscode.commands.executeCommand<string>('vscode.getContextKeyValue', 'activeViewlet');
+    } catch {
+      return undefined;
+    }
   }
 }

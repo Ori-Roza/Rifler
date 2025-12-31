@@ -82,9 +82,16 @@ async function sendFileContent(
 ): Promise<void> {
   try {
     const uri = vscode.Uri.parse(uriString);
-    const fileContent = new TextDecoder().decode(
-      await vscode.workspace.fs.readFile(uri)
-    );
+    // Prefer open document content (unsaved edits) before disk
+    const openDoc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uriString);
+    let fileContent: string;
+    if (openDoc) {
+      fileContent = openDoc.getText();
+    } else {
+      fileContent = new TextDecoder().decode(
+        await vscode.workspace.fs.readFile(uri)
+      );
+    }
     const fileName = uri.path.split('/').pop() || '';
     const relativePath = vscode.workspace.asRelativePath(uri);
 
@@ -218,6 +225,8 @@ async function openLocation(
 let stateStore: StateStore;
 let viewManager: ViewManager;
 let panelManager: PanelManager;
+let applyingFromWebview = new Set<string>(); // Track URIs being edited from webview to prevent loops
+let panelActivePreview: { uri: string; query: string; options: SearchOptions } | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('Rifler extension is now active');
@@ -293,14 +302,21 @@ export async function activate(context: vscode.ExtensionContext) {
         sendWorkspaceInfo(panel);
       },
       sendFileContent: async (uri, query, options, _activeIndex) => {
+        panelActivePreview = { uri, query, options };
         const panel = panelManager.panel;
         if (!panel) return;
         await sendFileContent(panel, uri, query, options);
       },
-      saveFile: async (uri, content) => {
-        const panel = panelManager.panel;
-        if (!panel) return;
-        await saveFile(panel, uri, content);
+      applyEdits: async (uri, content) => {
+        // For panel (full-window mode), just save to disk
+        // (panel mode is less interactive than sidebar edit mode)
+        try {
+          const uriObj = vscode.Uri.parse(uri);
+          const encoder = new TextEncoder();
+          await vscode.workspace.fs.writeFile(uriObj, encoder.encode(content));
+        } catch (error) {
+          console.error('Error saving file from panel:', error);
+        }
       },
       stateStore: stateStore
     });
@@ -319,6 +335,59 @@ export async function activate(context: vscode.ExtensionContext) {
       stateStore.onSidebarVisibilityChange(callback);
     }
   });
+
+  // Set up loop prevention: ignore onDidChangeTextDocument events when we're applying from webview
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      // Skip if this change came from applying edits from the webview
+      if (sidebarProvider.isApplyingFromWebview(e.document.uri)) {
+        return;
+      }
+
+      const panel = panelManager.panel;
+      if (!panel || !panel.visible || !panelActivePreview) return;
+
+      if (e.document.uri.toString() !== panelActivePreview.uri) return;
+
+      // Use unsaved text from the document
+      const fileName = e.document.uri.path.split('/').pop() || '';
+      const relativePath = vscode.workspace.asRelativePath(e.document.uri);
+      const languageId = getLanguageIdFromFilename(fileName);
+      const iconUri = `vscode-icon://file_type_${languageId}`;
+
+      const fileContent = e.document.getText();
+      const regex = buildSearchRegex(panelActivePreview.query, panelActivePreview.options);
+
+      const matches: Array<{ line: number; start: number; end: number }> = [];
+      const lines = fileContent.split('\n');
+
+      if (regex) {
+        for (let lineNo = 0; lineNo < lines.length; lineNo++) {
+          const line = lines[lineNo];
+          regex.lastIndex = 0;
+          let match: RegExpExecArray | null;
+          while ((match = regex.exec(line)) !== null) {
+            matches.push({
+              line: lineNo,
+              start: match.index,
+              end: match.index + match[0].length
+            });
+            if (match[0].length === 0) regex.lastIndex++;
+          }
+        }
+      }
+
+      panel.webview.postMessage({
+        type: 'fileContent',
+        uri: panelActivePreview.uri,
+        content: fileContent,
+        fileName,
+        relativePath,
+        iconUri,
+        matches
+      });
+    })
+  );
 
   // Safety net: close sidebar if Rifler tab is active or visible
   // This handles cases like dragging the tab or switching tab groups

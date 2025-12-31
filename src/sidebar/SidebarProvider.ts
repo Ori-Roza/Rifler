@@ -40,6 +40,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   };
   private _messageHandler?: MessageHandler;
   private _stateSaveResolver?: () => void;
+  private _activePreview?: { uri: string; query: string; options: SearchOptions; activeIndex?: number };
+  private _applyingFromWebview = new Set<string>(); // Track URIs being edited from webview to prevent loops
+  private _lastAppliedTextFromRifler = new Map<string, string>(); // Track last applied content per URI
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this._context = context;
@@ -78,7 +81,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       sendCurrentDirectory: () => this._sendCurrentDirectory(),
       sendWorkspaceInfo: () => this._sendWorkspaceInfo(),
       sendFileContent: (uri, query, options, activeIndex) => this._sendFileContent(uri, query, options, activeIndex),
-      saveFile: (uri, content) => this._saveFile(uri, content)
+      applyEdits: (uri, content) => this._applyEdits(uri, content)
     });
 
     // Handle messages from the webview
@@ -122,6 +125,13 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       this._view = undefined;
     });
 
+    // Refresh preview when the currently previewed document changes in VS Code
+    this._context.subscriptions.push(
+      vscode.workspace.onDidChangeTextDocument((e) => {
+        this._refreshPreviewFromDocument(e.document);
+      })
+    );
+
     // Initial state restore if visible
     if (webviewView.visible) {
       this._restoreState();
@@ -138,7 +148,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       'getModules',
       'getCurrentDirectory',
       'getFileContent',
-      'saveFile',
+      'applyEdits',
       'validateRegex',
       'validateFileMask',
       'validateDirectory',
@@ -367,8 +377,15 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
 
     try {
       const uri = vscode.Uri.parse(uriString);
-      const content = await vscode.workspace.fs.readFile(uri);
-      const text = new TextDecoder().decode(content);
+      // Prefer open document text (includes unsaved changes); fallback to disk
+      const openDoc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uriString);
+      let text: string;
+      if (openDoc) {
+        text = openDoc.getText();
+      } else {
+        const content = await vscode.workspace.fs.readFile(uri);
+        text = new TextDecoder().decode(content);
+      }
       const fileName = uri.path.split('/').pop() || 'File';
 
       // Find all matches in the file using buildSearchRegex from utils
@@ -409,6 +426,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         matches
       };
 
+      // Track active preview for live refresh
+      this._activePreview = { uri: uriString, query, options, activeIndex };
+
       this._view?.webview.postMessage(payload);
 
       // Persist last preview and active index for instant restore
@@ -426,6 +446,104 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       }
     } catch (error) {
       console.error('Error reading file for preview:', error);
+    }
+  }
+
+  private async _refreshPreviewFromDocument(doc: vscode.TextDocument): Promise<void> {
+    if (!this._view || !this._activePreview) return;
+
+    const key = doc.uri.toString();
+    if (key !== this._activePreview.uri) return;
+
+    // Avoid loops when updates originated from webview
+    if (this.isApplyingFromWebview(doc.uri)) return;
+
+    const text = doc.getText();
+    const fileName = doc.uri.path.split('/').pop() || 'File';
+
+    const matches: Array<{ line: number; start: number; end: number }> = [];
+    const lines = text.split('\n');
+    const regex = buildSearchRegex(this._activePreview.query, this._activePreview.options);
+
+    if (regex) {
+      for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex];
+        regex.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(line)) !== null) {
+          matches.push({ line: lineIndex, start: match.index, end: match.index + match[0].length });
+          if (match[0].length === 0) regex.lastIndex++;
+        }
+      }
+    }
+
+    const languageId = this.getLanguageIdFromFilename(fileName);
+    const iconUri = `vscode-icon://file_type_${languageId}`;
+
+    this._view.webview.postMessage({
+      type: 'fileContent',
+      uri: this._activePreview.uri,
+      content: text,
+      fileName,
+      iconUri,
+      matches
+    });
+  }
+
+  private async _applyEdits(uriString: string | undefined, content: string | undefined): Promise<void> {
+    if (!uriString || content === undefined) {
+      return;
+    }
+
+    try {
+      const uri = vscode.Uri.parse(uriString);
+      const key = uri.toString();
+      
+      // Mark that we're applying edits from the webview
+      this._applyingFromWebview.add(key);
+      
+      try {
+        // Open the document (or get if already open)
+        const doc = await vscode.workspace.openTextDocument(uri);
+        
+        // Check for conflicts: if document is dirty and content doesn't match our last applied
+        const lastApplied = this._lastAppliedTextFromRifler.get(key);
+        const currentText = doc.getText();
+        
+        // If doc is dirty and content has diverged from our last applied, it's a conflict
+        if (doc.isDirty && lastApplied !== undefined && currentText !== lastApplied) {
+          // Conflict detected: notify webview
+          this._view?.webview.postMessage({
+            type: 'editConflict',
+            uri: uriString,
+            reason: 'vsCodeDirtyOrDiverged'
+          });
+          return;
+        }
+        
+        // Apply the edit via WorkspaceEdit (doesn't save to disk)
+        const fullRange = new vscode.Range(
+          doc.positionAt(0),
+          doc.positionAt(doc.getText().length)
+        );
+        
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(uri, fullRange, content);
+        
+        await vscode.workspace.applyEdit(edit);
+        
+        // Track this as the last applied content
+        this._lastAppliedTextFromRifler.set(key, content);
+      } finally {
+        // Remove guard on next tick so VS Code has emitted change events
+        setTimeout(() => {
+          this._applyingFromWebview.delete(key);
+        }, 0);
+      }
+    } catch (error) {
+      const fileName = uriString.split('/').pop() || 'file';
+      console.error('Error applying edits:', error);
+      vscode.window.showErrorMessage(`Could not update ${fileName}: ${error}`);
     }
   }
 
@@ -575,5 +693,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         resultsShowCollapsed
       });
     }
+  }
+
+  public isApplyingFromWebview(uri: vscode.Uri): boolean {
+    return this._applyingFromWebview.has(uri.toString());
   }
 }

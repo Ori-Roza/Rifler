@@ -12,7 +12,7 @@ export interface CommonHandlerDeps {
   sendCurrentDirectory: () => void;
   sendWorkspaceInfo: () => void;
   sendFileContent: (uri: string, query: string, options: SearchOptions, activeIndex?: number) => Promise<void>;
-  saveFile: (uri: string, content: string) => Promise<void>;
+  applyEdits: (uri: string, content: string) => Promise<void>;
   stateStore?: StateStore;
 }
 
@@ -74,9 +74,9 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     await deps.sendFileContent(msg.uri, msg.query, msg.options, msg.activeIndex);
   });
 
-  handler.registerHandler('saveFile', async (message) => {
+  handler.registerHandler('applyEdits', async (message) => {
     const msg = message as { uri: string; content: string };
-    await deps.saveFile(msg.uri, msg.content);
+    await deps.applyEdits(msg.uri, msg.content);
   });
 
   handler.registerHandler('replaceOne', async (message) => {

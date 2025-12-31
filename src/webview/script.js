@@ -665,7 +665,7 @@ console.log('[Rifler] Webview script starting...');
   }
 
   let isEditMode = false;
-  let saveTimeout = null;
+  let applyEditsTimeout = null;
   
   // RAF throttling for backdrop sync to prevent flicker on arrow navigation
   let pendingBackdropUpdate = false;
@@ -918,19 +918,39 @@ console.log('[Rifler] Webview script starting...');
     if (!state.fileContent) return;
     
     const newContent = fileEditor.value;
-    vscode.postMessage({
-      type: 'saveFile',
-      uri: state.fileContent.uri,
-      content: newContent
-    });
     
+    // Update local state immediately
     state.fileContent.content = newContent;
+    
+    // Debounce sending applyEdits message (150-300ms for immediate feel)
+    if (applyEditsTimeout) clearTimeout(applyEditsTimeout);
+    applyEditsTimeout = setTimeout(() => {
+      vscode.postMessage({
+        type: 'applyEdits',
+        uri: state.fileContent.uri,
+        content: newContent,
+        source: 'rifler',
+        ts: Date.now()
+      });
+    }, 150);
   }
 
   function exitEditMode(skipRender = false) {
     if (!isEditMode) return;
     
-    saveFile();
+    // Flush any pending applyEdits
+    if (applyEditsTimeout) clearTimeout(applyEditsTimeout);
+    if (!state.fileContent) return;
+    
+    const finalContent = fileEditor.value;
+    vscode.postMessage({
+      type: 'applyEdits',
+      uri: state.fileContent.uri,
+      content: finalContent,
+      source: 'rifler',
+      ts: Date.now()
+    });
+    state.fileContent.content = finalContent;
     
     isEditMode = false;
     
@@ -955,14 +975,12 @@ console.log('[Rifler] Webview script starting...');
     fileEditor.addEventListener('input', () => {
       // Use RAF-throttled update to prevent flicker during rapid typing/navigation
       scheduleBackdropSync();
-      if (saveTimeout) clearTimeout(saveTimeout);
-      saveTimeout = setTimeout(() => {
-        saveFile();
-      }, 1000);
+      // Send applyEdits with debounce on input
+      saveFile();
     });
 
     fileEditor.addEventListener('blur', (e) => {
-      if (saveTimeout) clearTimeout(saveTimeout);
+      if (applyEditsTimeout) clearTimeout(applyEditsTimeout);
       
       // Check if focus moved to something else in the editor container (like the replace widget)
       const relatedTarget = e.relatedTarget;
@@ -1722,9 +1740,118 @@ console.log('[Rifler] Webview script starting...');
         return;
       }
       
+      // Don't exit if clicking the conflict banner
+      const conflictBanner = document.getElementById('edit-conflict-banner');
+      if (conflictBanner && (conflictBanner === e.target || conflictBanner.contains(e.target))) {
+        return;
+      }
+      
       exitEditMode();
     }
   });
+
+  function showEditConflictBanner(uri, reason) {
+    if (!editorContainer) return;
+    
+    // Create or get existing banner
+    let banner = document.getElementById('edit-conflict-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'edit-conflict-banner';
+      banner.className = 'conflict-banner';
+      banner.style.cssText = `
+        background: #f8d7da;
+        border: 1px solid #f5c2c7;
+        border-radius: 4px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto);
+        font-size: 13px;
+        color: #664d03;
+        z-index: 1000;
+      `;
+      
+      editorContainer.insertBefore(banner, editorContainer.firstChild);
+    }
+    
+    const fileName = uri.split('/').pop() || 'file';
+    const message = reason === 'vsCodeDirtyOrDiverged'
+      ? `This file changed in VS Code while editing in Rifler`
+      : `Conflict: cannot apply edit to ${fileName}`;
+    
+    banner.innerHTML = `
+      <span>${message}</span>
+      <div style="display: flex; gap: 8px;">
+        <button class="conflict-action-btn" data-action="overwrite" style="
+          background: #dc3545;
+          color: white;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+        ">Overwrite VS Code</button>
+        <button class="conflict-action-btn" data-action="reload" style="
+          background: #6c757d;
+          color: white;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+        ">Reload from VS Code</button>
+        <button class="conflict-action-btn" data-action="dismiss" style="
+          background: transparent;
+          color: #664d03;
+          border: 1px solid #664d03;
+          padding: 6px 12px;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+        ">Dismiss</button>
+      </div>
+    `;
+    
+    // Attach event handlers to buttons
+    banner.querySelectorAll('.conflict-action-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.getAttribute('data-action');
+        
+        if (action === 'overwrite') {
+          // Overwrite VS Code with current Rifler content
+          if (state.fileContent) {
+            const content = fileEditor.value;
+            vscode.postMessage({
+              type: 'applyEdits',
+              uri: uri,
+              content: content,
+              source: 'rifler',
+              ts: Date.now()
+            });
+            state.fileContent.content = content;
+          }
+          banner.style.display = 'none';
+        } else if (action === 'reload') {
+          // Reload from VS Code (discard Rifler edits)
+          vscode.postMessage({
+            type: 'getFileContent',
+            uri: uri,
+            query: state.currentQuery,
+            options: state.options
+          });
+          banner.style.display = 'none';
+        } else if (action === 'dismiss') {
+          // Just hide the banner
+          banner.style.display = 'none';
+        }
+      });
+    });
+    
+    banner.style.display = 'flex';
+  }
 
   window.addEventListener('message', (event) => {
     const message = event.data;
@@ -2261,6 +2388,10 @@ console.log('[Rifler] Webview script starting...');
           const searchEvent = new Event('input', { bubbles: true });
           queryInput.dispatchEvent(searchEvent);
         }
+        break;
+      case 'editConflict':
+        // Handle conflict when VS Code has edited the file while Rifler is in edit mode
+        showEditConflictBanner(message.uri, message.reason);
         break;
     }
   });

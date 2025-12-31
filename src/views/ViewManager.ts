@@ -116,6 +116,14 @@ export class ViewManager {
     }
   }
 
+  public async openInTab(): Promise<void> {
+    await this.openView({ forcedLocation: 'window' });
+  }
+
+  public async openInSidebar(): Promise<void> {
+    await this.openView({ forcedLocation: 'sidebar' });
+  }
+
   private async _performSwitchView(): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
     const configured = (config.get<PanelLocation>('panelLocation') || 'sidebar') as PanelLocation;

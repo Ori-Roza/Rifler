@@ -37,6 +37,8 @@ export function registerCommands(ctx: CommandContext): void {
     vscode.commands.registerCommand('rifler.openSidebar', () => openSidebarCommand(ctx)),
     vscode.commands.registerCommand('rifler.openSidebarReplace', () => openSidebarReplaceCommand(ctx)),
     vscode.commands.registerCommand('rifler.toggleView', () => toggleViewCommand(ctx)),
+    vscode.commands.registerCommand('rifler.openInTab', () => ctx.viewManager.openInTab()),
+    vscode.commands.registerCommand('rifler.openInSidebar', () => ctx.viewManager.openInSidebar()),
     vscode.commands.registerCommand('rifler.toggleReplace', () => toggleReplaceCommand(ctx)),
     vscode.commands.registerCommand('rifler.minimize', () => minimizeCommand(ctx)),
     vscode.commands.registerCommand('rifler.restore', () => restoreCommand(ctx)),

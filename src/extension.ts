@@ -187,23 +187,6 @@ function getLanguageIdFromFilename(fileName: string): string {
   return langMap[ext || ''] || 'file';
 }
 
-async function saveFile(
-  panel: vscode.WebviewPanel,
-  uriString: string,
-  content: string
-): Promise<void> {
-  try {
-    const uri = vscode.Uri.parse(uriString);
-    await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(content));
-  } catch (error) {
-    console.error('Error saving file:', error);
-    panel.webview.postMessage({
-      type: 'error',
-      message: `Failed to save file: ${error}`
-    });
-  }
-}
-
 async function openLocation(
   uriString: string,
   line: number,
@@ -225,7 +208,6 @@ async function openLocation(
 let stateStore: StateStore;
 let viewManager: ViewManager;
 let panelManager: PanelManager;
-let applyingFromWebview = new Set<string>(); // Track URIs being edited from webview to prevent loops
 let panelActivePreview: { uri: string; query: string; options: SearchOptions } | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {

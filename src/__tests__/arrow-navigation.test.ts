@@ -3,8 +3,6 @@
  * Tests the core navigation algorithm without requiring DOM
  */
 
-// @ts-nocheck - Disable type checking for navigation tests
-
 interface MockItem {
   index: number;
   groupIndex: number;
@@ -198,7 +196,7 @@ describe('Arrow Navigation - Continuous Cross-Group (Logic Tests)', () => {
 
   describe('State consistency', () => {
     it('should track group path correctly through navigation', () => {
-      let state = { activeIndex: 0, activeGroupPath: 'src/file1.ts' };
+      const state = { activeIndex: 0, activeGroupPath: 'src/file1.ts' };
 
       // Navigate down in group 1
       let nav = simulateArrowNavigation(state.activeIndex, 1);

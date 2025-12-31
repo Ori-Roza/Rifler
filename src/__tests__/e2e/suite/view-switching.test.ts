@@ -47,7 +47,7 @@ suite('View Switching E2E Tests - Bug Fix', () => {
     await vscode.commands.executeCommand('rifler.openInTab');
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    let panel = testHelpers.getCurrentPanel();
+    const panel = testHelpers.getCurrentPanel();
     assert.ok(panel, 'Tab should be open initially');
 
     // 2. Switch to sidebar with SINGLE click (should open sidebar)
@@ -133,7 +133,7 @@ suite('View Switching E2E Tests - Bug Fix', () => {
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Both should be accessible now
-    let panel = testHelpers.getCurrentPanel();
+    const panel = testHelpers.getCurrentPanel();
     assert.ok(panel, 'Tab should exist');
 
     // 2. Explicitly switch to tab via toggleView (should close sidebar for fullscreen)

@@ -126,7 +126,6 @@ export class ViewManager {
 
   private async _performSwitchView(): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
-    const configured = (config.get<PanelLocation>('panelLocation') || 'sidebar') as PanelLocation;
     
     // Determine current location: if panel exists, we're definitely in window mode
     // Otherwise use the configured setting

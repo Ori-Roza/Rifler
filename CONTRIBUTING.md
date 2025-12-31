@@ -92,6 +92,9 @@ src/
    npm run lint
    npm run compile
    ```
+   # Benchmarks (optional)
+   node ripgrep-benchmark.js <path>        # current ripgrep engine
+   node benchmark.js <path>                # legacy traversal benchmark
 
 4. **Fix any issues**
    - Resolve test failures

@@ -181,27 +181,27 @@ Search for "Rifler" in the VS Code Extensions marketplace.
 
 ## Performance
 
-Benchmark results on a large production codebase (~100k+ files):
+Rifler uses ripgrep (same engine as VS Code) for fast, async searches.
 
-| Scenario | Matches | Time |
-|----------|---------|------|
-| Search for "function" keyword | 5000+ | ~1.7s |
-| Search for import statements (regex) | 5000+ | ~1.5s |
-| Search for "if" keyword | 5000+ | ~0.4s |
-| Search for variable declarations (regex) | 5000+ | ~1.3s |
+Recent benchmark on a large monorepo (~112k matches, query "test"):
 
-**Average search time: ~1.2s** on large codebases | Max results: **10,000** (configurable)
+| Engine | Avg Time | Matches |
+|--------|----------|---------|
+| Rifler bundled rg | ~0.63s | ~112k |
+| VS Code rg | ~0.67s | ~112k |
 
-On smaller codebases (< 10k files), search times are typically **under 100ms**.
+Max results: **10,000** (configurable). Smaller codebases typically respond in **<100ms**.
 
-**Optimizations:**
+Optimizations:
 - 🎯 Smart exclusions (node_modules, .git, binaries, hidden folders)
 - 🚀 Early termination at configurable max results (default: 10,000)
 - 💾 Memory efficient (skips files > 1MB)
 - ⚡ Parallel async I/O with concurrency limiter
 - 🖥️ Virtualized results list for smooth scrolling with large result sets
 
-*Run `node benchmark.js [path]` to test performance on your own codebase*
+Benchmarks:
+- Legacy traversal benchmark: `node benchmark.js [path]`
+- Ripgrep benchmark (current engine): `node ripgrep-benchmark.js [path] [query] [runs]`
 
 ## Testing
 

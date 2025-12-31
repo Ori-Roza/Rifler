@@ -257,7 +257,8 @@
   "dependencies": {
     "@vscode/codicons": "^0.0.44",
     "@vscode/webview-ui-toolkit": "^1.4.0",
-    "highlight.js": "^11.11.1"
+    "highlight.js": "^11.11.1",
+    "@vscode/ripgrep": "1.17.0"
   },
   "overrides": {
     "undici": "5.28.4"

@@ -53,16 +53,18 @@ export class ViewManager {
     }
 
     if (panelLocation === 'sidebar') {
-      this._openSidebar(options);
+      await this._openSidebar(options);
     } else {
       await this._openWindow(options);
     }
   }
 
-  private _openSidebar(options: { showReplace?: boolean; initialQuery?: string; initialQueryFocus?: boolean }): void {
+  private async _openSidebar(options: { showReplace?: boolean; initialQuery?: string; initialQueryFocus?: boolean }): Promise<void> {
     if (this._sidebarProvider) {
-      // Reveal the sidebar view container first
-      vscode.commands.executeCommand('workbench.view.extension.rifler-sidebar');
+      // Wait for any lingering tab to close before focusing the sidebar
+      await this._waitForPanelClosure();
+      await vscode.commands.executeCommand('workbench.action.focusSideBar');
+      await vscode.commands.executeCommand('workbench.view.extension.rifler-sidebar');
       
       // Then show the sidebar provider view
       this._sidebarProvider.show();
@@ -92,6 +94,13 @@ export class ViewManager {
     });
   }
 
+  private async _waitForPanelClosure(): Promise<void> {
+    const deadline = Date.now() + 500;
+    while (this._panelManager?.panel && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+
   public async switchView(): Promise<void> {
     // Prevent concurrent switches - ignore if already switching
     if (this._isSwitching) {
@@ -109,27 +118,29 @@ export class ViewManager {
 
   private async _performSwitchView(): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
+    const configured = (config.get<PanelLocation>('panelLocation') || 'sidebar') as PanelLocation;
     
-    // Determine current location based on actual visibility/existence
-    // This fixes the "second click" issue when config is out of sync with reality
+    // Determine current location: if panel exists, we're definitely in window mode
+    // Otherwise use the configured setting
     let currentLocation: PanelLocation;
-    if (this._sidebarProvider && this._stateStore?.getSidebarVisible()) {
-      currentLocation = 'sidebar';
-    } else if (this._panelManager?.panel) {
+    if (this._panelManager?.panel) {
       currentLocation = 'window';
     } else {
-      // Fallback to config if we can't determine
-      currentLocation = config.get<PanelLocation>('panelLocation') || 'sidebar';
+      // No panel means we're in sidebar mode (even if sidebar isn't currently visible)
+      currentLocation = 'sidebar';
     }
     
     const newLocation: PanelLocation = currentLocation === 'sidebar' ? 'window' : 'sidebar';
+    
+    console.log('[Rifler] Switching view: current =', currentLocation, 'new =', newLocation);
     
     // Request state to be saved from current view before closing
     const scope = config.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
     const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
     
     if (currentLocation === 'sidebar' && this._sidebarProvider) {
-      // Request sidebar to save its current state and wait for it
+      this._sidebarProvider.markShouldSaveOnNextHide();
+      this._sidebarProvider.suppressVisibilitySideEffects(1000);
       await this._sidebarProvider.requestSaveState();
     } else {
       // Request window panel to save its state
@@ -148,11 +159,12 @@ export class ViewManager {
     
     // Close current view
     if (currentLocation === 'sidebar') {
-      // Close the sidebar when switching to window mode
+      // When switching FROM sidebar to tab, close the sidebar for a clean fullscreen feel
       await vscode.commands.executeCommand('workbench.action.closeSidebar');
       // Small delay to ensure sidebar is closed before opening window
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 100));
     } else {
+      // When switching FROM tab to sidebar, close the tab panel
       await vscode.commands.executeCommand('rifler._closeWindowInternal');
       // Small delay to ensure window is closed before opening sidebar
       await new Promise(resolve => setTimeout(resolve, 200));

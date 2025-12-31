@@ -103,28 +103,7 @@ export class PanelManager {
       this.extensionUri
     );
 
-    // Ensure sidebar is closed when the panel is visible
-    // Use multiple delayed attempts to handle async sidebar show/hide operations
-    this.currentPanel.onDidChangeViewState(e => {
-      if (e.webviewPanel.visible) {
-        // Close sidebar immediately
-        vscode.commands.executeCommand('workbench.action.closeSidebar');
-        // Close again after short delay (for async operations)
-        setTimeout(() => {
-          vscode.commands.executeCommand('workbench.action.closeSidebar');
-        }, 50);
-        // And once more after longer delay to handle resize/layout changes
-        setTimeout(() => {
-          vscode.commands.executeCommand('workbench.action.closeSidebar');
-        }, 200);
-      }
-    });
-
-    // Also close sidebar immediately after creation with multiple attempts
-    vscode.commands.executeCommand('workbench.action.closeSidebar');
-    setTimeout(() => {
-      vscode.commands.executeCommand('workbench.action.closeSidebar');
-    }, 50);
+    // Panel and sidebar can now coexist
 
     // Create unified message handler for the panel and configure common handlers
     this._messageHandler = new MessageHandler(this.currentPanel);

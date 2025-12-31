@@ -4,7 +4,7 @@ import { CommandContext } from './types';
 /**
  * rifler.open - Toggle search panel based on viewMode configuration
  */
-export function openCommand(ctx: CommandContext): void {
+export async function openCommand(ctx: CommandContext): Promise<void> {
   const config = vscode.workspace.getConfiguration('rifler');
   const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
   const selectedText = getSelectedText();
@@ -13,18 +13,18 @@ export function openCommand(ctx: CommandContext): void {
     if (ctx.getSidebarVisible()) {
       if (selectedText) {
         // Sidebar is visible: update search with selected text
-        ctx.viewManager.openView({
+        await ctx.viewManager.openView({
           forcedLocation: 'sidebar',
           initialQuery: selectedText,
           initialQueryFocus: false
         });
       } else {
-        // No selection: toggle (close) the sidebar
-        vscode.commands.executeCommand('workbench.action.closeSidebar');
+        // No selection: toggle (switch back to the previous sidebar container)
+        await ctx.viewManager.restorePreviousSidebarOrFallback();
       }
     } else {
       // Sidebar is closed: open it
-      ctx.viewManager.openView({
+      await ctx.viewManager.openView({
         forcedLocation: 'sidebar',
         initialQuery: selectedText,
         initialQueryFocus: true
@@ -38,7 +38,7 @@ export function openCommand(ctx: CommandContext): void {
     } else {
       const selectedText = getSelectedText();
       // Use viewManager to ensure sidebar is closed for "fullscreen" feel
-      ctx.viewManager.openView({
+      await ctx.viewManager.openView({
         forcedLocation: 'window',
         initialQuery: selectedText
       });

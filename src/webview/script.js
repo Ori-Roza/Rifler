@@ -31,6 +31,9 @@ console.log('[Rifler] Webview script starting...');
     results: [],
     renderItems: [],
     activeIndex: -1,
+    activeGroupPath: null, // Track which file group is active
+    activeIndexInGroup: -1, // Track index within the current group
+    activeGroupId: null, // Track the group container element ID or data attribute
     currentScope: 'project',
     modules: [],
     currentDirectory: '',
@@ -663,6 +666,85 @@ console.log('[Rifler] Webview script starting...');
 
   let isEditMode = false;
   let saveTimeout = null;
+  
+  // RAF throttling for backdrop sync to prevent flicker on arrow navigation
+  let pendingBackdropUpdate = false;
+  function scheduleBackdropSync() {
+    if (pendingBackdropUpdate) return;
+    pendingBackdropUpdate = true;
+    requestAnimationFrame(() => {
+      pendingBackdropUpdate = false;
+      updateHighlights();
+    });
+  }
+  
+  // Prevent scroll ping-pong between editor and preview
+  let isProgrammaticScroll = false;
+  
+  // Cache line elements to avoid querying on every arrow press
+  let lineEls = [];
+  let activeLineEl = null;
+  let activeLineIdx = 0;
+  
+  // RAF schedulers for active line and backdrop updates
+  let rafActiveScheduled = false;
+  let rafBackdropScheduled = false;
+  let pendingActiveIdx = 0;
+  
+  function scheduleActiveLineUpdate(idx) {
+    pendingActiveIdx = idx;
+    if (rafActiveScheduled) return;
+    rafActiveScheduled = true;
+    requestAnimationFrame(() => {
+      rafActiveScheduled = false;
+      applyActiveLineClass(pendingActiveIdx);
+      ensureLineVisible(pendingActiveIdx);
+    });
+  }
+  
+  function scheduleBackdropUpdateRAF() {
+    if (rafBackdropScheduled) return;
+    rafBackdropScheduled = true;
+    requestAnimationFrame(() => {
+      rafBackdropScheduled = false;
+      scheduleBackdropSync();
+    });
+  }
+  
+  function applyActiveLineClass(idx) {
+    // Touch only 2 line elements: remove from previous, add to next
+    if (activeLineEl) {
+      activeLineEl.classList.remove('isActive');
+    }
+    
+    activeLineEl = lineEls[idx] || null;
+    activeLineIdx = idx;
+    
+    if (activeLineEl) {
+      activeLineEl.classList.add('isActive');
+    }
+  }
+  
+  function ensureLineVisible(idx) {
+    if (!previewContent || idx < 0 || idx >= lineEls.length) return;
+    const lineEl = lineEls[idx];
+    if (lineEl) {
+      // Only assign scrollTop if element is outside viewport
+      const rect = lineEl.getBoundingClientRect();
+      const containerRect = previewContent.getBoundingClientRect();
+      
+      if (rect.top < containerRect.top) {
+        previewContent.scrollTop -= (containerRect.top - rect.top);
+      } else if (rect.bottom > containerRect.bottom) {
+        previewContent.scrollTop += (rect.bottom - containerRect.bottom);
+      }
+    }
+  }
+  
+  function rebuildLineElementCache() {
+    lineEls = Array.from(document.querySelectorAll('.pvLine'));
+    activeLineEl = lineEls[activeLineIdx] || null;
+  }
 
   if (previewContent) {
     previewContent.addEventListener('click', (e) => {
@@ -756,43 +838,78 @@ console.log('[Rifler] Webview script starting...');
     const scrollTop = previewContent.scrollTop;
     
     isEditMode = true;
-    if (previewContent) previewContent.classList.add('hidden-for-edit');
-    if (editorContainer) editorContainer.classList.add('visible');
-    if (fileEditor) fileEditor.value = state.fileContent.content;
-    updateHighlights();
     
+    // 1) POPULATE BEFORE ANY VISIBILITY CHANGES
+    // This prevents first-time blank frame
+    if (fileEditor) {
+      fileEditor.value = state.fileContent.content;
+    }
+    
+    // Cheap immediate backdrop paint to prevent blank
+    if (editorBackdrop) {
+      editorBackdrop.textContent = state.fileContent.content;
+    }
+    
+    // Update line numbers based on content
+    if (fileEditor && editorLineNumbers) {
+      const lines = state.fileContent.content.split('\n');
+      let html = '';
+      for (let i = 1; i <= lines.length; i++) {
+        html += '<div>' + i + '</div>';
+      }
+      editorLineNumbers.innerHTML = html;
+    }
+    
+    // Set caret position before showing editor
+    if (fileEditor && typeof clickedLineNumber === 'number' && clickedLineNumber >= 0) {
+      const content = state.fileContent.content;
+      const lineStarts = [0];
+      for (let i = 0; i < content.length; i++) {
+        if (content[i] === '\n') {
+          lineStarts.push(i + 1);
+        }
+      }
+      
+      const lineStart = lineStarts[clickedLineNumber] !== undefined ? lineStarts[clickedLineNumber] : content.length;
+      const lines = content.split('\n');
+      const lineLength = lines[clickedLineNumber]?.length || 0;
+      const clampedColumn = Math.min(clickedColumn, lineLength);
+      const charPosition = lineStart + clampedColumn;
+      fileEditor.setSelectionRange(charPosition, charPosition);
+    }
+    
+    // Sync initial scroll position
+    if (fileEditor) {
+      fileEditor.scrollTop = scrollTop;
+    }
+    if (editorBackdrop) {
+      editorBackdrop.scrollTop = scrollTop;
+    }
+    if (editorLineNumbers) {
+      editorLineNumbers.scrollTop = scrollTop;
+    }
+    
+    // 2) SHOW EDITOR FIRST
+    if (editorContainer) {
+      editorContainer.classList.add('visible');
+    }
+    
+    // 3) FOCUS IMMEDIATELY
+    if (fileEditor) {
+      fileEditor.focus({ preventScroll: true });
+    }
+    
+    // 4) HIDE PREVIEW ONLY AFTER PAINT (2 frames to be safe)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (fileEditor) {
-          fileEditor.scrollTop = scrollTop;
-          
-          // Set cursor position if a line was clicked
-          if (typeof clickedLineNumber === 'number' && clickedLineNumber >= 0) {
-            // Build line start offsets by scanning for actual \n positions (CRLF safe)
-            const content = state.fileContent.content;
-            const lineStarts = [0];
-            for (let i = 0; i < content.length; i++) {
-              if (content[i] === '\n') {
-                lineStarts.push(i + 1);
-              }
-            }
-            
-            // Global cursor offset = line start + clicked column
-            const lineStart = lineStarts[clickedLineNumber] !== undefined ? lineStarts[clickedLineNumber] : content.length;
-            
-            // Clamp column to line length
-            const lines = content.split('\n');
-            const lineLength = lines[clickedLineNumber]?.length || 0;
-            const clampedColumn = Math.min(clickedColumn, lineLength);
-            
-            const charPosition = lineStart + clampedColumn;
-            fileEditor.setSelectionRange(charPosition, charPosition);
-          }
-          
-          fileEditor.focus({ preventScroll: true });
+        if (previewContent) {
+          previewContent.classList.add('hidden-for-edit');
         }
-        if (editorBackdrop) editorBackdrop.scrollTop = scrollTop;
-        if (editorLineNumbers) editorLineNumbers.scrollTop = scrollTop;
+        
+        // 5) EXPENSIVE HIGHLIGHTING AFTER EDITOR VISIBLE
+        requestAnimationFrame(() => {
+          scheduleBackdropSync();
+        });
       });
     });
   }
@@ -816,11 +933,18 @@ console.log('[Rifler] Webview script starting...');
     saveFile();
     
     isEditMode = false;
+    
+    // SHOW PREVIEW FIRST
     if (previewContent) {
       previewContent.classList.remove('hidden-for-edit');
-      previewContent.style.display = 'block';
     }
-    if (editorContainer) editorContainer.classList.remove('visible');
+    
+    // HIDE EDITOR ON NEXT PAINT
+    requestAnimationFrame(() => {
+      if (editorContainer) {
+        editorContainer.classList.remove('visible');
+      }
+    });
     
     if (!skipRender) {
       renderFilePreview(state.fileContent);
@@ -829,7 +953,8 @@ console.log('[Rifler] Webview script starting...');
 
   if (fileEditor) {
     fileEditor.addEventListener('input', () => {
-      updateHighlights();
+      // Use RAF-throttled update to prevent flicker during rapid typing/navigation
+      scheduleBackdropSync();
       if (saveTimeout) clearTimeout(saveTimeout);
       saveTimeout = setTimeout(() => {
         saveFile();
@@ -887,6 +1012,11 @@ console.log('[Rifler] Webview script starting...');
   
   if (fileEditor) {
     fileEditor.addEventListener('scroll', () => {
+      // Prevent scroll ping-pong during programmatic scroll
+      if (isProgrammaticScroll) return;
+      
+      isProgrammaticScroll = true;
+      
       if (editorBackdrop) {
         editorBackdrop.scrollTop = fileEditor.scrollTop;
         editorBackdrop.scrollLeft = fileEditor.scrollLeft;
@@ -894,6 +1024,11 @@ console.log('[Rifler] Webview script starting...');
       if (editorLineNumbers) {
         editorLineNumbers.scrollTop = fileEditor.scrollTop;
       }
+      
+      // Reset guard in next frame
+      requestAnimationFrame(() => {
+        isProgrammaticScroll = false;
+      });
     });
   }
   
@@ -1541,10 +1676,10 @@ console.log('[Rifler] Webview script starting...');
       toggleReplace();
     } else if (e.key === 'ArrowDown' && !isInEditor) {
       e.preventDefault();
-      navigateResults(1);
+      moveSelection(1); // Navigate down (flat list, no groups)
     } else if (e.key === 'ArrowUp' && !isInEditor) {
       e.preventDefault();
-      navigateResults(-1);
+      moveSelection(-1); // Navigate up (flat list, no groups)
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isInEditor) {
       e.preventDefault();
       openActiveResult();
@@ -3311,13 +3446,14 @@ console.log('[Rifler] Webview script starting...');
     
     // Ensure previewContent is visible and populated
     previewContent.innerHTML = html;
-    // Only restore visibility if not in hidden-for-edit mode
-    if (!previewContent.classList.contains('hidden-for-edit')) {
-      previewContent.style.display = 'block';
-      previewContent.style.visibility = 'visible';
-    }
+    // Content is always visible; editing state is controlled by parent container
+    previewContent.style.display = 'grid';
+    previewContent.style.visibility = 'visible';
     previewContent.style.opacity = '1';
     previewContent.style.zIndex = '1';
+    
+    // Rebuild line element cache for lightweight arrow navigation
+    rebuildLineElementCache();
     
     // Update cache markers to prevent duplicate renders
     previewContent.dataset.lastRenderedUri = fileData.uri;
@@ -3445,7 +3581,7 @@ console.log('[Rifler] Webview script starting...');
     requestAnimationFrame(doScroll);
   }
 
-  function setActiveIndex(index, { skipLoad = false } = {}) {
+  function setActiveIndex(index, { skipLoad = false, skipRender = false } = {}) {
     if (index < 0 || index >= state.results.length) return;
 
     if (isEditMode) {
@@ -3454,9 +3590,23 @@ console.log('[Rifler] Webview script starting...');
 
     state.activeIndex = index;
 
-    renderResultsVirtualized();
-    ensureActiveVisible();
-    ensureActiveVisibleInGroup();
+    // Only rebuild results list if we're not using lightweight navigation
+    if (!skipRender) {
+      renderResultsVirtualized();
+    }
+    
+    // After render, apply active styling and ensure visibility
+    requestAnimationFrame(() => {
+      const activeEl = document.querySelector(`.result-item[data-index="${index}"]`);
+      if (activeEl) {
+        document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
+        activeEl.classList.add('active');
+        activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      
+      ensureActiveVisible();
+      ensureActiveVisibleInGroup();
+    });
 
     if (!skipLoad) {
       loadFileContent(state.results[index]);
@@ -3471,12 +3621,215 @@ console.log('[Rifler] Webview script starting...');
   }
 
 
-  function navigateResults(delta) {
-    if (state.results.length === 0) return;
-    let newIndex = state.activeIndex + delta;
-    if (newIndex < 0) newIndex = state.results.length - 1;
-    if (newIndex >= state.results.length) newIndex = 0;
-    setActiveIndex(newIndex);
+  // === Flat-List Navigation (Robust, No Group Assumptions) ===
+
+  /**
+   * Check if an element is visible in the DOM
+   */
+  function isElementVisible(el) {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  /**
+   * Get all navigable result items in visual order (flat list)
+   * Scope to results list container, never include preview clones
+   */
+  function getNavigableItems() {
+    // Use the actual results list element (virtualized container)
+    const root = resultsList;
+    if (!root) return [];
+
+    // Only result rows (match rows), not headers/end-of-results
+    const items = Array.from(root.querySelectorAll('.result-item'));
+    return items.filter(isElementVisible);
+  }
+
+  /**
+   * Get file path for a result index
+   */
+  function getPathForResultIndex(resultIndex) {
+    const r = state.results[resultIndex];
+    return (r?.relativePath || r?.fileName) || null;
+  }
+
+  /**
+   * Get all unique file paths in renderItems order (fileHeader items)
+   */
+  function getAllGroupPathsInOrder() {
+    return state.renderItems
+      .filter(it => it.type === 'fileHeader')
+      .map(it => it.path);
+  }
+
+  /**
+   * Check if a group is collapsed
+   */
+  function isGroupCollapsed(path) {
+    if (state.collapsedFiles.has(path)) return true;
+    if (state.expandedFiles.has(path)) return false;
+
+    // Fallback: check renderItems header state
+    const header = state.renderItems.find(it => it.type === 'fileHeader' && it.path === path);
+    return header ? !!header.isCollapsed : false;
+  }
+
+  /**
+   * Expand a collapsed group and re-render
+   */
+  function expandGroup(path) {
+    state.collapsedFiles.delete(path);
+    state.expandedFiles.add(path);
+
+    // Rebuild renderItems without losing scroll or active selection
+    handleSearchResults(state.results, {
+      skipAutoLoad: true,
+      activeIndex: state.activeIndex,
+      preserveScroll: true
+    });
+  }
+
+  /**
+   * Find first result index for a given file path
+   */
+  function findFirstResultIndexInPath(path) {
+    return state.results.findIndex(r => (r.relativePath || r.fileName) === path);
+  }
+
+  /**
+   * Find last result index for a given file path
+   */
+  function findLastResultIndexInPath(path) {
+    for (let i = state.results.length - 1; i >= 0; i--) {
+      const r = state.results[i];
+      if ((r.relativePath || r.fileName) === path) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Robustly find the currently active result item
+   * Handles cases where active element is lost or on a child
+   */
+  function getCurrentActiveItem(navigableItems) {
+    if (!navigableItems || navigableItems.length === 0) return null;
+
+    // Try to find .result-item.active within resultsList scope
+    const domActive = resultsList ? resultsList.querySelector('.result-item.active') : null;
+    if (domActive && navigableItems.includes(domActive)) return domActive;
+
+    // Try state.activeIndex
+    if (state.activeIndex >= 0 && state.activeIndex < state.results.length) {
+      const targetItem = document.querySelector(`.result-item[data-index="${state.activeIndex}"]`);
+      if (targetItem && navigableItems.includes(targetItem)) return targetItem;
+    }
+
+    // Fallback to first item
+    return navigableItems[0] || null;
+  }
+
+  /**
+   * Move selection up or down with cross-group navigation
+   * - Within visible items: move normally
+   * - At boundaries: jump to next/prev group (auto-expand if needed)
+   * - No wrap-around
+   */
+  function moveSelection(delta) {
+    const navigableItems = getNavigableItems();
+    if (!navigableItems.length) return;
+
+    const currentItem = getCurrentActiveItem(navigableItems);
+    if (!currentItem) return;
+
+    const currentIdx = navigableItems.indexOf(currentItem);
+    if (currentIdx === -1) return;
+
+    const nextIdx = currentIdx + delta;
+
+    // Normal case: move within visible items
+    if (nextIdx >= 0 && nextIdx < navigableItems.length) {
+      setActiveResult(navigableItems[nextIdx], { reason: 'keyboard' });
+      return;
+    }
+
+    // Edge case: at boundary of visible items -> cross-group navigation
+    if (state.activeIndex < 0 || state.activeIndex >= state.results.length) return;
+
+    const currentPath = getPathForResultIndex(state.activeIndex);
+    if (!currentPath) return;
+
+    const paths = getAllGroupPathsInOrder();
+    const groupIdx = paths.indexOf(currentPath);
+    if (groupIdx === -1) return;
+
+    if (delta > 0) {
+      // ArrowDown at boundary: go to next group
+      const nextPath = paths[groupIdx + 1];
+      if (!nextPath) return; // Already last group -> stop
+
+      if (isGroupCollapsed(nextPath)) {
+        expandGroup(nextPath);
+      }
+
+      const firstIdx = findFirstResultIndexInPath(nextPath);
+      if (firstIdx >= 0) {
+        setActiveIndex(firstIdx);
+      }
+    } else {
+      // ArrowUp at boundary: go to previous group
+      const prevPath = paths[groupIdx - 1];
+      if (!prevPath) return; // Already first group -> stop
+
+      if (isGroupCollapsed(prevPath)) {
+        expandGroup(prevPath);
+      }
+
+      const lastIdx = findLastResultIndexInPath(prevPath);
+      if (lastIdx >= 0) {
+        setActiveIndex(lastIdx);
+      }
+    }
+  }
+  
+  /**
+   * Set the active result: updates state, DOM, preview, and ensures visibility
+   * IDEMPOTENT: safe to call multiple times with same or different items
+   * Handles virtualization by re-rendering to ensure target item is in DOM
+   */
+  function setActiveResult(itemEl, meta) {
+    const item = itemEl?.closest('.result-item');
+    if (!item) return;
+
+    const resultIndex = parseInt(item.dataset.index, 10);
+    if (isNaN(resultIndex) || resultIndex < 0 || resultIndex >= state.results.length) return;
+
+    // Update state: just track the active index (no group logic needed)
+    state.activeIndex = resultIndex;
+
+    // Re-render virtual list so the active item is guaranteed to exist in DOM
+    renderResultsVirtualized();
+
+    // After render, re-select the actual DOM element for this index and apply .active
+    requestAnimationFrame(() => {
+      const fresh = document.querySelector(`.result-item[data-index="${resultIndex}"]`);
+      if (fresh) {
+        document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
+        fresh.classList.add('active');
+        fresh.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      
+      // Ensure visibility in both main list and group containers
+      ensureActiveVisible();
+      ensureActiveVisibleInGroup();
+    });
+
+    // Load file content for preview (same as mouse click selection)
+    if (!isEditMode) {
+      loadFileContent(state.results[resultIndex]);
+    }
   }
 
   function openActiveResult() {

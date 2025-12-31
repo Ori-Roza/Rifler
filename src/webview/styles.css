@@ -1286,11 +1286,35 @@ body.loaded {
   grid-template-columns: 1fr;
   min-width: 100%;
   width: fit-content;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.12s ease, visibility 0.12s ease;
+  will-change: opacity;
 }
 
 .preview-content.hidden-for-edit {
+  opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+.preview-panel-container.is-editing .preview-content {
+  opacity: 1; /* Keep visible for natural feel, no cross-fade */
+  pointer-events: none; /* Disable interaction while editing */
+}
+
+.editor-container.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-content,
+  .editor-container {
+    transition: none !important;
+  }
 }
 
 /* ===== Preview Code Rows (Spec: code left, line number far right) ===== */
@@ -1301,6 +1325,7 @@ body.loaded {
   white-space: pre;
   direction: ltr;
   align-items: center;
+  contain: paint; /* Reduces repaint scope for smoother navigation */
 }
 
 .pvLine:hover {
@@ -1315,8 +1340,10 @@ body.loaded {
 /* Active/current line (yellow outline, like VS Code find-result selection) */
 .pvLine.isActive {
   background-color: var(--rifler-highlight-bg) !important;
-  border-top: 1px solid var(--rifler-highlight-border);
-  border-bottom: 1px solid var(--rifler-highlight-border);
+  /* Use outline instead of border to avoid layout shifts on navigation */
+  border: none !important;
+  outline: 1px solid var(--rifler-highlight-border);
+  outline-offset: -1px;
   z-index: 2;
 }
 
@@ -1423,14 +1450,20 @@ body.loaded {
   bottom: 0;
   overflow: hidden;
   background-color: var(--rifler-bg);
-  display: none;
+  display: flex;
   flex-direction: column;
   z-index: 2;
-  transition: opacity 0.1s ease;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  will-change: opacity;
 }
 
 .editor-container.visible {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .editor-wrapper {

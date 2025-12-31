@@ -1365,17 +1365,28 @@ body.loaded {
 }
 
 .pvLineNo.has-match {
-  font-weight: bold !important;
-  color: #E6E6B6 !important;
+  color: var(--rifler-primary) !important;
 }
 
 .pvLine.isActive .pvLineNo {
-  font-weight: normal;
-  color: color-mix(
-    in srgb,
-    var(--rifler-fg-muted) 70%,
-    var(--rifler-fg) 30%
-  );
+  position: relative;
+  z-index: 1; /* keep tint and indicator above the row highlight */
+  font-weight: 700 !important;
+  color: var(--rifler-primary) !important;
+  background-color: var(--rifler-primary-dim) !important;
+  border-right-color: var(--rifler-primary) !important;
+  box-shadow: inset -2px 0 0 var(--rifler-primary);
+}
+
+.pvLine.isActive .pvLineNo::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 100%;
+  background-color: var(--rifler-primary);
+  pointer-events: none;
 }
 
 .preview-content .pvLine:not(.isHit):not(.isActive) .pvCode {

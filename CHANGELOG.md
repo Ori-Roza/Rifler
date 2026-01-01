@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [1.2.1](https://github.com/Ori-Roza/Rifler/compare/v1.1.3...v1.2.1) (2026-01-01)
+## [1.1.4](https://github.com/Ori-Roza/Rifler/compare/v1.1.3...v1.1.4) (2026-01-01)
 
 
 ### Features
@@ -16,28 +16,6 @@ All notable changes to this project will be documented in this file. See [standa
 
 * change variable declarations from let to const for improved clarity in view switching tests ([a99201d](https://github.com/Ori-Roza/Rifler/commit/a99201db534979e81e18982be8aef54d48cc448a))
 * streamline sidebar and panel visibility management, removing aggressive closing logic ([0a8d3b9](https://github.com/Ori-Roza/Rifler/commit/0a8d3b9add5eff2fbce75aee5b3bcc0684730dde))
-
-## [1.2.0](https://github.com/Ori-Roza/Rifler/compare/v1.1.3...v1.2.0) (2026-01-01)
-
-
-### Features
-
-* add ripgrep benchmarks and update performance metrics in documentation ([a04b9dd](https://github.com/Ori-Roza/Rifler/commit/a04b9dd35da8e54d46f228f11cce8eb1c1a8ea78))
-* implement openInTab and openInSidebar commands for enhanced view management ([4ebeed5](https://github.com/Ori-Roza/Rifler/commit/4ebeed5f5de1bb9f85d2e3cbfa13b9eeb6335cff))
-* integrate ripgrep for enhanced search functionality and add e2e test task ([5ed2d6e](https://github.com/Ori-Roza/Rifler/commit/5ed2d6e0d2c97268f4d9a5af3c77348c4f572185))
-
-
-### Refactoring
-
-* change variable declarations from let to const for improved clarity in view switching tests ([a99201d](https://github.com/Ori-Roza/Rifler/commit/a99201db534979e81e18982be8aef54d48cc448a))
-* streamline sidebar and panel visibility management, removing aggressive closing logic ([0a8d3b9](https://github.com/Ori-Roza/Rifler/commit/0a8d3b9add5eff2fbce75aee5b3bcc0684730dde))
-
-### [1.1.2](https://github.com/Ori-Roza/Rifler/compare/v1.1.0...v1.1.2) (2025-12-20)
-
-
-### Bug Fixes
-
-* update video source path in README and index.html; bump version to 1.1.2 ([4203871](https://github.com/Ori-Roza/Rifler/commit/420387127dce39006125ed5a39be9b710450a228))
 
 ## [1.1.0](https://github.com/Ori-Roza/Rifler/compare/v1.0.10...v1.1.0) (2025-12-19)
 

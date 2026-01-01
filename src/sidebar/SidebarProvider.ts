@@ -43,9 +43,24 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   private _activePreview?: { uri: string; query: string; options: SearchOptions; activeIndex?: number };
   private _applyingFromWebview = new Set<string>(); // Track URIs being edited from webview to prevent loops
   private _lastAppliedTextFromRifler = new Map<string, string>(); // Track last applied content per URI
+  private _suppressSideEffectsUntil = 0;
+  private _shouldSaveOnNextHide = false;
+  private _lastVisibility?: boolean;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this._context = context;
+  }
+
+  public suppressVisibilitySideEffects(ms: number): void {
+    this._suppressSideEffectsUntil = Date.now() + ms;
+  }
+
+  private _sideEffectsSuppressed(): boolean {
+    return Date.now() < this._suppressSideEffectsUntil;
+  }
+
+  public markShouldSaveOnNextHide(): void {
+    this._shouldSaveOnNextHide = true;
   }
 
   public setVisibilityCallback(callback: (visible: boolean) => void): void {
@@ -102,18 +117,27 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     });
     // Restore state when view becomes visible, save when hidden
     webviewView.onDidChangeVisibility(() => {
-      console.log('SidebarProvider: visibility changed, visible =', webviewView.visible);
-      if (webviewView.visible) {
+      const currentVisibility = webviewView.visible;
+      if (this._sideEffectsSuppressed()) {
+        console.log('SidebarProvider: visibility changed but side effects suppressed. visible =', currentVisibility);
+        this._lastVisibility = currentVisibility;
+        return;
+      }
+      console.log('SidebarProvider: visibility changed, visible =', currentVisibility);
+      this._lastVisibility = currentVisibility;
+      if (currentVisibility) {
         this._restoreState();
-        // Notify that sidebar is now visible
         if (this._onVisibilityChanged) {
           this._onVisibilityChanged(true);
         }
       } else {
-        // Save state before hiding - request state from webview
-        console.log('SidebarProvider: sidebar hidden, requesting state save');
-        webviewView.webview.postMessage({ type: 'requestStateForMinimize' });
-        // Notify that sidebar is now hidden
+        if (this._shouldSaveOnNextHide) {
+          this._shouldSaveOnNextHide = false;
+          console.log('SidebarProvider: sidebar hidden, requesting state save');
+          webviewView.webview.postMessage({ type: 'requestStateForMinimize' });
+        } else {
+          console.log('SidebarProvider: hidden due to incidental layout/focus; skipping save');
+        }
         if (this._onVisibilityChanged) {
           this._onVisibilityChanged(false);
         }

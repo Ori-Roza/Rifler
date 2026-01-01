@@ -371,31 +371,8 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Safety net: close sidebar if Rifler tab is active or visible
-  // This handles cases like dragging the tab or switching tab groups
+  // Monitor for configuration changes that might affect panel visibility
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor(() => {
-      if (panelManager.panel?.active) {
-        setTimeout(() => {
-          vscode.commands.executeCommand('workbench.action.closeSidebar');
-        }, 100);
-      }
-    }),
-    vscode.window.tabGroups.onDidChangeTabs(() => {
-      if (panelManager.panel?.visible) {
-        setTimeout(() => {
-          vscode.commands.executeCommand('workbench.action.closeSidebar');
-        }, 100);
-      }
-    }),
-    vscode.window.tabGroups.onDidChangeTabGroups(() => {
-      if (panelManager.panel?.visible) {
-        setTimeout(() => {
-          vscode.commands.executeCommand('workbench.action.closeSidebar');
-        }, 100);
-      }
-    }),
-    // Monitor for configuration changes that might affect panel visibility
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('rifler')) {
         const config = vscode.workspace.getConfiguration('rifler');
@@ -407,10 +384,6 @@ export async function activate(context: vscode.ExtensionContext) {
             type: 'config',
             resultsShowCollapsed
           });
-          
-          setTimeout(() => {
-            vscode.commands.executeCommand('workbench.action.closeSidebar');
-          }, 100);
         }
         
         // Also update sidebar if visible
@@ -419,26 +392,7 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Set up an interval to continuously ensure sidebar is closed while panel is visible
-  // This handles edge cases where VS Code auto-shows sidebar due to resize/layout changes
-  const sidebarCloserInterval = setInterval(() => {
-    if (panelManager.panel?.visible) {
-      try {
-        vscode.commands.executeCommand('workbench.action.closeSidebar');
-      } catch (err) {
-        // Ignore errors from closeSidebar command
-      }
-    }
-  }, 500);
-  
-  // Mark timer as not preventing process exit (important for test teardown)
-  if (sidebarCloserInterval.unref) {
-    sidebarCloserInterval.unref();
-  }
-
-  context.subscriptions.push({
-    dispose: () => clearInterval(sidebarCloserInterval)
-  });
+  // Sidebar and panel can now coexist - no need for aggressive closing logic
 
   // If persistence is disabled, clear any prior leftover state on activation
   {

@@ -10,6 +10,8 @@ vsc-extension-quickstart.md
 **/*.ts
 !out/**
 node_modules/**
+# Keep bundled runtime dependency for ripgrep
+!node_modules/@vscode/ripgrep/**
 coverage/**
 coverage-e2e/**
 plans/**

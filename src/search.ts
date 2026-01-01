@@ -5,14 +5,15 @@ import {
   SearchResult,
   SearchScope,
   buildSearchRegex,
+  validateRegex,
+  validateFileMask,
   matchesFileMask,
   searchInContent,
   EXCLUDE_DIRS,
   BINARY_EXTENSIONS,
-  Limiter,
-  validateRegex,
-  validateFileMask
+  Limiter
 } from './utils';
+import { startRipgrepSearch } from './rgSearch';
 
 export async function performSearch(
   query: string,
@@ -37,8 +38,7 @@ export async function performSearch(
     return [];
   }
 
-  const regex = buildSearchRegex(query, options);
-  if (!regex) {
+  if (!buildSearchRegex(query, options)) {
     return [];
   }
 
@@ -49,48 +49,119 @@ export async function performSearch(
   }
 
   const effectiveMaxResults = Math.max(1, Math.floor(maxResults || 10000));
-  const results: SearchResult[] = [];
-  const limiter = new Limiter(100);
-  const perFileTimeBudgetMs = 2500;
+  const roots = await resolveSearchRoots(scope, directoryPath, modulePath);
+  if (roots.length === 0) {
+    return [];
+  }
+
+  cancelActiveSearch();
+  const { promise, cancel } = startRipgrepSearch({
+    query,
+    options,
+    fileMask: options.fileMask,
+    roots,
+    maxResults: effectiveMaxResults,
+    workspaceFolders: vscode.workspace.workspaceFolders
+  });
+
+  activeSearchCancel = cancel;
+
+  try {
+    const results = await promise;
+    if (activeSearchCancel === cancel) {
+      activeSearchCancel = undefined;
+    }
+    return results;
+  } catch (error) {
+    if (activeSearchCancel === cancel) {
+      activeSearchCancel = undefined;
+    }
+    console.error('Error during ripgrep search:', error);
+    // Fallback to JS search to preserve behavior (useful for tests or missing rg)
+    try {
+      const results: SearchResult[] = [];
+      const regex = buildSearchRegex(query, options);
+      if (!regex) return [];
+      const limiter = new Limiter(100);
+      const perFileTimeBudgetMs = 2500;
+
+      for (const root of roots) {
+        // In legacy behavior, project scope roots were treated as directories without stat
+        const treatAsDirectory = scope === 'project';
+        let stat: vscode.FileStat | undefined;
+
+        if (!treatAsDirectory) {
+          try {
+            stat = await vscode.workspace.fs.stat(vscode.Uri.file(root));
+          } catch {
+            stat = undefined; // default to directory traversal
+          }
+        }
+
+        if (treatAsDirectory || !stat || stat.type === vscode.FileType.Directory) {
+          await fallbackSearchInDirectory(root, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
+        } else if (stat.type === vscode.FileType.File) {
+          await fallbackSearchInFile(root, regex, results, effectiveMaxResults, perFileTimeBudgetMs);
+        }
+
+        if (results.length >= effectiveMaxResults) break;
+      }
+      return results;
+    } catch {
+      return [];
+    }
+  }
+}
+
+let activeSearchCancel: (() => void) | undefined;
+
+function cancelActiveSearch(): void {
+  if (activeSearchCancel) {
+    activeSearchCancel();
+    activeSearchCancel = undefined;
+  }
+}
+
+async function resolveSearchRoots(
+  scope: SearchScope,
+  directoryPath?: string,
+  modulePath?: string
+): Promise<string[]> {
+  const roots: string[] = [];
+
+  const addIfExists = async (fsPath: string | undefined): Promise<void> => {
+    if (!fsPath) return;
+    try {
+      const uri = vscode.Uri.file(fsPath);
+      const stat = await vscode.workspace.fs.stat(uri);
+      roots.push(fsPath);
+      if (stat.type === vscode.FileType.File) {
+        // For files, ensure we only search that file path
+        return;
+      }
+    } catch {
+      // Ignore missing paths
+    }
+  };
 
   if (scope === 'directory') {
-    const searchPath = (directoryPath || '').trim();
-    try {
-      if (searchPath) {
-        const uri = vscode.Uri.file(searchPath);
-        const stat = await vscode.workspace.fs.stat(uri);
-        if (stat.type === vscode.FileType.Directory) {
-          await searchInDirectory(searchPath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
-        } else {
-          await searchInFileAsync(searchPath, regex, results, effectiveMaxResults, perFileTimeBudgetMs);
-        }
-      }
-    } catch (error) {
-      // Directory does not exist or cannot be accessed
-    }
-  } else if (scope === 'module' && modulePath) {
-    try {
-      const uri = vscode.Uri.file(modulePath);
-      await vscode.workspace.fs.stat(uri);
-      await searchInDirectory(modulePath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
-    } catch {
-      // Module path doesn't exist
-    }
+    await addIfExists(directoryPath?.trim());
+  } else if (scope === 'module') {
+    await addIfExists(modulePath?.trim());
   } else {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
-      const tasks = workspaceFolders.map(folder => {
-        if (results.length >= effectiveMaxResults) return Promise.resolve();
-        return searchInDirectory(folder.uri.fsPath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
-      });
-      await Promise.all(tasks);
+      for (const folder of workspaceFolders) {
+        roots.push(folder.uri.fsPath);
+      }
     }
   }
 
-  return results;
+  // Deduplicate
+  return Array.from(new Set(roots.filter(Boolean)));
 }
 
-async function searchInDirectory(
+async function fallbackSearchInDirectory(
   dirPath: string,
   regex: RegExp,
   fileMask: string,
@@ -109,33 +180,27 @@ async function searchInDirectory(
       const fullPath = path.join(dirPath, entryName);
       if (entryType === vscode.FileType.Directory) {
         if (!EXCLUDE_DIRS.has(entryName) && !entryName.startsWith('.')) {
-          tasks.push(searchInDirectory(fullPath, regex, fileMask, results, maxResults, limiter, perFileTimeBudgetMs));
+          tasks.push(fallbackSearchInDirectory(fullPath, regex, fileMask, results, maxResults, limiter, perFileTimeBudgetMs));
         }
       } else if (entryType === vscode.FileType.File) {
         const ext = path.extname(entryName).toLowerCase();
         const isBinary = BINARY_EXTENSIONS.has(ext);
         const matchesMask = matchesFileMask(entryName, fileMask);
         if (!isBinary && matchesMask) {
-          tasks.push(limiter.run(() => searchInFileAsync(fullPath, regex, results, maxResults, perFileTimeBudgetMs)));
+          tasks.push(limiter.run(() => fallbackSearchInFile(fullPath, regex, results, maxResults, perFileTimeBudgetMs)));
         }
       }
     }
     await Promise.all(tasks);
   } catch (error) {
-    // Only log if it's not a "not found" error, which can happen during tests
-    // when workspace folders are added/removed rapidly.
     const isNotFound = (error instanceof vscode.FileSystemError && error.code === 'FileNotFound') ||
-                      (error instanceof Error && (error as { code?: string }).code === 'ENOENT');
-    
-    if (isNotFound) {
-      // Ignore
-    } else {
-      console.error(`Error reading directory: ${dirPath}`, error);
-    }
+      (error instanceof Error && (error as { code?: string }).code === 'ENOENT');
+    if (isNotFound) return;
+    console.error(`Error reading directory: ${dirPath}`, error);
   }
 }
 
-async function searchInFileAsync(
+async function fallbackSearchInFile(
   filePath: string,
   regex: RegExp,
   results: SearchResult[],
@@ -147,12 +212,12 @@ async function searchInFileAsync(
     const fileUri = vscode.Uri.file(filePath);
     const fileUriString = fileUri.toString();
     const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === fileUriString);
-    
+
     if (openDoc) {
       content = openDoc.getText();
     } else {
       const stats = await vscode.workspace.fs.stat(fileUri);
-      if (stats.size > 1024 * 1024) return; // 1MB limit (aligned with tests)
+      if (stats.size > 1024 * 1024) return; // 1MB limit
       const contentBytes = await vscode.workspace.fs.readFile(fileUri);
       content = new TextDecoder('utf-8').decode(contentBytes);
     }

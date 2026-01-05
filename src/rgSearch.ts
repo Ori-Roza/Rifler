@@ -80,7 +80,7 @@ async function spawnWithFallback(
     try {
       const child = spawn(command, args, { windowsHide: true });
       await new Promise<void>((resolve, reject) => {
-        const onError = (err: unknown): void => {
+        const onError = (err: NodeJS.ErrnoException): void => {
           cleanup();
           reject(err);
         };
@@ -89,11 +89,11 @@ async function spawnWithFallback(
           resolve();
         };
         const cleanup = (): void => {
-          child.removeListener('error', onError as any);
+          child.removeListener('error', onError);
           child.removeListener('spawn', onSpawn);
         };
 
-        child.once('error', onError as any);
+        child.once('error', onError);
         child.once('spawn', onSpawn);
       });
 

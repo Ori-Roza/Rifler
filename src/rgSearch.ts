@@ -1,11 +1,9 @@
 import * as vscode from 'vscode';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { SearchOptions, SearchResult, EXCLUDE_DIRS } from './utils';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { rgPath } = require('@vscode/ripgrep');
 
 interface RipgrepSearchParams {
   query: string;
@@ -27,6 +25,98 @@ type RipgrepMatchEvent = {
 };
 
 type RipgrepJsonEvent = RipgrepMatchEvent | { type: string; data?: unknown };
+
+export function getRipgrepCommandCandidates(): string[] {
+  const exeName = process.platform === 'win32' ? 'rg.exe' : 'rg';
+
+  // Test/diagnostic override. Allows E2E to simulate a broken/wrong-format rg.
+  const override = process.env.RIFLER_RG_PATH?.trim();
+
+  const appRoot = (vscode.env as unknown as { appRoot?: string } | undefined)?.appRoot;
+
+  const candidates: string[] = [];
+
+  if (override) {
+    candidates.push(override);
+  }
+
+  if (appRoot) {
+    // VS Code installs vary: sometimes @vscode/ripgrep is under node_modules,
+    // sometimes it is unpacked alongside an asar.
+    candidates.push(path.join(appRoot, 'node_modules', '@vscode', 'ripgrep', 'bin', exeName));
+    candidates.push(path.join(appRoot, 'node_modules.asar.unpacked', '@vscode', 'ripgrep', 'bin', exeName));
+  }
+
+  // Last resort: try PATH.
+  candidates.push('rg');
+
+  // Deduplicate while preserving order.
+  return Array.from(new Set(candidates));
+}
+
+function isRetryableSpawnError(err: unknown): boolean {
+  const code = (err as { code?: string } | undefined)?.code;
+  return code === 'ENOENT' || code === 'ENOEXEC' || code === 'EACCES';
+}
+
+function fileSeemsPresent(cmd: string): boolean {
+  // Only pre-check absolute paths. For `rg` (PATH) we must attempt spawn.
+  if (!path.isAbsolute(cmd)) return true;
+  try {
+    return fs.existsSync(cmd);
+  } catch {
+    return true;
+  }
+}
+
+async function spawnWithFallback(
+  commands: string[],
+  args: string[]
+): Promise<{ child: ChildProcessWithoutNullStreams; command: string }> {
+  const attempts = commands.filter(fileSeemsPresent);
+  const errors: Array<{ command: string; error: unknown }> = [];
+
+  for (const command of attempts) {
+    try {
+      const child = spawn(command, args, { windowsHide: true });
+      await new Promise<void>((resolve, reject) => {
+        const onError = (err: NodeJS.ErrnoException): void => {
+          cleanup();
+          reject(err);
+        };
+        const onSpawn = (): void => {
+          cleanup();
+          resolve();
+        };
+        const cleanup = (): void => {
+          child.removeListener('error', onError);
+          child.removeListener('spawn', onSpawn);
+        };
+
+        child.once('error', onError);
+        child.once('spawn', onSpawn);
+      });
+
+      return { child, command };
+    } catch (error) {
+      errors.push({ command, error });
+      if (isRetryableSpawnError(error)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  const detail = errors
+    .map((e) => {
+      const code = (e.error as { code?: string } | undefined)?.code;
+      const msg = e.error instanceof Error ? e.error.message : String(e.error);
+      return `${e.command} (${code || 'unknown'}): ${msg}`;
+    })
+    .join('; ');
+
+  throw new Error(`Failed to spawn ripgrep. Attempts: ${detail}`);
+}
 
 function buildGlobArgs(fileMask: string): string[] {
   const args: string[] = [];
@@ -125,75 +215,98 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
 
   args.push('-e', query, '--', ...roots);
 
-  const child: ChildProcessWithoutNullStreams = spawn(rgPath as string, args, {
-    windowsHide: true
-  });
+  let child: ChildProcessWithoutNullStreams | undefined;
+  let cancelled = false;
 
   const results: SearchResult[] = [];
   let done = false;
 
   const cleanup = (): void => {
     done = true;
-    child.removeAllListeners();
-    child.stdout.removeAllListeners();
-    child.stderr.removeAllListeners();
+    const proc = child;
+    if (!proc) return;
+    proc.removeAllListeners();
+    proc.stdout.removeAllListeners();
+    proc.stderr.removeAllListeners();
   };
 
   const cancel = (): void => {
-    if (!done) {
+    cancelled = true;
+    if (!done && child) {
       child.kill();
       cleanup();
     }
   };
 
-  const promise = new Promise<SearchResult[]>((resolve, reject) => {
-    const rl = readline.createInterface({ input: child.stdout });
+  const promise = (async (): Promise<SearchResult[]> => {
+    const candidates = getRipgrepCommandCandidates();
+    const spawned = await spawnWithFallback(candidates, args);
+    child = spawned.child;
 
-    rl.on('line', (line: string) => {
-      if (done) return;
-      let parsed: RipgrepJsonEvent;
+    if (cancelled) {
       try {
-        parsed = JSON.parse(line) as RipgrepJsonEvent;
+        child.kill();
       } catch {
+        // ignore
+      }
+      cleanup();
+      return results;
+    }
+
+    return new Promise<SearchResult[]>((resolve, reject) => {
+      if (!child) {
+        reject(new Error('ripgrep spawn failed'));
         return;
       }
 
-      if (!isMatchEvent(parsed)) return;
-      const result = mapMatchToResult(parsed, workspaceFolders);
-      if (!result) return;
+      const rl = readline.createInterface({ input: child.stdout });
 
-      results.push(result);
-      if (results.length >= maxResults) {
-        cancel();
-        resolve(results);
-      }
-    });
+      rl.on('line', (line: string) => {
+        if (done) return;
+        let parsed: RipgrepJsonEvent;
+        try {
+          parsed = JSON.parse(line) as RipgrepJsonEvent;
+        } catch {
+          return;
+        }
 
-    child.on('error', (err) => {
-      if (done) return;
-      cleanup();
-      reject(err);
-    });
+        if (!isMatchEvent(parsed)) return;
+        const result = mapMatchToResult(parsed, workspaceFolders);
+        if (!result) return;
 
-    child.stderr.on('data', () => {
-      // Ignore stderr noise from ripgrep (e.g., broken pipes on cancel)
-    });
+        results.push(result);
+        if (results.length >= maxResults) {
+          cancel();
+          resolve(results);
+        }
+      });
 
-    child.on('close', (code, signal) => {
-      if (done) return;
-      cleanup();
-      if (signal) {
-        resolve(results);
-        return;
-      }
-      // ripgrep exits 0 when matches found, 1 when none found
-      if (code === 0 || code === 1) {
-        resolve(results);
-      } else {
-        reject(new Error(`ripgrep exited with code ${code}`));
-      }
+      child.on('error', (err) => {
+        if (done) return;
+        cleanup();
+        reject(err);
+      });
+
+      child.stderr.on('data', () => {
+        // Ignore stderr noise from ripgrep (e.g., broken pipes on cancel)
+      });
+
+      child.on('close', (code, signal) => {
+        if (done) return;
+        cleanup();
+        if (signal) {
+          resolve(results);
+          return;
+        }
+        // ripgrep exits 0 when matches found, 1 when none found
+        if (code === 0 || code === 1) {
+          resolve(results);
+        } else {
+          reject(new Error(`ripgrep exited with code ${code}`));
+        }
+      });
     });
-  });
+  })();
 
   return { promise, cancel };
 }

@@ -2,7 +2,6 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { rgPath } = require('@vscode/ripgrep');
 
 const root = process.argv[2];
 const query = process.argv[3] || 'test';
@@ -10,7 +9,7 @@ const runs = Number(process.argv[4] || 5);
 const maxMatches = Number(process.env.RG_MAX_MATCHES || 20000);
 const extraArgs = (process.env.RG_ARGS || '').split(' ').filter(Boolean);
 // Allow overriding the rg binary to compare against native VS Code rg
-const rgBin = process.env.RG_BIN || rgPath;
+const rgBin = process.env.RG_BIN || 'rg';
 
 if (!root) {
   console.error('Usage: node ripgrep-benchmark.js <directory> [query="test"] [runs=5]');

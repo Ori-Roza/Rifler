@@ -48,6 +48,10 @@ export const workspace = {
   },
 };
 
+export const env = {
+  appRoot: '/tmp/vscode-app-root',
+};
+
 export const window = {
   showErrorMessage: jest.fn(),
   showInformationMessage: jest.fn(),

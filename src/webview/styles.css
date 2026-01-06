@@ -1,7 +1,33 @@
 /**
  * Rifler Webview Styles - Issue #83 Redesign
  * Modern search interface with improved UI/UX
+ * Issues #96 & #98: Font bundling, color refinement, responsive layouts
  */
+
+/* ===== Font Loading ===== */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 * {
   box-sizing: border-box;
@@ -83,40 +109,40 @@ body.loaded {
 }
 
 :root {
-  /* Custom Rifler Theme - Fixed Colors (Dark Mode) */
-  --rifler-bg: #0d1117;
-  --rifler-fg: #c9d1d9;
-  --rifler-fg-muted: #8b949e;
-  --rifler-border: #30363d;
+  /* Custom Rifler Theme - Refined Colors (Issues #96 & #98) */
+  --rifler-bg: #09090b;
+  --rifler-fg: #e4e4e7;
+  --rifler-fg-muted: #a1a1aa;
+  --rifler-border: #27272a;
   
-  --rifler-input-bg: #0d1117;
-  --rifler-input-border: #30363d;
-  --rifler-input-fg: #c9d1d9;
-  --rifler-input-placeholder: #484f58;
+  --rifler-input-bg: #18181b;
+  --rifler-input-border: #3f3f46;
+  --rifler-input-fg: #e4e4e7;
+  --rifler-input-placeholder: #71717a;
   
-  --rifler-button-bg: #21262d;
-  --rifler-button-fg: #c9d1d9;
-  --rifler-button-hover: #30363d;
-  --rifler-button-secondary-bg: #30363d;
-  --rifler-button-secondary-fg: #c9d1d9;
-  --rifler-button-secondary-hover: #3b424b;
+  --rifler-button-bg: #27272a;
+  --rifler-button-fg: #e4e4e7;
+  --rifler-button-hover: #3f3f46;
+  --rifler-button-secondary-bg: #3f3f46;
+  --rifler-button-secondary-fg: #e4e4e7;
+  --rifler-button-secondary-hover: #52525b;
   
-  --rifler-primary: #58a6ff;
-  --rifler-primary-hover: #79c0ff;
-  --rifler-focus-border: #58a6ff;
+  --rifler-primary: #3B82F6;
+  --rifler-primary-hover: #60A5FA;
+  --rifler-focus-border: #3B82F6;
   
-  --rifler-list-hover: #161b22;
-  --rifler-list-active: #1f242c;
+  --rifler-list-hover: #18181b;
+  --rifler-list-active: #27272a;
   
-  --rifler-badge-bg: #1f6feb;
+  --rifler-badge-bg: #3B82F6;
   --rifler-badge-fg: #ffffff;
   
-  --rifler-error: #f85149;
-  --rifler-warning: #d29922;
-  --rifler-success: #3fb950;
+  --rifler-error: #ef4444;
+  --rifler-warning: #f59e0b;
+  --rifler-success: #22c55e;
   
-  --rifler-scrollbar-thumb: #484f58;
-  --rifler-scrollbar-thumb-hover: #8b949e;
+  --rifler-scrollbar-thumb: #52525b;
+  --rifler-scrollbar-thumb-hover: #71717a;
   
   --rifler-font-family: Menlo, Monaco, 'Courier New', monospace;
   --rifler-font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', 'Consolas', 'Courier New', monospace;
@@ -127,7 +153,7 @@ body.loaded {
   --rifler-highlight-strong: #E6E6B6;
   --rifler-highlight-muted: rgba(255, 213, 79, 0.15);
   --rifler-highlight-border: #FDD54F;
-  --rifler-primary-dim: rgba(88, 166, 255, 0.15);
+  --rifler-primary-dim: rgba(59, 130, 246, 0.15);
   --rifler-highlight-bg: #584c2e;
   --rifler-highlight-text: #E6E6B6;
   --rifler-match-bg: rgba(254, 240, 138, 0.3);
@@ -775,6 +801,13 @@ body.loaded {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.result-file-header .file-name:hover {
+  color: var(--rifler-primary);
+  text-decoration: underline;
 }
 
 .result-file-header .file-path {
@@ -854,38 +887,6 @@ body.loaded {
   border-radius: 1px;
 }
 
-.result-actions {
-  display: none;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.result-item:hover .result-actions {
-  display: flex;
-}
-
-.open-in-editor-btn {
-  background: transparent;
-  border: none;
-  color: var(--rifler-fg-muted);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.open-in-editor-btn:hover {
-  background-color: var(--rifler-list-hover);
-  color: var(--rifler-fg);
-}
-
-.open-in-editor-btn .material-symbols-outlined {
-  font-size: 14px;
-}
-
 /* ===== End of Results ===== */
 .end-of-results {
   display: flex;
@@ -960,38 +961,6 @@ body.loaded {
 
 .result-item.active .result-meta {
   border-right-color: var(--rifler-primary);
-}
-
-.result-actions {
-  display: flex;
-  align-items: center;
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-
-.result-item:hover .result-actions {
-  opacity: 1;
-}
-
-.open-in-editor-btn {
-  background: transparent;
-  border: none;
-  color: var(--rifler-fg-muted);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.open-in-editor-btn:hover {
-  background-color: var(--rifler-list-hover);
-  color: var(--rifler-fg);
-}
-
-.result-item.active .open-in-editor-btn {
-  color: inherit;
 }
 
 .match-highlight {
@@ -1750,4 +1719,151 @@ body.loaded {
 /* Match highlights remain visible on active line */
 .pvLine.isActive .pvMatch {
   background-color: var(--rifler-match-bg);
+}
+/* ===== Responsive Layouts (Issue #98) ===== */
+/* Narrow layout for sidebar use (< 350px) */
+body.narrow-layout {
+  --rifler-font-size: 12px;
+}
+
+body.narrow-layout .search-section {
+  padding: 4px 6px;
+  gap: 6px;
+}
+
+body.narrow-layout .search-box {
+  gap: 4px;
+}
+
+body.narrow-layout .search-input-group {
+  padding: 4px 6px;
+  gap: 4px;
+}
+
+body.narrow-layout .search-input {
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+body.narrow-layout .search-controls {
+  gap: 2px;
+}
+
+body.narrow-layout .icon-btn {
+  width: 26px;
+  height: 26px;
+}
+
+body.narrow-layout .icon-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+body.narrow-layout .filters-container {
+  padding: 4px;
+  gap: 4px;
+}
+
+body.narrow-layout .filter-row {
+  gap: 4px;
+}
+
+body.narrow-layout .results-summary-bar {
+  padding: 4px 8px;
+  min-height: 28px;
+}
+
+body.narrow-layout .results-count-text {
+  font-size: 11px;
+}
+
+body.narrow-layout .collapse-all-btn {
+  padding: 3px 6px;
+  font-size: 11px;
+  gap: 3px;
+}
+
+body.narrow-layout .result-file-header {
+  padding: 4px 8px;
+  gap: 6px;
+  min-height: 32px;
+}
+
+body.narrow-layout .file-name {
+  font-size: 12px;
+}
+
+body.narrow-layout .file-path {
+  font-size: 10px;
+}
+
+body.narrow-layout .match-count {
+  padding: 1px 5px;
+  font-size: 10px;
+  min-width: 18px;
+}
+
+body.narrow-layout .result-item {
+  height: 24px;
+  padding: 2px 8px 2px 24px;
+  gap: 4px;
+}
+
+body.narrow-layout .line-number {
+  font-size: 10px;
+  min-width: 32px;
+}
+
+body.narrow-layout .line-text {
+  font-size: 11px;
+}
+
+body.narrow-layout .drag-handle {
+  height: 6px;
+}
+
+body.narrow-layout .preview-header {
+  padding: 6px 8px;
+  gap: 6px;
+}
+
+body.narrow-layout .preview-filename {
+  font-size: 12px;
+}
+
+body.narrow-layout .preview-filepath {
+  font-size: 10px;
+}
+
+body.narrow-layout .replace-field-row {
+  padding: 4px 6px;
+  gap: 4px;
+}
+
+body.narrow-layout .replace-input {
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+body.narrow-layout .replace-actions {
+  gap: 3px;
+}
+
+body.narrow-layout .replace-actions button {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+/* Normal layout (350px - 600px) - default styles apply */
+
+/* Wide layout (> 600px) - slight spacing increases */
+body.wide-layout .search-section {
+  padding: 12px 16px;
+}
+
+body.wide-layout .result-file-header {
+  padding: 8px 12px;
+}
+
+body.wide-layout .result-item {
+  padding: 4px 12px 4px 32px;
 }

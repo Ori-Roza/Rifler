@@ -190,6 +190,39 @@ console.log('[Rifler] Webview script starting...');
     filtersContainer: !!filtersContainer
   });
 
+  // ===== Width Detection for Responsive Layouts (Issue #98) =====
+  function updateLayoutClass() {
+    const width = document.body.clientWidth;
+    
+    // Remove all layout classes
+    document.body.classList.remove('narrow-layout', 'normal-layout', 'wide-layout');
+    
+    // Apply appropriate class based on width
+    if (width < 350) {
+      document.body.classList.add('narrow-layout');
+      console.log('[Rifler] Applied narrow-layout for width:', width);
+    } else if (width >= 350 && width <= 600) {
+      document.body.classList.add('normal-layout');
+      console.log('[Rifler] Applied normal-layout for width:', width);
+    } else {
+      document.body.classList.add('wide-layout');
+      console.log('[Rifler] Applied wide-layout for width:', width);
+    }
+  }
+
+  // Initial layout detection
+  updateLayoutClass();
+
+  // Set up ResizeObserver to detect width changes
+  const resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      updateLayoutClass();
+    }
+  });
+
+  // Observe body element for resize
+  resizeObserver.observe(document.body);
+
   var localMatches = [];
   var localMatchIndex = 0;
   var searchBoxFocusedOnStartup = false;
@@ -420,12 +453,6 @@ console.log('[Rifler] Webview script starting...');
 
   if (replaceInFileBtn) {
     replaceInFileBtn.addEventListener('click', triggerReplaceInFile);
-  }
-
-  if (openInEditorBtn) {
-    openInEditorBtn.addEventListener('click', () => {
-      openActiveResult();
-    });
   }
   
   if (localReplaceClose) {
@@ -2793,13 +2820,28 @@ console.log('[Rifler] Webview script starting...');
         '<div class="file-info">' +
           '<div class="file-name-row">' +
             '<span class="seti-icon ' + getFileIconName(itemData.fileName) + '"></span>' +
-            '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
+            '<span class="file-name" title="Click to open file" style="cursor: pointer;">' + escapeHtml(itemData.fileName) + '</span>' +
           '</div>' +
-          '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
+          '<span class="file-path" title="' + escapeAttr(itemData.path) + '">' + escapeHtml(displayPath) + '</span>' +
         '</div>' +
         '<span class="match-count">' + itemData.matchCount + '</span>';
         
-      item.addEventListener('click', () => {
+      // Click on arrow or file info area (except filename) toggles collapse
+      item.addEventListener('click', (e) => {
+        const target = e.target;
+        // If clicking on filename, open the file instead of toggling
+        if (target && target.classList.contains('file-name')) {
+          e.stopPropagation();
+          const fullPath = itemData.path;
+          vscode.postMessage({
+            type: 'openFile',
+            path: fullPath,
+            line: 0
+          });
+          return;
+        }
+        
+        // Otherwise toggle collapse/expand
         const willExpand = itemData.isCollapsed;
         if (itemData.isCollapsed) {
           // Expanding: remove from collapsedFiles and add to expandedFiles
@@ -2860,23 +2902,17 @@ console.log('[Rifler] Webview script starting...');
           '<div class="result-meta">' +
             '<span class="result-line-number">' + (match.line + 1) + '</span>' +
           '</div>' +
-          '<div class="result-preview hljs">' + previewHtml + '</div>' +
-          '<div class="result-actions">' +
-            '<button class="open-in-editor-btn" data-index="' + match.originalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
-              '<span class="material-symbols-outlined">open_in_new</span>' +
-            '</button>' +
-          '</div>';
+          '<div class="result-preview hljs">' + previewHtml + '</div>';
 
         matchEl.addEventListener('click', (e) => {
-          if (e.target && e.target.closest('.open-in-editor-btn')) return;
-          // Preserve the current scroll position of this group before re-rendering
+          // Single click toggles preview
           if (!state.groupScrollTops) state.groupScrollTops = {};
           state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
           setActiveIndex(match.originalIndex);
         });
 
         matchEl.addEventListener('dblclick', (e) => {
-          if (e.target && e.target.closest('.open-in-editor-btn')) return;
+          // Double click opens file in editor
           openActiveResult();
         });
 
@@ -2884,15 +2920,6 @@ console.log('[Rifler] Webview script starting...');
           e.preventDefault();
           showContextMenu(e, match.originalIndex);
         });
-
-        const openBtn = matchEl.querySelector('.open-in-editor-btn');
-        if (openBtn) {
-          openBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const idx = parseInt(openBtn.dataset.index, 10);
-            openResultInEditor(idx);
-          });
-        }
 
         groupContainer.appendChild(matchEl);
       });
@@ -2948,22 +2975,15 @@ console.log('[Rifler] Webview script starting...');
       '<div class="result-meta">' +
         '<span class="result-line-number">' + (itemData.line + 1) + '</span>' +
       '</div>' +
-      '<div class="result-preview hljs">' + previewHtml + '</div>' +
-      '<div class="result-actions">' +
-        '<button class="open-in-editor-btn" data-index="' + itemData.originalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
-          '<span class="material-symbols-outlined">open_in_new</span>' +
-        '</button>' +
-      '</div>';
+      '<div class="result-preview hljs">' + previewHtml + '</div>';
 
     item.addEventListener('click', (e) => {
-      const target = e.target;
-      if (target && (target.closest('.open-in-editor-btn'))) return;
+      // Single click toggles preview
       setActiveIndex(itemData.originalIndex);
     });
 
     item.addEventListener('dblclick', (e) => {
-      const target = e.target;
-      if (target && (target.closest('.open-in-editor-btn'))) return;
+      // Double click opens file in editor
       openActiveResult();
     });
 
@@ -2971,15 +2991,6 @@ console.log('[Rifler] Webview script starting...');
       e.preventDefault();
       showContextMenu(e, itemData.originalIndex);
     });
-
-    const openBtn = item.querySelector('.open-in-editor-btn');
-    if (openBtn) {
-      openBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const idx = parseInt(openBtn.dataset.index, 10);
-        openResultInEditor(idx);
-      });
-    }
 
     return item;
   }

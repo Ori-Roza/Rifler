@@ -128,6 +128,8 @@ console.log('[Rifler] Webview script starting...');
   const filtersContainer = document.getElementById('filters-container');
   const filterBtn = document.getElementById('filter-btn');
   const replaceToggleBtn = document.getElementById('replace-toggle-btn');
+  const moreActionsBtn = document.getElementById('more-actions-btn');
+  const moreActionsMenu = document.getElementById('more-actions-menu');
   const dragHandle = document.getElementById('drag-handle');
   const previewPanelContainer = document.getElementById('preview-panel-container');
   const resultsCountText = document.getElementById('results-count-text');
@@ -315,6 +317,36 @@ console.log('[Rifler] Webview script starting...');
       vscode.postMessage({ type: 'clearState' });
       
       vscode.postMessage({ type: 'minimize', state: {} });
+    });
+  }
+
+  // Overflow actions menu (for narrow layout)
+  if (moreActionsBtn && moreActionsMenu) {
+    moreActionsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moreActionsMenu.classList.toggle('open');
+    });
+
+    moreActionsMenu.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      moreActionsMenu.classList.remove('open');
+      switch (action) {
+        case 'toggle-replace':
+          if (replaceToggleBtn) replaceToggleBtn.click();
+          break;
+        case 'toggle-filters':
+          if (filterBtn) filterBtn.click();
+          break;
+        case 'clear-search':
+          if (clearSearchBtn) clearSearchBtn.click();
+          break;
+      }
+    });
+
+    document.addEventListener('click', () => {
+      moreActionsMenu.classList.remove('open');
     });
   }
 
@@ -2832,12 +2864,15 @@ console.log('[Rifler] Webview script starting...');
         // If clicking on filename, open the file instead of toggling
         if (target && target.classList.contains('file-name')) {
           e.stopPropagation();
-          const fullPath = itemData.path;
-          vscode.postMessage({
-            type: 'openFile',
-            path: fullPath,
-            line: 0
+          // Find the first match for this file and open it in the editor
+          const resultIndex = state.results.findIndex((r) => {
+            const path = r.relativePath || r.fileName;
+            return path === itemData.path;
           });
+          if (resultIndex !== -1) {
+            setActiveIndex(resultIndex);
+            openResultInEditor(resultIndex);
+          }
           return;
         }
         

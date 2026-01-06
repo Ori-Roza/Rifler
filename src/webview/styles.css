@@ -793,6 +793,47 @@ body.loaded {
   align-items: center;
   gap: 6px;
 }
+.search-controls .more-actions-btn {
+  display: none;
+}
+.more-actions-menu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  background: var(--rifler-bg);
+  border: 1px solid var(--rifler-border);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+  padding: 6px;
+  display: none;
+  min-width: 160px;
+  z-index: 50;
+}
+.more-actions-menu.open {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.more-actions-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  color: var(--rifler-fg);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s;
+}
+.more-actions-menu button:hover {
+  background: var(--rifler-list-hover);
+}
+.more-actions-menu .material-symbols-outlined {
+  font-size: 18px;
+  opacity: 0.8;
+}
 
 .result-file-header .file-name {
   font-size: 13px;
@@ -1722,36 +1763,49 @@ body.loaded {
 }
 /* ===== Responsive Layouts (Issue #98) ===== */
 /* Narrow layout for sidebar use (< 350px) */
-body.narrow-layout {
-  --rifler-font-size: 12px;
-}
-
 body.narrow-layout .search-section {
   padding: 4px 6px;
   gap: 6px;
 }
 
 body.narrow-layout .search-box {
+  flex-direction: column;
+  align-items: stretch;
   gap: 4px;
 }
 
 body.narrow-layout .search-input-group {
   padding: 4px 6px;
   gap: 4px;
+  width: 100%;
 }
 
 body.narrow-layout .search-input {
-  font-size: 12px;
   padding: 4px 0;
 }
 
 body.narrow-layout .search-controls {
   gap: 2px;
+  align-self: flex-end;
+  position: relative;
 }
 
 body.narrow-layout .icon-btn {
   width: 26px;
   height: 26px;
+}
+
+/* Position the overflow menu relative to search-controls */
+.search-controls {
+  position: relative;
+}
+
+/* In narrow layout, hide individual controls and show the overflow menu */
+body.narrow-layout .search-controls .icon-btn:not(.more-actions-btn) {
+  display: none;
+}
+body.narrow-layout .search-controls .more-actions-btn {
+  display: inline-flex;
 }
 
 body.narrow-layout .icon-btn .material-symbols-outlined {

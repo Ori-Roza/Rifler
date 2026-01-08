@@ -1289,11 +1289,12 @@ body.loaded {
   line-height: 20px;
   background-color: var(--rifler-bg);
   color: var(--rifler-fg);
-  padding: 8px 0;
+  padding: 0;
   z-index: 1;
   direction: ltr;
   display: grid;
   grid-template-columns: 1fr;
+  align-content: start;
   min-width: 100%;
   width: fit-content;
   opacity: 1;

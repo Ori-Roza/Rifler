@@ -2849,12 +2849,11 @@ console.log('[Rifler] Webview script starting...');
       
       item.innerHTML = 
         '<span class="material-symbols-outlined arrow-icon">' + arrowIcon + '</span>' +
-        '<div class="file-info">' +
+        '<div class="file-info" title="' + escapeAttr(displayPath) + '">' +
           '<div class="file-name-row">' +
             '<span class="seti-icon ' + getFileIconName(itemData.fileName) + '"></span>' +
-            '<span class="file-name" title="Click to open file" style="cursor: pointer;">' + escapeHtml(itemData.fileName) + '</span>' +
+            '<span class="file-name" title="' + escapeAttr(displayPath) + '" style="cursor: pointer;">' + escapeHtml(itemData.fileName) + '</span>' +
           '</div>' +
-          '<span class="file-path" title="' + escapeAttr(itemData.path) + '">' + escapeHtml(displayPath) + '</span>' +
         '</div>' +
         '<span class="match-count">' + itemData.matchCount + '</span>';
         
@@ -3343,7 +3342,11 @@ console.log('[Rifler] Webview script starting...');
     }
     
     if (previewFilepath) {
-      const relPath = message.relativePath || '';
+      const resultForUri = Array.isArray(state.results)
+        ? state.results.find((r) => r && r.uri === message.uri)
+        : null;
+
+      const relPath = message.relativePath || (resultForUri && resultForUri.relativePath) || '';
       const displayPath = relPath.startsWith('/') ? relPath.substring(1) : relPath;
       previewFilepath.textContent = displayPath;
       previewFilepath.title = displayPath;

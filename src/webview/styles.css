@@ -1185,6 +1185,7 @@ body.loaded {
 .preview-filename {
   color: var(--rifler-primary);
   font-weight: 600;
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1193,6 +1194,7 @@ body.loaded {
 .preview-filepath {
   font-size: 12px;
   color: color-mix(in srgb, var(--rifler-fg-muted) 35%, var(--rifler-fg) 65%);
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1203,6 +1205,7 @@ body.loaded {
 .preview-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .preview-actions {

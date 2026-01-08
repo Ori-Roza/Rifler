@@ -441,11 +441,14 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       const languageId = this.getLanguageIdFromFilename(fileName);
       const iconUri = `vscode-icon://file_type_${languageId}`;
 
+      const relativePath = vscode.workspace.asRelativePath(vscode.Uri.parse(uriString));
+
       const payload = {
         type: 'fileContent',
         uri: uriString,
         content: text,
         fileName,
+        relativePath,
         iconUri,
         matches
       };
@@ -485,6 +488,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     const text = doc.getText();
     const fileName = doc.uri.path.split('/').pop() || 'File';
 
+    const relativePath = vscode.workspace.asRelativePath(doc.uri);
+
     const matches: Array<{ line: number; start: number; end: number }> = [];
     const lines = text.split('\n');
     const regex = buildSearchRegex(this._activePreview.query, this._activePreview.options);
@@ -509,6 +514,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       uri: this._activePreview.uri,
       content: text,
       fileName,
+      relativePath,
       iconUri,
       matches
     });

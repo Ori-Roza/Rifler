@@ -109,13 +109,21 @@ body.loaded {
 }
 
 :root {
-  /* Custom Rifler Theme - Refined Colors (Issues #96 & #98) */
-  --rifler-bg: #09090b;
-  --rifler-fg: #e4e4e7;
+  /* Custom Rifler Theme - Final Design Alignment */
+  /* Unify extension background with preview surface */
+  --rifler-bg: rgb(28, 28, 30);
+  --rifler-fg: rgb(207, 210, 215);
   --rifler-fg-muted: #a1a1aa;
-  --rifler-border: #27272a;
+  --rifler-border: #2C2C2E;
   
-  --rifler-input-bg: #18181b;
+  /* Surface layers for card-style UI (macOS-style depth) */
+  --rifler-surface-0: #131315;
+  --rifler-surface-1: rgb(28, 28, 30);
+  --rifler-surface-2: rgb(36, 36, 38);
+  --rifler-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 1px 4px rgba(0, 0, 0, 0.30);
+  --rifler-hairline: rgba(255, 255, 255, 0.08);
+  
+  --rifler-input-bg: #1C1C1E;
   --rifler-input-border: #3f3f46;
   --rifler-input-fg: #e4e4e7;
   --rifler-input-placeholder: #71717a;
@@ -199,7 +207,7 @@ body.loaded {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0;
-  color: var(--rifler-fg-muted);
+  color: rgba(207, 210, 215, 0.55);
 }
 
 .header-btn .material-symbols-outlined {
@@ -838,7 +846,7 @@ body.loaded {
 .result-file-header .file-name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--rifler-fg);
+  color: rgba(207, 210, 215, 0.86);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1051,25 +1059,26 @@ body.loaded {
   display: flex; /* Start visible by default */
   flex-direction: column;
   min-height: 0;
-  border-top: 1px solid var(--rifler-border);
-  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
+  border-top: 1px solid var(--rifler-hairline);
+  box-shadow: var(--rifler-card-shadow);
   z-index: 30;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   overflow: hidden;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
+  margin: 0 4px;
 }
 
 /* ===== Drag Handle ===== */
 .drag-handle {
   flex-shrink: 0;
   height: 22px;
-  background: var(--rifler-bg);
+  background: var(--rifler-surface-2);
   cursor: grab;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
+  padding: 0 12px;
   transition: all 0.15s ease;
   user-select: none;
   position: relative;
@@ -1084,28 +1093,35 @@ body.loaded {
 
 .drag-handle:hover,
 .drag-handle.dragging {
-  background-color: var(--rifler-list-hover);
+  background-color: var(--rifler-surface-2);
 }
 
 .preview-toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   background: transparent;
   border: none;
-  border-radius: 2px;
+  border-radius: 6px;
   color: var(--rifler-fg-muted);
-  cursor: pointer;
-  opacity: 0.6;
+  cursor: pointer !important;
+  opacity: 0.8;
   transition: all 0.15s ease;
   flex-shrink: 0;
   position: absolute;
-  left: 8px;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .preview-toggle-btn:hover {
+  opacity: 1;
+  background-color: var(--rifler-list-hover);
+}
+
+.preview-toggle-btn:active {
   opacity: 1;
   background-color: var(--rifler-list-hover);
 }
@@ -1146,18 +1162,20 @@ body.loaded {
 
 .preview-header {
   flex-shrink: 0;
-  padding: 8px 8px;
-  background-color: var(--rifler-bg);
-  border-bottom: 1px solid var(--rifler-border);
+  padding: 10px 12px;
+  background-color: var(--rifler-surface-2);
+  border-bottom: 1px solid var(--rifler-hairline);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 11px;
   font-weight: 600;
-  min-height: 38px;
+  min-height: 42px;
   box-sizing: border-box;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .preview-title-group {
@@ -1183,7 +1201,7 @@ body.loaded {
 
 
 .preview-filename {
-  color: var(--rifler-primary);
+  color: rgba(207, 210, 215, 0.9);
   font-weight: 600;
   display: block;
   white-space: nowrap;
@@ -1192,13 +1210,13 @@ body.loaded {
 }
 
 .preview-filepath {
-  font-size: 12px;
-  color: color-mix(in srgb, var(--rifler-fg-muted) 35%, var(--rifler-fg) 65%);
+  font-size: 11px;
+  color: color-mix(in srgb, var(--rifler-fg-muted) 75%, var(--rifler-fg) 25%);
   display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: 1;
+  opacity: 0.9;
   font-family: var(--rifler-font-mono);
 }
 
@@ -1206,6 +1224,7 @@ body.loaded {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  gap: 6px;
 }
 
 .preview-actions {
@@ -1227,15 +1246,37 @@ body.loaded {
 }
 
 .preview-actions #replace-in-file-btn {
-  background: var(--rifler-bg);
-  color: var(--rifler-fg);
-  border-color: var(--rifler-border);
+  background: var(--rifler-button-secondary-bg);
+  color: var(--rifler-button-secondary-fg);
+  border: 1px solid var(--rifler-border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-weight: 600;
+  box-shadow: none;
+  transform: none;
 }
 
 .preview-actions #replace-in-file-btn:hover {
-  background: var(--rifler-list-hover);
-  color: var(--rifler-fg);
-  border-color: var(--rifler-focus-border);
+  background: var(--rifler-button-secondary-hover);
+  color: var(--rifler-button-secondary-fg);
+  border-color: var(--rifler-border);
+  box-shadow: none;
+  transform: none;
+}
+
+.preview-actions #replace-in-file-btn:active {
+  background: rgba(94, 161, 244, 0.18);
+  color: rgb(94, 161, 244);
+  border-color: rgba(94, 161, 244, 0.55);
+  box-shadow: none;
+  transform: none;
+}
+
+/* Keep Replace button "active" while the replace menu/widget is open */
+.preview-panel-container:has(.replace-widget.visible) .preview-actions #replace-in-file-btn {
+  background: rgba(94, 161, 244, 0.18);
+  color: rgb(94, 161, 244);
+  border-color: rgba(94, 161, 244, 0.55);
 }
 
 .preview-actions button:hover {
@@ -1243,15 +1284,21 @@ body.loaded {
 }
 
 .preview-actions button.primary {
-  background: var(--rifler-button-secondary-bg);
-  color: var(--rifler-primary);
-  border-color: var(--rifler-primary);
+  background: rgba(94, 161, 244, 0.18);
+  color: rgb(94, 161, 244);
+  border: none;
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-weight: 600;
+  box-shadow: none;
+  transition: background-color 0.12s ease;
 }
 
 .preview-actions button.primary:hover {
-  background: var(--rifler-button-secondary-hover);
-  border-color: var(--rifler-primary-hover);
-  color: var(--rifler-primary-hover);
+  background: rgba(94, 161, 244, 0.28);
+  color: rgb(94, 161, 244);
+  box-shadow: none;
+  transform: none;
 }
 
 .preview-actions button.ghost {
@@ -1264,6 +1311,7 @@ body.loaded {
   background: transparent;
   border-color: var(--rifler-border);
   color: var(--rifler-fg-muted);
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 .preview-actions button.ghost:hover {
@@ -1272,12 +1320,20 @@ body.loaded {
   border-color: var(--rifler-focus-border);
 }
 
+.preview-actions button.ghost:active {
+  background: var(--rifler-list-hover);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-focus-border);
+  transform: none;
+  box-shadow: none;
+}
+
 .preview-body {
   flex: 1;
   position: relative;
   min-height: 0;
   overflow: hidden;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
 }
 
 .preview-content {
@@ -1290,7 +1346,7 @@ body.loaded {
   font-family: var(--rifler-font-mono);
   font-size: 13px;
   line-height: 20px;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
   color: var(--rifler-fg);
   padding: 0;
   z-index: 1;
@@ -1303,19 +1359,29 @@ body.loaded {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  transition: opacity 0.12s ease, visibility 0.12s ease;
+  transition: opacity 0.12s ease;
   will-change: opacity;
 }
 
 .preview-content.hidden-for-edit {
-  opacity: 0;
-  visibility: hidden;
+  /* Do not hide (avoids one-frame flash); only disable interaction */
+  opacity: 1;
+  visibility: visible;
   pointer-events: none;
 }
 
 .preview-panel-container.is-editing .preview-content {
-  opacity: 1; /* Keep visible for natural feel, no cross-fade */
+  opacity: 1 !important; /* Keep visible for natural feel, no cross-fade */
+  visibility: visible !important;
   pointer-events: none; /* Disable interaction while editing */
+  transition: none !important;
+}
+
+/* If JS briefly applies both states, do NOT allow a hidden frame */
+.preview-panel-container.is-editing .preview-content.hidden-for-edit {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: none !important;
 }
 
 .editor-container.visible {
@@ -1351,14 +1417,16 @@ body.loaded {
   border: 1px solid var(--rifler-primary);
 } */
 
-/* Active/current line (yellow outline, like VS Code find-result selection) */
+/* Active/current line (calm highlight, VS Code style) */
 .pvLine.isActive {
-  background-color: var(--rifler-highlight-bg) !important;
+  background-color: rgba(240, 226, 128, 0.10) !important;
   /* Use outline instead of border to avoid layout shifts on navigation */
   border: none !important;
-  outline: 1px solid var(--rifler-highlight-border);
-  outline-offset: -1px;
+  outline: none;
+  outline-offset: 0;
   z-index: 2;
+  border-left: 1px solid rgba(240, 226, 128, 0.35);
+  margin-left: -1px;
 }
 
 .pvCode {
@@ -1409,21 +1477,14 @@ body.loaded {
   position: relative;
   z-index: 1; /* keep tint and indicator above the row highlight */
   font-weight: 700 !important;
-  color: var(--rifler-primary) !important;
-  background-color: var(--rifler-primary-dim) !important;
-  border-right-color: var(--rifler-primary) !important;
-  box-shadow: inset -2px 0 0 var(--rifler-primary);
+  color: rgb(94, 161, 244) !important;
+  background-color: rgba(94, 161, 244, 0.08) !important;
+  border-right-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none;
 }
 
 .pvLine.isActive .pvLineNo::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 2px;
-  height: 100%;
-  background-color: var(--rifler-primary);
-  pointer-events: none;
+  content: none;
 }
 
 .preview-content .pvLine:not(.isHit):not(.isActive) .pvCode {
@@ -1438,21 +1499,25 @@ body.loaded {
   opacity: 1;
 }
 
-/* Stronger token highlight than the row highlight + bold */
-.pvMatch,
-.preview-content .match,
-.result-preview .match {
-  background-color: var(--rifler-match-bg);
-  color: var(--rifler-highlight-text) !important;
-  border-radius: 2px;
-  padding: 0 2px;
-  font-weight: bold;
+/* Stronger token highlight than the row highlight + bold (preview only; results handled separately) */
+.preview-content .pvMatch,
+.preview-content .match {
+  display: inline;
+  background: rgb(248, 229, 112);
+  color: rgb(42, 36, 0);
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-weight: 700;
+  border: none;
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.20);
+  text-decoration: none;
 }
 
-.pvMatch *,
-.preview-content .match *,
-.result-preview .match * {
-  color: inherit !important;
+.preview-content .pvMatch *,
+.preview-content .match * {
+  color: inherit;
+  background: transparent;
 }
 
 /* ===== Editor Container ===== */
@@ -1463,12 +1528,11 @@ body.loaded {
   right: 0;
   bottom: 0;
   overflow: hidden;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
   display: flex;
   flex-direction: column;
   z-index: 2;
   opacity: 0;
-  visibility: hidden;
   pointer-events: none;
   transition: opacity 0.12s ease;
   will-change: opacity;
@@ -1476,7 +1540,6 @@ body.loaded {
 
 .editor-container.visible {
   opacity: 1;
-  visibility: visible;
   pointer-events: auto;
 }
 
@@ -1497,7 +1560,7 @@ body.loaded {
   font-size: 13px;
   line-height: 20px;
   color: var(--rifler-fg-muted);
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
   user-select: none;
   overflow: hidden;
   box-sizing: border-box;
@@ -1552,7 +1615,7 @@ body.loaded {
 #editor-backdrop {
   z-index: 1;
   pointer-events: none;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
   color: var(--rifler-fg);
 }
 
@@ -1751,19 +1814,16 @@ body.loaded {
 .hljs-comment, .hljs-quote { color: #8b949e !important; }
 .hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable, .hljs-tag .hljs-attr { color: #79c0ff !important; }
 
-/* But matches must keep their color and be bold */
-.match, .match *, .pvMatch, .pvMatch * {
+/* Result list match styling (scoped so it does NOT affect preview) */
+.result-preview .match,
+.result-preview .match * {
   color: var(--rifler-highlight-text) !important;
   font-weight: bold !important;
+  background: transparent !important;
 }
 
-.match, .pvMatch {
-  background-color: var(--rifler-match-bg);
-}
-
-/* Match highlights remain visible on active line */
-.pvLine.isActive .pvMatch {
-  background-color: var(--rifler-match-bg);
+.result-preview .match {
+  background-color: var(--rifler-match-bg) !important;
 }
 /* ===== Responsive Layouts (Issue #98) ===== */
 /* Narrow layout for sidebar use (< 350px) */
@@ -1924,4 +1984,41 @@ body.wide-layout .result-file-header {
 
 body.wide-layout .result-item {
   padding: 4px 12px 4px 32px;
+}
+
+/* ===== FINAL PREVIEW MATCH OVERRIDE (must be last in file) ===== */
+.preview-content .pvMatch,
+.preview-content .match {
+  display: inline !important;
+  background: rgb(248, 229, 112) !important;
+  color: rgb(42, 36, 0) !important;
+  border-radius: 8px !important;
+  padding: 1px 6px !important;
+  font-weight: 700 !important;
+  border: none !important;
+  outline: none !important;
+  text-decoration: none !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.20) !important;
+}
+
+.preview-content .pvMatch *,
+.preview-content .match * {
+  color: inherit !important;
+  background: transparent !important;
+  font-weight: inherit !important;
+}
+
+.preview-content .pvMatch::before,
+.preview-content .pvMatch::after,
+.preview-content .match::before,
+.preview-content .match::after {
+  content: none !important;
+}
+
+/* Active line must not alter match pills */
+.preview-content .pvLine.isActive .pvMatch,
+.preview-content .pvLine.isActive .match {
+  background: var(--rifler-match-bg) !important;
+  color: var(--rifler-highlight-text) !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.20) !important;
 }

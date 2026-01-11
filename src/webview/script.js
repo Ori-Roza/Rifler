@@ -2476,8 +2476,10 @@ console.log('[Rifler] Webview script starting...');
       if (pathLabel) pathLabel.textContent = 'Project:';
       if (directoryInput) {
         directoryInput.style.display = 'block';
-        directoryInput.placeholder = state.workspaceName || 'All files';
-        directoryInput.value = state.workspacePath || '';
+        directoryInput.placeholder = 'All Files';
+        directoryInput.value = '';
+        // Keep the real path accessible without displaying it in the field
+        directoryInput.title = state.workspacePath || '';
         directoryInput.readOnly = true;
       }
     } else if (state.currentScope === 'directory') {
@@ -2857,6 +2859,7 @@ console.log('[Rifler] Webview script starting...');
             '<span class="seti-icon ' + getFileIconName(itemData.fileName) + '"></span>' +
             '<span class="file-name" title="' + escapeAttr(displayPath) + '" style="cursor: pointer;">' + escapeHtml(itemData.fileName) + '</span>' +
           '</div>' +
+          '<div class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</div>' +
         '</div>' +
         '<span class="match-count">' + itemData.matchCount + '</span>';
         
@@ -2942,7 +2945,14 @@ console.log('[Rifler] Webview script starting...');
           '<div class="result-preview hljs">' + previewHtml + '</div>';
 
         matchEl.addEventListener('click', (e) => {
-          // Single click toggles preview
+          // Single click selects/loads preview (no show/hide toggle)
+          if (match.originalIndex === state.activeIndex) {
+            const active = state.results?.[state.activeIndex];
+            if (active && (!state.fileContent || state.fileContent.uri !== active.uri)) {
+              loadFileContent(active);
+            }
+            return;
+          }
           if (!state.groupScrollTops) state.groupScrollTops = {};
           state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
           setActiveIndex(match.originalIndex);
@@ -3015,7 +3025,14 @@ console.log('[Rifler] Webview script starting...');
       '<div class="result-preview hljs">' + previewHtml + '</div>';
 
     item.addEventListener('click', (e) => {
-      // Single click toggles preview
+      // Single click selects/loads preview (no show/hide toggle)
+      if (itemData.originalIndex === state.activeIndex) {
+        const active = state.results?.[state.activeIndex];
+        if (active && (!state.fileContent || state.fileContent.uri !== active.uri)) {
+          loadFileContent(active);
+        }
+        return;
+      }
       setActiveIndex(itemData.originalIndex);
     });
 
@@ -3315,7 +3332,11 @@ console.log('[Rifler] Webview script starting...');
 
   function handleCurrentDirectory(directory) {
     state.currentDirectory = directory;
-    directoryInput.value = directory;
+    // Only apply to the directory input when directory scope is active.
+    // Otherwise this overwrites the project-scope display ("All Files").
+    if (state.currentScope === 'directory' && directoryInput && !directoryInput.value) {
+      directoryInput.value = directory;
+    }
   }
 
   function handleWorkspaceInfo(name, path) {
@@ -3794,6 +3815,16 @@ console.log('[Rifler] Webview script starting...');
     if (!skipLoad) {
       loadFileContent(state.results[index]);
     }
+  }
+
+  // Clicking the preview filename should open the file in the editor (Issue #96 feedback)
+  if (previewFilename) {
+    previewFilename.style.cursor = 'pointer';
+    previewFilename.addEventListener('click', () => {
+      if (state.activeIndex >= 0) {
+        openActiveResult();
+      }
+    });
   }
 
   function activateFirstMatchForPath(path) {

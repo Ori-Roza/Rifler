@@ -75,11 +75,6 @@
         "icon": "$(replace-all)"
       },
       {
-        "command": "rifler.toggleView",
-        "title": "Rifler: Switch Between Sidebar and Window View",
-        "icon": "$(split-horizontal)"
-      },
-      {
         "command": "rifler.minimize",
         "title": "Minimize to Status Bar",
         "icon": "$(chevron-right)"
@@ -101,13 +96,6 @@
           "when": "activeWebviewPanelId == 'rifler'",
           "group": "navigation"
         }
-      ],
-      "view/title": [
-        {
-          "command": "rifler.toggleView",
-          "when": "view == rifler.sidebarView",
-          "group": "navigation"
-        }
       ]
     },
     "keybindings": [
@@ -126,11 +114,6 @@
         "key": "alt+shift+f",
         "mac": "shift+option+f",
         "when": "activeWebviewPanelId == 'rifler' || view == rifler.sidebarView"
-      },
-      {
-        "command": "rifler.toggleView",
-        "key": "ctrl+alt+t",
-        "mac": "cmd+alt+t"
       }
     ],
     "configuration": {

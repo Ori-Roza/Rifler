@@ -380,6 +380,9 @@ console.log('[Rifler] Webview script starting...');
           const targetHeight = lastExpandedHeight || getDefaultPreviewHeight();
           applyPreviewHeight(targetHeight, { persist: true });
         }
+
+        // Preview height changes affect the results viewport; re-render virtual rows immediately.
+        scheduleVirtualRender();
         
         previewToggleBtn.innerHTML = state.previewPanelCollapsed ? 
           '<span class="material-symbols-outlined">add</span>' : 

@@ -335,6 +335,10 @@ body.loaded {
   min-width: 0;
 }
 
+.search-input-group {
+  position: relative;
+}
+
 .search-input::placeholder {
   color: var(--rifler-input-placeholder);
   opacity: 0.7;
@@ -345,6 +349,10 @@ body.loaded {
   gap: 2px;
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.search-overflow {
+  display: none;
 }
 
 .search-controls {
@@ -807,14 +815,15 @@ body.loaded {
 .more-actions-menu {
   position: absolute;
   right: 0;
-  top: 36px;
+  top: calc(100% + 6px);
   background: var(--rifler-bg);
   border: 1px solid var(--rifler-border);
   border-radius: 6px;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
   padding: 6px;
   display: none;
-  min-width: 160px;
+  min-width: 170px;
+  max-width: calc(100vw - 16px);
   z-index: 50;
 }
 .more-actions-menu.open {
@@ -826,7 +835,7 @@ body.loaded {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 7px 10px;
   background: transparent;
   border: none;
   color: var(--rifler-fg);
@@ -834,6 +843,10 @@ body.loaded {
   cursor: pointer;
   text-align: left;
   transition: background-color 0.12s;
+}
+.more-actions-menu button span:last-child {
+  font-size: 12px;
+  line-height: 1.2;
 }
 .more-actions-menu button:hover {
   background: var(--rifler-list-hover);
@@ -1852,6 +1865,29 @@ body.narrow-layout .search-controls {
   gap: 2px;
   align-self: flex-end;
   position: relative;
+}
+
+/* When we relocate the overflow button into the input group, hide the empty controls row */
+body.narrow-layout.overflow-in-input .search-controls {
+  display: none;
+}
+
+body.narrow-layout .search-overflow {
+  display: inline-flex;
+  align-items: center;
+  position: static;
+}
+
+body.narrow-layout .search-overflow .more-actions-btn {
+  display: inline-flex;
+  width: 24px;
+  height: 28px;
+  border-radius: 2px;
+}
+
+body.narrow-layout .search-overflow .more-actions-menu {
+  top: calc(100% + 6px);
+  right: 0;
 }
 
 body.narrow-layout .icon-btn {

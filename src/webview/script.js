@@ -130,6 +130,8 @@ console.log('[Rifler] Webview script starting...');
   const replaceToggleBtn = document.getElementById('replace-toggle-btn');
   const moreActionsBtn = document.getElementById('more-actions-btn');
   const moreActionsMenu = document.getElementById('more-actions-menu');
+  const searchOverflow = document.getElementById('search-overflow');
+  const searchControls = document.querySelector('.search-controls');
   const dragHandle = document.getElementById('drag-handle');
   const previewPanelContainer = document.getElementById('preview-panel-container');
   const resultsCountText = document.getElementById('results-count-text');
@@ -209,6 +211,31 @@ console.log('[Rifler] Webview script starting...');
     } else {
       document.body.classList.add('wide-layout');
       console.log('[Rifler] Applied wide-layout for width:', width);
+    }
+
+    // In narrow layout, place the overflow (arrow-down) button next to the regex toggle
+    // so it stays inside the main search textbox.
+    try {
+      const isNarrow = document.body.classList.contains('narrow-layout');
+      if (searchOverflow && searchControls && moreActionsBtn && moreActionsMenu) {
+        const alreadyInOverflow = searchOverflow.contains(moreActionsBtn);
+        if (isNarrow && !alreadyInOverflow) {
+          moreActionsMenu.classList.remove('open');
+          searchOverflow.appendChild(moreActionsBtn);
+          searchOverflow.appendChild(moreActionsMenu);
+          document.body.classList.add('overflow-in-input');
+        } else if (!isNarrow && alreadyInOverflow) {
+          moreActionsMenu.classList.remove('open');
+          searchControls.appendChild(moreActionsBtn);
+          searchControls.appendChild(moreActionsMenu);
+          document.body.classList.remove('overflow-in-input');
+        } else {
+          // Keep class in sync even if the nodes are already in the right spot.
+          document.body.classList.toggle('overflow-in-input', isNarrow && alreadyInOverflow);
+        }
+      }
+    } catch {
+      // Ignore layout relocation failures; UI remains functional with default placement.
     }
   }
 

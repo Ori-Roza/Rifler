@@ -28,7 +28,10 @@ interface SidebarState {
 }
 
 export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'rifler.sidebarView';
+  public static readonly sidebarViewType = 'rifler.sidebarView';
+  public static readonly bottomViewType = 'rifler.bottomView';
+  // Backward-compatible alias used throughout the codebase
+  public static readonly viewType = RiflerSidebarProvider.sidebarViewType;
   
   private _view?: vscode.WebviewView;
   private _context: vscode.ExtensionContext;
@@ -47,8 +50,19 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   private _shouldSaveOnNextHide = false;
   private _lastVisibility?: boolean;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  public readonly viewType: string;
+  private readonly _stateKey: string;
+  private readonly _logLabel: string;
+
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    options: { viewType?: string; stateKey?: string; logLabel?: string } = {}
+  ) {
     this._context = context;
+    this.viewType = options.viewType ?? RiflerSidebarProvider.sidebarViewType;
+    // Bottom and sidebar intentionally share state by default for a seamless experience.
+    this._stateKey = options.stateKey ?? 'rifler.sidebarState';
+    this._logLabel = options.logLabel ?? (this.viewType === RiflerSidebarProvider.bottomViewType ? 'BottomProvider' : 'SidebarProvider');
   }
 
   public suppressVisibilitySideEffects(ms: number): void {
@@ -73,7 +87,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ): void | Thenable<void> {
     this._view = webviewView;
-    console.log('Rifler Sidebar WebviewView resolved');
+    console.log(`Rifler ${this._logLabel} WebviewView resolved`);
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -223,15 +237,15 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         break;
       case 'minimize':
         // Save state before minimize
-        console.log('SidebarProvider: received minimize message with state:', message.state);
+        console.log(`${this._logLabel}: received minimize message with state:`, message.state);
         if (message.state) {
           const cfg = vscode.workspace.getConfiguration('rifler');
           const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
           const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
           const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
           if (persist) {
-            await store.update('rifler.sidebarState', message.state as unknown as SidebarState);
-            console.log('SidebarProvider: state saved to rifler.sidebarState');
+            await store.update(this._stateKey, message.state as unknown as SidebarState);
+            console.log(`${this._logLabel}: state saved to ${this._stateKey}`);
           }
           // Resolve any pending save promise
           if (this._stateSaveResolver) {
@@ -246,7 +260,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           const cfg = vscode.workspace.getConfiguration('rifler');
           const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
           const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
-          await store.update('rifler.sidebarState', undefined);
+          await store.update(this._stateKey, undefined);
         }
         break;
     }
@@ -279,14 +293,14 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
     const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
     if (persist) {
-      await store.update('rifler.sidebarState', {
-      query: message.query,
-      scope: message.scope,
-      options: message.options,
-      directoryPath: message.directoryPath,
-      modulePath: message.modulePath,
-      results: results,
-      activeIndex
+      await store.update(this._stateKey, {
+        query: message.query,
+        scope: message.scope,
+        options: message.options,
+        directoryPath: message.directoryPath,
+        modulePath: message.modulePath,
+        results: results,
+        activeIndex
       });
     }
   }
@@ -463,12 +477,12 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
       const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
       const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
-      const existing = store.get<SidebarState>('rifler.sidebarState') || {};
+      const existing = store.get<SidebarState>(this._stateKey) || {};
       if (persist) {
-        await store.update('rifler.sidebarState', {
-        ...existing,
-        lastPreview: payload,
-        activeIndex: activeIndex ?? existing.activeIndex ?? 0
+        await store.update(this._stateKey, {
+          ...existing,
+          lastPreview: payload,
+          activeIndex: activeIndex ?? existing.activeIndex ?? 0
         });
       }
     } catch (error) {
@@ -598,7 +612,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     const cfg = vscode.workspace.getConfiguration('rifler');
     const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
     const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
-    const state = store.get('rifler.sidebarState');
+    const state = store.get(this._stateKey);
 
     if (this._view) {
       // Send configuration to webview
@@ -613,15 +627,15 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         resultsShowCollapsed
       });
 
-      console.log('SidebarProvider._restoreState: state =', state ? 'exists' : 'undefined', state);
+      console.log(`${this._logLabel}._restoreState: state =`, state ? 'exists' : 'undefined', state);
       if (state) {
-        console.log('SidebarProvider._restoreState: sending restoreState message');
+        console.log(`${this._logLabel}._restoreState: sending restoreState message`);
         this._view.webview.postMessage({
           type: 'restoreState',
           state
         });
       } else {
-        console.log('SidebarProvider._restoreState: no state to restore, sending clearState');
+        console.log(`${this._logLabel}._restoreState: no state to restore, sending clearState`);
         this._view.webview.postMessage({ type: 'clearState' });
       }
     }

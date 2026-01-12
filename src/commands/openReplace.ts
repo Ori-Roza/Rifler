@@ -4,20 +4,30 @@ import { CommandContext } from './types';
 /**
  * rifler.openReplace - Open search panel in replace mode
  */
-export function openReplaceCommand(ctx: CommandContext): void {
+export async function openReplaceCommand(ctx: CommandContext): Promise<void> {
   const config = vscode.workspace.getConfiguration('rifler');
-  const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+  let panelLocation = config.get<'sidebar' | 'bottom' | 'window'>('panelLocation');
+  if (!panelLocation) {
+    const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+    panelLocation = viewMode === 'tab' ? 'window' : 'sidebar';
+  }
   const selectedText = getSelectedText();
 
-  if (viewMode === 'sidebar') {
-    ctx.viewManager.openView({
+  if (panelLocation === 'sidebar') {
+    await ctx.viewManager.openView({
       forcedLocation: 'sidebar',
+      showReplace: true,
+      initialQuery: selectedText
+    });
+  } else if (panelLocation === 'bottom') {
+    await ctx.viewManager.openView({
+      forcedLocation: 'bottom',
       showReplace: true,
       initialQuery: selectedText
     });
   } else {
     // Use viewManager to ensure sidebar is closed for "fullscreen" feel
-    ctx.viewManager.openView({
+    await ctx.viewManager.openView({
       forcedLocation: 'window',
       showReplace: true,
       initialQuery: selectedText

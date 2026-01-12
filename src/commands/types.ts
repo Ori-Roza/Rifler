@@ -14,4 +14,7 @@ export interface CommandContext {
   sidebarProvider: RiflerSidebarProvider;
   getSidebarVisible: () => boolean;
   onSidebarVisibilityChange: (callback: (visible: boolean) => void) => void;
+
+  getBottomVisible: () => boolean;
+  onBottomVisibilityChange: (callback: (visible: boolean) => void) => void;
 }

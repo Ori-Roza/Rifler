@@ -39,6 +39,13 @@
           "title": "Rifler",
           "icon": "assets/icon-activitybar.svg"
         }
+      ],
+      "panel": [
+        {
+          "id": "rifler-bottom",
+          "title": "Rifler",
+          "icon": "assets/icon-activitybar.svg"
+        }
       ]
     },
     "views": {
@@ -46,6 +53,14 @@
         {
           "type": "webview",
           "id": "rifler.sidebarView",
+          "name": "Search",
+          "contextualTitle": "Rifler Search"
+        }
+      ],
+      "rifler-bottom": [
+        {
+          "type": "webview",
+          "id": "rifler.bottomView",
           "name": "Search",
           "contextualTitle": "Rifler Search"
         }
@@ -113,7 +128,7 @@
         "command": "rifler.toggleReplace",
         "key": "alt+shift+f",
         "mac": "shift+option+f",
-        "when": "activeWebviewPanelId == 'rifler' || view == rifler.sidebarView"
+        "when": "activeWebviewPanelId == 'rifler' || view == rifler.sidebarView || view == rifler.bottomView"
       }
     ],
     "configuration": {
@@ -145,14 +160,16 @@
           "type": "string",
           "enum": [
             "sidebar",
+            "bottom",
             "window"
           ],
           "enumDescriptions": [
             "Open as a sidebar panel in the Activity Bar",
+            "Open in the bottom Panel area",
             "Open as a full editor tab beside your files"
           ],
           "default": "sidebar",
-          "markdownDescription": "Controls where Rifler opens. Choose **Sidebar** for the Activity Bar view, or **Window** for a full editor tab.",
+          "markdownDescription": "Controls where Rifler opens. Choose **Sidebar** for the Activity Bar view, **Bottom** for the Panel area, or **Window** for a full editor tab.",
           "order": 1
         },
         "rifler.viewMode": {

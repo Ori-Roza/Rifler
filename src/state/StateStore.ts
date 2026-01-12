@@ -7,11 +7,13 @@ import { MinimizeMessage } from '../messaging/types';
  */
 export class StateStore {
   private sidebarVisible = false;
+  private bottomVisible = false;
   private minimized = false;
   private savedState: MinimizeMessage['state'] | undefined;
   private previewPanelCollapsed = false;
   private resultsShowCollapsed = false;
   private visibilityCallbacks: Array<(visible: boolean) => void> = [];
+  private bottomVisibilityCallbacks: Array<(visible: boolean) => void> = [];
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const cfg = vscode.workspace.getConfiguration('rifler');
@@ -47,6 +49,19 @@ export class StateStore {
 
   onSidebarVisibilityChange(callback: (visible: boolean) => void): void {
     this.visibilityCallbacks.push(callback);
+  }
+
+  getBottomVisible(): boolean {
+    return this.bottomVisible;
+  }
+
+  setBottomVisible(visible: boolean): void {
+    this.bottomVisible = visible;
+    this.bottomVisibilityCallbacks.forEach((cb) => cb(visible));
+  }
+
+  onBottomVisibilityChange(callback: (visible: boolean) => void): void {
+    this.bottomVisibilityCallbacks.push(callback);
   }
 
   isMinimized(): boolean {

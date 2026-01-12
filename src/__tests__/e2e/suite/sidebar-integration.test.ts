@@ -597,6 +597,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     // Set viewMode to tab
     const config = vscode.workspace.getConfiguration('rifler');
     // Ensure the new setting doesn't override the legacy one for this test
+    await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Global);
     await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Workspace);
     await config.update('viewMode', 'tab', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -617,6 +618,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Reset viewMode to sidebar
     await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
+    await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Global);
     await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Workspace);
 
     assert.ok(hasRiflerTab, 'Tab panel should open when viewMode=tab');
@@ -628,6 +630,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     // Set viewMode to tab
     const config = vscode.workspace.getConfiguration('rifler');
     // Ensure the new setting doesn't override the legacy one for this test
+    await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Global);
     await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Workspace);
     await config.update('viewMode', 'tab', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -675,6 +678,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Reset viewMode to sidebar
     await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
+    await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Global);
     await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Workspace);
 
     assert.ok(!hasRiflerTabAfter, 'Tab should be closed after toggle');

@@ -41,6 +41,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     initialQuery?: string;
     showReplace?: boolean;
   };
+  private _webviewReady = false;
   private _messageHandler?: MessageHandler;
   private _stateSaveResolver?: () => void;
   private _activePreview?: { uri: string; query: string; options: SearchOptions; activeIndex?: number };
@@ -87,6 +88,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ): void | Thenable<void> {
     this._view = webviewView;
+    this._webviewReady = false;
     console.log(`Rifler ${this._logLabel} WebviewView resolved`);
 
     webviewView.webview.options = {
@@ -140,7 +142,10 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       console.log('SidebarProvider: visibility changed, visible =', currentVisibility);
       this._lastVisibility = currentVisibility;
       if (currentVisibility) {
-        this._restoreState();
+        // Only restore state if we don't have a pending initialQuery (selection takes precedence)
+        if (!this._pendingInitOptions?.initialQuery) {
+          this._restoreState();
+        }
         if (this._onVisibilityChanged) {
           this._onVisibilityChanged(true);
         }
@@ -161,6 +166,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     // Handle dispose
     webviewView.onDidDispose(() => {
       this._view = undefined;
+      this._webviewReady = false;
     });
 
     // Refresh preview when the currently previewed document changes in VS Code
@@ -208,7 +214,10 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'webviewReady': {
-        // Send pending initialization options when webview is ready
+        this._webviewReady = true;
+        // Restore persisted sidebar state first
+        this._restoreState();
+        // Then apply pending initialization options (e.g. selection query) so they win over restored state
         if (this._pendingInitOptions) {
           const { initialQuery, showReplace } = this._pendingInitOptions;
           if (showReplace) {
@@ -222,8 +231,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           }
           this._pendingInitOptions = undefined;
         }
-        // Restore persisted sidebar state immediately on initial ready
-        this._restoreState();
         break;
       }
       case 'requestStateForMinimize':
@@ -648,22 +655,41 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public postMessage(message: { type: string; [key: string]: unknown }): void {
-    // If view is ready, forward immediately
-    if (this._view) {
-      this._view.webview.postMessage(message);
-      return;
-    }
+    // Before the webview is ready, VS Code may drop messages.
+    // Buffer key init messages and send them after 'webviewReady'.
+    const shouldBufferUntilReady =
+      message.type === 'setSearchQuery' ||
+      message.type === 'showReplace' ||
+      message.type === 'focusSearch';
 
-    // Otherwise queue initialization messages until webview is ready
-    if (message.type === 'setSearchQuery' || message.type === 'showReplace') {
+    if (shouldBufferUntilReady && (!this._view || !this._webviewReady)) {
       if (!this._pendingInitOptions) {
         this._pendingInitOptions = {};
       }
       if (message.type === 'setSearchQuery') {
         this._pendingInitOptions.initialQuery = message.query as string;
-      } else {
+      } else if (message.type === 'showReplace') {
         this._pendingInitOptions.showReplace = true;
       }
+      return;
+    }
+
+    // For setSearchQuery, mark pending so visibility handler won't overwrite with restored state
+    if (message.type === 'setSearchQuery' && message.query) {
+      if (!this._pendingInitOptions) {
+        this._pendingInitOptions = {};
+      }
+      this._pendingInitOptions.initialQuery = message.query as string;
+      // Clear after a brief delay so it doesn't persist forever
+      setTimeout(() => {
+        if (this._pendingInitOptions?.initialQuery === message.query) {
+          this._pendingInitOptions = undefined;
+        }
+      }, 500);
+    }
+
+    if (this._view) {
+      this._view.webview.postMessage(message);
     }
   }
 

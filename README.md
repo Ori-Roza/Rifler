@@ -14,6 +14,7 @@
 ## Features
 
 - **Dynamic Search** - Results appear as you type (no Find button needed)
+- **Search From Selection** - Select text in the editor, then open Rifler and it will be used as the initial search query
 - **Fresh State** - Automatically clears search results and state when switching workspaces
 - **High Performance**
   - **Virtualized Results** - Smooth scrolling with 10,000+ results
@@ -43,6 +44,8 @@
 - **Responsive Sidebar**
   - Layout flexes to the default VS Code sidebar width with wrapping controls (no overflow on first open)
   - Restores your last search, results, and preview when reopening
+- **Flexible Panel Location**
+  - Open Rifler in the **sidebar**, **bottom panel**, or a **separate editor tab** via `rifler.panelLocation`
 - **Inline File Editing**
   - Edit files directly in the preview panel
   - Real-time syntax highlighting while editing
@@ -63,9 +66,14 @@
 
 Press `Cmd+Alt+F` (Mac) or `Ctrl+Alt+F` (Windows/Linux) to **toggle** Rifler open/close.
 
+- If you have text selected in the editor when you open Rifler, that selection becomes the initial search query (and searches immediately for queries with 2+ characters).
+
 - By default, Rifler opens in the **sidebar** (Activity Bar)
-- To use **tab mode** instead, change the setting: `rifler.viewMode` to `"tab"`
-- The same shortcut toggles open/close in both modes
+- To change where Rifler opens, set `rifler.panelLocation` to one of:
+  - `"sidebar"` (default)
+  - `"bottom"`
+  - `"window"` (opens as a separate editor tab)
+- Legacy setting: `rifler.viewMode` (`"sidebar" | "tab"`) is still supported for backwards compatibility, but `rifler.panelLocation` is the preferred setting.
 
 ### Searching
 
@@ -89,23 +97,25 @@ Click anywhere in the file preview to enter edit mode:
 - Press `Escape` to exit edit mode
 - Press `Cmd+S` / `Ctrl+S` to save immediately
 
-### Choosing Your View Mode
+### Choosing Your Panel Location
 
-Rifler can open in two modes:
+Rifler can open in three locations:
 
-1. **Sidebar Mode (Default)** - Opens in the Activity Bar sidebar
-   - Use `Cmd+Alt+F` (Mac) / `Ctrl+Alt+F` to toggle open/close
-   - Or click the Rifler icon in the Activity Bar
+1. **Sidebar (Default)** - Activity Bar sidebar
+2. **Bottom Panel** - VS Code panel at the bottom
+3. **Window** - A separate editor tab
 
-2. **Tab Mode** - Opens as a separate editor tab
-   - Change setting: `rifler.viewMode` to `"tab"`
-   - Use `Cmd+Alt+F` (Mac) / `Ctrl+Alt+F` to toggle open/close
+Configure via your `settings.json`:
 
-### Switching Between Modes
+```json
+{
+  "rifler.panelLocation": "sidebar" // or "bottom" or "window"
+}
+```
 
-You can switch between sidebar and tab mode:
-- Use `Cmd+Alt+T` (Mac) / `Ctrl+Alt+T` (Windows/Linux)
-- Or use the toggle button in the sidebar view title
+### Switching Between Sidebar and Window
+
+Rifler includes the `rifler.toggleView` command to switch between **sidebar** and **window**. There is no default keybinding; bind it via **Keyboard Shortcuts** by searching for `rifler.toggleView`.
 
 ### Replace in Preview Editor
 While editing a file in the preview panel:
@@ -139,22 +149,22 @@ To customize the main Rifler keybindings, open Keyboard Shortcuts (`Cmd+K Cmd+S`
 |---------|---------------|------------------------|
 | Rifler: Toggle Open/Close | `Cmd+Alt+F` | `Ctrl+Alt+F` |
 | Rifler: Open Replace Mode | `Cmd+Alt+R` | `Ctrl+Alt+R` |
-| Rifler: Switch View Mode | `Cmd+Alt+T` | `Ctrl+Alt+T` |
+| Rifler: Toggle View (sidebar/window) | _(not bound by default)_ | _(not bound by default)_ |
 
-### View Mode Configuration
+### Panel Location Configuration
 
-To change the default view mode, add to your `settings.json`:
+To change where Rifler opens by default, add to your `settings.json`:
 
 ```json
 {
-  "rifler.viewMode": "sidebar"  // or "tab"
+  "rifler.panelLocation": "sidebar"  // or "bottom" or "window"
 }
 ```
 
 Or change it in Settings UI:
 1. Open Settings (`Cmd+,` on Mac / `Ctrl+,` on Windows/Linux)
-2. Search for "rifler viewMode"
-3. Choose either "sidebar" or "tab"
+2. Search for "rifler panelLocation"
+3. Choose either "sidebar", "bottom", or "window"
 
 ### Max Results Configuration
 

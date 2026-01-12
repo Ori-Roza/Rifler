@@ -8,7 +8,7 @@
 </div>
 
 <div align="center">
-  <video src="https://raw.githubusercontent.com/ori-roza/rifler/assets/assets/rifler-demo.mov" width="100%" autoplay loop muted playsinline></video>
+  <video src="https://raw.githubusercontent.com/ori-roza/rifler/assets/assets/rifler_demo_v116.mov" width="100%" autoplay loop muted playsinline></video>
 </div>
 
 ## Features

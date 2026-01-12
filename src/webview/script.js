@@ -2503,9 +2503,8 @@ console.log('[Rifler] Webview script starting...');
       if (pathLabel) pathLabel.textContent = 'Project:';
       if (directoryInput) {
         directoryInput.style.display = 'block';
-        directoryInput.placeholder = 'All Files';
-        directoryInput.value = '';
-        // Keep the real path accessible without displaying it in the field
+        directoryInput.placeholder = state.workspaceName || 'All Files';
+        directoryInput.value = state.workspacePath || '';
         directoryInput.title = state.workspacePath || '';
         directoryInput.readOnly = true;
       }

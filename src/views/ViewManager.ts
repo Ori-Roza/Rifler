@@ -48,12 +48,29 @@ export class ViewManager {
     
     let panelLocation = options.forcedLocation;
     if (!panelLocation) {
-      // Try new setting first
-      panelLocation = config.get<PanelLocation>('panelLocation');
+      const panelLocationInspection = config.inspect<PanelLocation>('panelLocation');
+      const panelLocationExplicitlyConfigured =
+        panelLocationInspection?.globalValue !== undefined ||
+        panelLocationInspection?.workspaceValue !== undefined ||
+        panelLocationInspection?.workspaceFolderValue !== undefined;
+
+      // If the new setting isn't explicitly configured, honor the deprecated setting
+      // for backwards compatibility (it may have been set by existing users/tests).
+      if (!panelLocationExplicitlyConfigured) {
+        const viewModeInspection = config.inspect<'sidebar' | 'tab'>('viewMode');
+        const viewModeExplicitlyConfigured =
+          viewModeInspection?.globalValue !== undefined ||
+          viewModeInspection?.workspaceValue !== undefined ||
+          viewModeInspection?.workspaceFolderValue !== undefined;
+
+        if (viewModeExplicitlyConfigured) {
+          const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+          panelLocation = viewMode === 'tab' ? 'window' : 'sidebar';
+        }
+      }
+
       if (!panelLocation) {
-        // Fall back to deprecated viewMode setting
-        const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
-        panelLocation = viewMode === 'tab' ? 'window' : 'sidebar';
+        panelLocation = config.get<PanelLocation>('panelLocation') || 'sidebar';
       }
     }
 

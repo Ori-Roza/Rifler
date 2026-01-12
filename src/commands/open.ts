@@ -6,11 +6,7 @@ import { CommandContext } from './types';
  */
 export async function openCommand(ctx: CommandContext): Promise<void> {
   const config = vscode.workspace.getConfiguration('rifler');
-  let panelLocation = config.get<'sidebar' | 'bottom' | 'window'>('panelLocation');
-  if (!panelLocation) {
-    const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
-    panelLocation = viewMode === 'tab' ? 'window' : 'sidebar';
-  }
+  const panelLocation = getEffectivePanelLocation(config);
   const selectedText = getSelectedText();
 
   if (panelLocation === 'sidebar') {
@@ -68,6 +64,29 @@ export async function openCommand(ctx: CommandContext): Promise<void> {
       });
     }
   }
+}
+
+function getEffectivePanelLocation(config: vscode.WorkspaceConfiguration): 'sidebar' | 'bottom' | 'window' {
+  const panelLocationInspection = config.inspect<'sidebar' | 'bottom' | 'window'>('panelLocation');
+  const panelLocationExplicitlyConfigured =
+    panelLocationInspection?.globalValue !== undefined ||
+    panelLocationInspection?.workspaceValue !== undefined ||
+    panelLocationInspection?.workspaceFolderValue !== undefined;
+
+  if (!panelLocationExplicitlyConfigured) {
+    const viewModeInspection = config.inspect<'sidebar' | 'tab'>('viewMode');
+    const viewModeExplicitlyConfigured =
+      viewModeInspection?.globalValue !== undefined ||
+      viewModeInspection?.workspaceValue !== undefined ||
+      viewModeInspection?.workspaceFolderValue !== undefined;
+
+    if (viewModeExplicitlyConfigured) {
+      const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+      return viewMode === 'tab' ? 'window' : 'sidebar';
+    }
+  }
+
+  return config.get<'sidebar' | 'bottom' | 'window'>('panelLocation') || 'sidebar';
 }
 
 /**

@@ -1,7 +1,33 @@
 /**
  * Rifler Webview Styles - Issue #83 Redesign
  * Modern search interface with improved UI/UX
+ * Issues #96 & #98: Font bundling, color refinement, responsive layouts
  */
+
+/* ===== Font Loading ===== */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 * {
   box-sizing: border-box;
@@ -83,40 +109,48 @@ body.loaded {
 }
 
 :root {
-  /* Custom Rifler Theme - Fixed Colors (Dark Mode) */
-  --rifler-bg: #0d1117;
-  --rifler-fg: #c9d1d9;
-  --rifler-fg-muted: #8b949e;
-  --rifler-border: #30363d;
+  /* Custom Rifler Theme - Final Design Alignment */
+  /* Unify extension background with preview surface */
+  --rifler-bg: rgb(28, 28, 30);
+  --rifler-fg: rgb(207, 210, 215);
+  --rifler-fg-muted: #a1a1aa;
+  --rifler-border: #2C2C2E;
   
-  --rifler-input-bg: #0d1117;
-  --rifler-input-border: #30363d;
-  --rifler-input-fg: #c9d1d9;
-  --rifler-input-placeholder: #484f58;
+  /* Surface layers for card-style UI (macOS-style depth) */
+  --rifler-surface-0: #131315;
+  --rifler-surface-1: rgb(28, 28, 30);
+  --rifler-surface-2: rgb(36, 36, 38);
+  --rifler-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 1px 4px rgba(0, 0, 0, 0.30);
+  --rifler-hairline: rgba(255, 255, 255, 0.08);
   
-  --rifler-button-bg: #21262d;
-  --rifler-button-fg: #c9d1d9;
-  --rifler-button-hover: #30363d;
-  --rifler-button-secondary-bg: #30363d;
-  --rifler-button-secondary-fg: #c9d1d9;
-  --rifler-button-secondary-hover: #3b424b;
+  --rifler-input-bg: #1C1C1E;
+  --rifler-input-border: #3f3f46;
+  --rifler-input-fg: #e4e4e7;
+  --rifler-input-placeholder: #71717a;
   
-  --rifler-primary: #58a6ff;
-  --rifler-primary-hover: #79c0ff;
-  --rifler-focus-border: #58a6ff;
+  --rifler-button-bg: #27272a;
+  --rifler-button-fg: #e4e4e7;
+  --rifler-button-hover: #3f3f46;
+  --rifler-button-secondary-bg: #3f3f46;
+  --rifler-button-secondary-fg: #e4e4e7;
+  --rifler-button-secondary-hover: #52525b;
   
-  --rifler-list-hover: #161b22;
-  --rifler-list-active: #1f242c;
+  --rifler-primary: #3B82F6;
+  --rifler-primary-hover: #60A5FA;
+  --rifler-focus-border: #3B82F6;
   
-  --rifler-badge-bg: #1f6feb;
+  --rifler-list-hover: #18181b;
+  --rifler-list-active: #27272a;
+  
+  --rifler-badge-bg: #3B82F6;
   --rifler-badge-fg: #ffffff;
   
-  --rifler-error: #f85149;
-  --rifler-warning: #d29922;
-  --rifler-success: #3fb950;
+  --rifler-error: #ef4444;
+  --rifler-warning: #f59e0b;
+  --rifler-success: #22c55e;
   
-  --rifler-scrollbar-thumb: #484f58;
-  --rifler-scrollbar-thumb-hover: #8b949e;
+  --rifler-scrollbar-thumb: #52525b;
+  --rifler-scrollbar-thumb-hover: #71717a;
   
   --rifler-font-family: Menlo, Monaco, 'Courier New', monospace;
   --rifler-font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', 'Consolas', 'Courier New', monospace;
@@ -127,7 +161,7 @@ body.loaded {
   --rifler-highlight-strong: #E6E6B6;
   --rifler-highlight-muted: rgba(255, 213, 79, 0.15);
   --rifler-highlight-border: #FDD54F;
-  --rifler-primary-dim: rgba(88, 166, 255, 0.15);
+  --rifler-primary-dim: rgba(59, 130, 246, 0.15);
   --rifler-highlight-bg: #584c2e;
   --rifler-highlight-text: #E6E6B6;
   --rifler-match-bg: rgba(254, 240, 138, 0.3);
@@ -173,7 +207,7 @@ body.loaded {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0;
-  color: var(--rifler-fg-muted);
+  color: rgba(207, 210, 215, 0.55);
 }
 
 .header-btn .material-symbols-outlined {
@@ -301,6 +335,10 @@ body.loaded {
   min-width: 0;
 }
 
+.search-input-group {
+  position: relative;
+}
+
 .search-input::placeholder {
   color: var(--rifler-input-placeholder);
   opacity: 0.7;
@@ -311,6 +349,10 @@ body.loaded {
   gap: 2px;
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.search-overflow {
+  display: none;
 }
 
 .search-controls {
@@ -742,13 +784,13 @@ body.loaded {
 }
 
 .result-file-header .seti-icon {
-  width: 16px;
-  height: 16px;
+  width: 20px !important;
+  height: 20px !important;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 20px !important;
   line-height: 1;
   opacity: 0.8;
 }
@@ -767,14 +809,67 @@ body.loaded {
   align-items: center;
   gap: 6px;
 }
+.search-controls .more-actions-btn {
+  display: none;
+}
+.more-actions-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  background: var(--rifler-bg);
+  border: 1px solid var(--rifler-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  padding: 6px;
+  display: none;
+  min-width: 170px;
+  max-width: calc(100vw - 16px);
+  z-index: 50;
+}
+.more-actions-menu.open {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.more-actions-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  color: var(--rifler-fg);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s;
+}
+.more-actions-menu button span:last-child {
+  font-size: 12px;
+  line-height: 1.2;
+}
+.more-actions-menu button:hover {
+  background: var(--rifler-list-hover);
+}
+.more-actions-menu .material-symbols-outlined {
+  font-size: 18px;
+  opacity: 0.8;
+}
 
 .result-file-header .file-name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--rifler-fg);
+  color: rgba(207, 210, 215, 0.86);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.result-file-header .file-name:hover {
+  color: var(--rifler-primary);
+  text-decoration: underline;
 }
 
 .result-file-header .file-path {
@@ -854,38 +949,6 @@ body.loaded {
   border-radius: 1px;
 }
 
-.result-actions {
-  display: none;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.result-item:hover .result-actions {
-  display: flex;
-}
-
-.open-in-editor-btn {
-  background: transparent;
-  border: none;
-  color: var(--rifler-fg-muted);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.open-in-editor-btn:hover {
-  background-color: var(--rifler-list-hover);
-  color: var(--rifler-fg);
-}
-
-.open-in-editor-btn .material-symbols-outlined {
-  font-size: 14px;
-}
-
 /* ===== End of Results ===== */
 .end-of-results {
   display: flex;
@@ -962,38 +1025,6 @@ body.loaded {
   border-right-color: var(--rifler-primary);
 }
 
-.result-actions {
-  display: flex;
-  align-items: center;
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-
-.result-item:hover .result-actions {
-  opacity: 1;
-}
-
-.open-in-editor-btn {
-  background: transparent;
-  border: none;
-  color: var(--rifler-fg-muted);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.open-in-editor-btn:hover {
-  background-color: var(--rifler-list-hover);
-  color: var(--rifler-fg);
-}
-
-.result-item.active .open-in-editor-btn {
-  color: inherit;
-}
-
 .match-highlight {
   background-color: var(--rifler-highlight);
   color: var(--rifler-fg);
@@ -1041,25 +1072,26 @@ body.loaded {
   display: flex; /* Start visible by default */
   flex-direction: column;
   min-height: 0;
-  border-top: 1px solid var(--rifler-border);
-  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
+  border-top: 1px solid var(--rifler-hairline);
+  box-shadow: var(--rifler-card-shadow);
   z-index: 30;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   overflow: hidden;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
+  margin: 0 4px;
 }
 
 /* ===== Drag Handle ===== */
 .drag-handle {
   flex-shrink: 0;
   height: 22px;
-  background: var(--rifler-bg);
+  background: var(--rifler-surface-2);
   cursor: grab;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
+  padding: 0 12px;
   transition: all 0.15s ease;
   user-select: none;
   position: relative;
@@ -1074,28 +1106,35 @@ body.loaded {
 
 .drag-handle:hover,
 .drag-handle.dragging {
-  background-color: var(--rifler-list-hover);
+  background-color: var(--rifler-surface-2);
 }
 
 .preview-toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   background: transparent;
   border: none;
-  border-radius: 2px;
+  border-radius: 6px;
   color: var(--rifler-fg-muted);
-  cursor: pointer;
-  opacity: 0.6;
+  cursor: pointer !important;
+  opacity: 0.8;
   transition: all 0.15s ease;
   flex-shrink: 0;
   position: absolute;
-  left: 8px;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .preview-toggle-btn:hover {
+  opacity: 1;
+  background-color: var(--rifler-list-hover);
+}
+
+.preview-toggle-btn:active {
   opacity: 1;
   background-color: var(--rifler-list-hover);
 }
@@ -1136,18 +1175,20 @@ body.loaded {
 
 .preview-header {
   flex-shrink: 0;
-  padding: 8px 8px;
-  background-color: var(--rifler-bg);
-  border-bottom: 1px solid var(--rifler-border);
+  padding: 10px 12px;
+  background-color: var(--rifler-surface-2);
+  border-bottom: 1px solid var(--rifler-hairline);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 11px;
   font-weight: 600;
-  min-height: 38px;
+  min-height: 42px;
   box-sizing: border-box;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .preview-title-group {
@@ -1160,12 +1201,12 @@ body.loaded {
 
 .seti-icon {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: 20px !important;
+  height: 20px !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 20px !important;
   line-height: 1;
   color: var(--rifler-fg-muted);
   opacity: 0.8;
@@ -1173,26 +1214,30 @@ body.loaded {
 
 
 .preview-filename {
-  color: var(--rifler-primary);
+  color: rgba(207, 210, 215, 0.9);
   font-weight: 600;
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .preview-filepath {
-  font-size: 12px;
-  color: color-mix(in srgb, var(--rifler-fg-muted) 35%, var(--rifler-fg) 65%);
+  font-size: 11px;
+  color: color-mix(in srgb, var(--rifler-fg-muted) 75%, var(--rifler-fg) 25%);
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: 1;
+  opacity: 0.9;
   font-family: var(--rifler-font-mono);
 }
 
 .preview-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  gap: 6px;
 }
 
 .preview-actions {
@@ -1214,15 +1259,37 @@ body.loaded {
 }
 
 .preview-actions #replace-in-file-btn {
-  background: var(--rifler-bg);
-  color: var(--rifler-fg);
-  border-color: var(--rifler-border);
+  background: var(--rifler-button-secondary-bg);
+  color: var(--rifler-button-secondary-fg);
+  border: 1px solid var(--rifler-border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-weight: 600;
+  box-shadow: none;
+  transform: none;
 }
 
 .preview-actions #replace-in-file-btn:hover {
-  background: var(--rifler-list-hover);
-  color: var(--rifler-fg);
-  border-color: var(--rifler-focus-border);
+  background: var(--rifler-button-secondary-hover);
+  color: var(--rifler-button-secondary-fg);
+  border-color: var(--rifler-border);
+  box-shadow: none;
+  transform: none;
+}
+
+.preview-actions #replace-in-file-btn:active {
+  background: rgba(94, 161, 244, 0.18);
+  color: rgb(94, 161, 244);
+  border-color: rgba(94, 161, 244, 0.55);
+  box-shadow: none;
+  transform: none;
+}
+
+/* Keep Replace button "active" while the replace menu/widget is open */
+.preview-panel-container:has(.replace-widget.visible) .preview-actions #replace-in-file-btn {
+  background: rgba(94, 161, 244, 0.18);
+  color: rgb(94, 161, 244);
+  border-color: rgba(94, 161, 244, 0.55);
 }
 
 .preview-actions button:hover {
@@ -1230,15 +1297,21 @@ body.loaded {
 }
 
 .preview-actions button.primary {
-  background: var(--rifler-button-secondary-bg);
-  color: var(--rifler-primary);
-  border-color: var(--rifler-primary);
+  background: rgba(94, 161, 244, 0.18);
+  color: rgb(94, 161, 244);
+  border: none;
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-weight: 600;
+  box-shadow: none;
+  transition: background-color 0.12s ease;
 }
 
 .preview-actions button.primary:hover {
-  background: var(--rifler-button-secondary-hover);
-  border-color: var(--rifler-primary-hover);
-  color: var(--rifler-primary-hover);
+  background: rgba(94, 161, 244, 0.28);
+  color: rgb(94, 161, 244);
+  box-shadow: none;
+  transform: none;
 }
 
 .preview-actions button.ghost {
@@ -1251,6 +1324,7 @@ body.loaded {
   background: transparent;
   border-color: var(--rifler-border);
   color: var(--rifler-fg-muted);
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 .preview-actions button.ghost:hover {
@@ -1259,12 +1333,20 @@ body.loaded {
   border-color: var(--rifler-focus-border);
 }
 
+.preview-actions button.ghost:active {
+  background: var(--rifler-list-hover);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-focus-border);
+  transform: none;
+  box-shadow: none;
+}
+
 .preview-body {
   flex: 1;
   position: relative;
   min-height: 0;
   overflow: hidden;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
 }
 
 .preview-content {
@@ -1277,31 +1359,42 @@ body.loaded {
   font-family: var(--rifler-font-mono);
   font-size: 13px;
   line-height: 20px;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
   color: var(--rifler-fg);
-  padding: 8px 0;
+  padding: 0;
   z-index: 1;
   direction: ltr;
   display: grid;
   grid-template-columns: 1fr;
+  align-content: start;
   min-width: 100%;
   width: fit-content;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  transition: opacity 0.12s ease, visibility 0.12s ease;
+  transition: opacity 0.12s ease;
   will-change: opacity;
 }
 
 .preview-content.hidden-for-edit {
-  opacity: 0;
-  visibility: hidden;
+  /* Do not hide (avoids one-frame flash); only disable interaction */
+  opacity: 1;
+  visibility: visible;
   pointer-events: none;
 }
 
 .preview-panel-container.is-editing .preview-content {
-  opacity: 1; /* Keep visible for natural feel, no cross-fade */
+  opacity: 1 !important; /* Keep visible for natural feel, no cross-fade */
+  visibility: visible !important;
   pointer-events: none; /* Disable interaction while editing */
+  transition: none !important;
+}
+
+/* If JS briefly applies both states, do NOT allow a hidden frame */
+.preview-panel-container.is-editing .preview-content.hidden-for-edit {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: none !important;
 }
 
 .editor-container.visible {
@@ -1337,14 +1430,16 @@ body.loaded {
   border: 1px solid var(--rifler-primary);
 } */
 
-/* Active/current line (yellow outline, like VS Code find-result selection) */
+/* Active/current line (calm highlight, VS Code style) */
 .pvLine.isActive {
-  background-color: var(--rifler-highlight-bg) !important;
+  background-color: rgba(240, 226, 128, 0.10) !important;
   /* Use outline instead of border to avoid layout shifts on navigation */
   border: none !important;
-  outline: 1px solid var(--rifler-highlight-border);
-  outline-offset: -1px;
+  outline: none;
+  outline-offset: 0;
   z-index: 2;
+  border-left: 1px solid rgba(240, 226, 128, 0.35);
+  margin-left: -1px;
 }
 
 .pvCode {
@@ -1395,21 +1490,14 @@ body.loaded {
   position: relative;
   z-index: 1; /* keep tint and indicator above the row highlight */
   font-weight: 700 !important;
-  color: var(--rifler-primary) !important;
-  background-color: var(--rifler-primary-dim) !important;
-  border-right-color: var(--rifler-primary) !important;
-  box-shadow: inset -2px 0 0 var(--rifler-primary);
+  color: rgb(94, 161, 244) !important;
+  background-color: rgba(94, 161, 244, 0.08) !important;
+  border-right-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none;
 }
 
 .pvLine.isActive .pvLineNo::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 2px;
-  height: 100%;
-  background-color: var(--rifler-primary);
-  pointer-events: none;
+  content: none;
 }
 
 .preview-content .pvLine:not(.isHit):not(.isActive) .pvCode {
@@ -1424,21 +1512,25 @@ body.loaded {
   opacity: 1;
 }
 
-/* Stronger token highlight than the row highlight + bold */
-.pvMatch,
-.preview-content .match,
-.result-preview .match {
-  background-color: var(--rifler-match-bg);
-  color: var(--rifler-highlight-text) !important;
-  border-radius: 2px;
-  padding: 0 2px;
-  font-weight: bold;
+/* Stronger token highlight than the row highlight + bold (preview only; results handled separately) */
+.preview-content .pvMatch,
+.preview-content .match {
+  display: inline;
+  background: var(--rifler-match-bg);
+  color: var(--rifler-highlight-text);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-weight: 700;
+  border: none;
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.20);
+  text-decoration: none;
 }
 
-.pvMatch *,
-.preview-content .match *,
-.result-preview .match * {
-  color: inherit !important;
+.preview-content .pvMatch *,
+.preview-content .match * {
+  color: inherit;
+  background: transparent;
 }
 
 /* ===== Editor Container ===== */
@@ -1449,12 +1541,11 @@ body.loaded {
   right: 0;
   bottom: 0;
   overflow: hidden;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
   display: flex;
   flex-direction: column;
   z-index: 2;
   opacity: 0;
-  visibility: hidden;
   pointer-events: none;
   transition: opacity 0.12s ease;
   will-change: opacity;
@@ -1462,7 +1553,6 @@ body.loaded {
 
 .editor-container.visible {
   opacity: 1;
-  visibility: visible;
   pointer-events: auto;
 }
 
@@ -1483,7 +1573,7 @@ body.loaded {
   font-size: 13px;
   line-height: 20px;
   color: var(--rifler-fg-muted);
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
   user-select: none;
   overflow: hidden;
   box-sizing: border-box;
@@ -1538,7 +1628,7 @@ body.loaded {
 #editor-backdrop {
   z-index: 1;
   pointer-events: none;
-  background-color: var(--rifler-bg);
+  background-color: var(--rifler-surface-1);
   color: var(--rifler-fg);
 }
 
@@ -1737,17 +1827,234 @@ body.loaded {
 .hljs-comment, .hljs-quote { color: #8b949e !important; }
 .hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable, .hljs-tag .hljs-attr { color: #79c0ff !important; }
 
-/* But matches must keep their color and be bold */
-.match, .match *, .pvMatch, .pvMatch * {
+/* Result list match styling (scoped so it does NOT affect preview) */
+.result-preview .match,
+.result-preview .match * {
   color: var(--rifler-highlight-text) !important;
   font-weight: bold !important;
+  background: transparent !important;
 }
 
-.match, .pvMatch {
-  background-color: var(--rifler-match-bg);
+.result-preview .match {
+  background-color: var(--rifler-match-bg) !important;
+}
+/* ===== Responsive Layouts (Issue #98) ===== */
+/* Narrow layout for sidebar use (< 350px) */
+body.narrow-layout .search-section {
+  padding: 4px 6px;
+  gap: 6px;
 }
 
-/* Match highlights remain visible on active line */
-.pvLine.isActive .pvMatch {
-  background-color: var(--rifler-match-bg);
+body.narrow-layout .search-box {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+body.narrow-layout .search-input-group {
+  padding: 4px 6px;
+  gap: 4px;
+  width: 100%;
+}
+
+body.narrow-layout .search-input {
+  padding: 4px 0;
+}
+
+body.narrow-layout .search-controls {
+  gap: 2px;
+  align-self: flex-end;
+  position: relative;
+}
+
+/* When we relocate the overflow button into the input group, hide the empty controls row */
+body.narrow-layout.overflow-in-input .search-controls {
+  display: none;
+}
+
+body.narrow-layout .search-overflow {
+  display: inline-flex;
+  align-items: center;
+  position: static;
+}
+
+body.narrow-layout .search-overflow .more-actions-btn {
+  display: inline-flex;
+  width: 24px;
+  height: 28px;
+  border-radius: 2px;
+}
+
+body.narrow-layout .search-overflow .more-actions-menu {
+  top: calc(100% + 6px);
+  right: 0;
+}
+
+body.narrow-layout .icon-btn {
+  width: 26px;
+  height: 26px;
+}
+
+/* Position the overflow menu relative to search-controls */
+.search-controls {
+  position: relative;
+}
+
+/* In narrow layout, hide individual controls and show the overflow menu */
+body.narrow-layout .search-controls .icon-btn:not(.more-actions-btn) {
+  display: none;
+}
+body.narrow-layout .search-controls .more-actions-btn {
+  display: inline-flex;
+}
+
+body.narrow-layout .icon-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+body.narrow-layout .filters-container {
+  padding: 4px;
+  gap: 4px;
+}
+
+body.narrow-layout .filter-row {
+  gap: 4px;
+}
+
+body.narrow-layout .results-summary-bar {
+  padding: 4px 8px;
+  min-height: 28px;
+}
+
+body.narrow-layout .results-count-text {
+  font-size: 11px;
+}
+
+body.narrow-layout .collapse-all-btn {
+  padding: 3px 6px;
+  font-size: 11px;
+  gap: 3px;
+}
+
+body.narrow-layout .result-file-header {
+  padding: 4px 8px;
+  gap: 6px;
+  min-height: 32px;
+}
+
+body.narrow-layout .file-name {
+  font-size: 12px;
+}
+
+body.narrow-layout .file-path {
+  font-size: 10px;
+}
+
+body.narrow-layout .match-count {
+  padding: 1px 5px;
+  font-size: 10px;
+  min-width: 18px;
+}
+
+body.narrow-layout .result-item {
+  height: 24px;
+  padding: 2px 8px 2px 24px;
+  gap: 4px;
+}
+
+body.narrow-layout .line-number {
+  font-size: 10px;
+  min-width: 32px;
+}
+
+body.narrow-layout .line-text {
+  font-size: 11px;
+}
+
+body.narrow-layout .drag-handle {
+  height: 28px;
+}
+
+body.narrow-layout .preview-header {
+  padding: 6px 8px;
+  gap: 6px;
+}
+
+body.narrow-layout .preview-filename {
+  font-size: 12px;
+}
+
+body.narrow-layout .preview-filepath {
+  font-size: 10px;
+}
+
+body.narrow-layout .replace-field-row {
+  padding: 4px 6px;
+  gap: 4px;
+}
+
+body.narrow-layout .replace-input {
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+body.narrow-layout .replace-actions {
+  gap: 3px;
+}
+
+body.narrow-layout .replace-actions button {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+/* Normal layout (350px - 600px) - default styles apply */
+
+/* Wide layout (> 600px) - slight spacing increases */
+body.wide-layout .search-section {
+  padding: 12px 16px;
+}
+
+body.wide-layout .result-file-header {
+  padding: 8px 12px;
+}
+
+body.wide-layout .result-item {
+  padding: 4px 12px 4px 32px;
+}
+
+/* ===== FINAL PREVIEW MATCH OVERRIDE (must be last in file) ===== */
+.preview-content .pvMatch,
+.preview-content .match {
+  display: inline !important;
+  background: var(--rifler-match-bg) !important;
+  color: var(--rifler-highlight-text) !important;
+  border-radius: 4px !important;
+  padding: 0 3px !important;
+  font-weight: 700 !important;
+  border: none !important;
+  outline: none !important;
+  text-decoration: none !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.20) !important;
+}
+
+.preview-content .pvMatch *,
+.preview-content .match * {
+  color: inherit !important;
+  background: transparent !important;
+  font-weight: inherit !important;
+}
+
+.preview-content .pvMatch::before,
+.preview-content .pvMatch::after,
+.preview-content .match::before,
+.preview-content .match::after {
+  content: none !important;
+}
+
+/* Active line must not alter match pills */
+.preview-content .pvLine.isActive .pvMatch,
+.preview-content .pvLine.isActive .match {
+  background: var(--rifler-match-bg) !important;
+  color: var(--rifler-highlight-text) !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.20) !important;
 }

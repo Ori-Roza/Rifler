@@ -249,18 +249,39 @@ export async function activate(context: vscode.ExtensionContext) {
   viewManager.setPanelManager(panelManager);
 
   // Register sidebar provider
-  const sidebarProvider = new RiflerSidebarProvider(context);
+  const sidebarProvider = new RiflerSidebarProvider(context, {
+    viewType: RiflerSidebarProvider.sidebarViewType,
+    logLabel: 'SidebarProvider'
+  });
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
-      RiflerSidebarProvider.viewType,
+      RiflerSidebarProvider.sidebarViewType,
       sidebarProvider
     )
   );
   viewManager.registerSidebarProvider(sidebarProvider);
 
+  // Register bottom panel provider
+  const bottomProvider = new RiflerSidebarProvider(context, {
+    viewType: RiflerSidebarProvider.bottomViewType,
+    logLabel: 'BottomProvider'
+  });
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      RiflerSidebarProvider.bottomViewType,
+      bottomProvider
+    )
+  );
+  viewManager.registerBottomProvider(bottomProvider);
+
   // Set up sidebar visibility tracking
   sidebarProvider.setVisibilityCallback((visible: boolean) => {
     stateStore.setSidebarVisible(visible);
+  });
+
+  // Set up bottom visibility tracking
+  bottomProvider.setVisibilityCallback((visible: boolean) => {
+    stateStore.setBottomVisible(visible);
   });
 
   // Configure shared/common message handlers for the panel
@@ -315,6 +336,10 @@ export async function activate(context: vscode.ExtensionContext) {
     getSidebarVisible: () => stateStore.getSidebarVisible(),
     onSidebarVisibilityChange: (callback) => {
       stateStore.onSidebarVisibilityChange(callback);
+    },
+    getBottomVisible: () => stateStore.getBottomVisible(),
+    onBottomVisibilityChange: (callback) => {
+      stateStore.onBottomVisibilityChange(callback);
     }
   });
 
@@ -388,6 +413,9 @@ export async function activate(context: vscode.ExtensionContext) {
         
         // Also update sidebar if visible
         sidebarProvider.sendConfigUpdate(resultsShowCollapsed);
+
+        // Also update bottom view if visible
+        bottomProvider.sendConfigUpdate(resultsShowCollapsed);
       }
     })
   );
@@ -428,6 +456,12 @@ export async function activate(context: vscode.ExtensionContext) {
         sidebarProvider.postMessage({ type: 'focusSearch' });
         sidebarProvider.sendCurrentDirectory();
         sidebarProvider.sendModules();
+      }
+      if (bottomProvider) {
+        bottomProvider.postMessage({ type: 'clearState' });
+        bottomProvider.postMessage({ type: 'focusSearch' });
+        bottomProvider.sendCurrentDirectory();
+        bottomProvider.sendModules();
       }
       if (panelManager) {
         const panel = panelManager.panel;

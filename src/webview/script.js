@@ -128,6 +128,10 @@ console.log('[Rifler] Webview script starting...');
   const filtersContainer = document.getElementById('filters-container');
   const filterBtn = document.getElementById('filter-btn');
   const replaceToggleBtn = document.getElementById('replace-toggle-btn');
+  const moreActionsBtn = document.getElementById('more-actions-btn');
+  const moreActionsMenu = document.getElementById('more-actions-menu');
+  const searchOverflow = document.getElementById('search-overflow');
+  const searchControls = document.querySelector('.search-controls');
   const dragHandle = document.getElementById('drag-handle');
   const previewPanelContainer = document.getElementById('preview-panel-container');
   const resultsCountText = document.getElementById('results-count-text');
@@ -189,6 +193,64 @@ console.log('[Rifler] Webview script starting...');
     dragHandle: !!dragHandle,
     filtersContainer: !!filtersContainer
   });
+
+  // ===== Width Detection for Responsive Layouts (Issue #98) =====
+  function updateLayoutClass() {
+    const width = document.body.clientWidth;
+    
+    // Remove all layout classes
+    document.body.classList.remove('narrow-layout', 'normal-layout', 'wide-layout');
+    
+    // Apply appropriate class based on width
+    if (width < 350) {
+      document.body.classList.add('narrow-layout');
+      console.log('[Rifler] Applied narrow-layout for width:', width);
+    } else if (width >= 350 && width <= 600) {
+      document.body.classList.add('normal-layout');
+      console.log('[Rifler] Applied normal-layout for width:', width);
+    } else {
+      document.body.classList.add('wide-layout');
+      console.log('[Rifler] Applied wide-layout for width:', width);
+    }
+
+    // In narrow layout, place the overflow (arrow-down) button next to the regex toggle
+    // so it stays inside the main search textbox.
+    try {
+      const isNarrow = document.body.classList.contains('narrow-layout');
+      if (searchOverflow && searchControls && moreActionsBtn && moreActionsMenu) {
+        const alreadyInOverflow = searchOverflow.contains(moreActionsBtn);
+        if (isNarrow && !alreadyInOverflow) {
+          moreActionsMenu.classList.remove('open');
+          searchOverflow.appendChild(moreActionsBtn);
+          searchOverflow.appendChild(moreActionsMenu);
+          document.body.classList.add('overflow-in-input');
+        } else if (!isNarrow && alreadyInOverflow) {
+          moreActionsMenu.classList.remove('open');
+          searchControls.appendChild(moreActionsBtn);
+          searchControls.appendChild(moreActionsMenu);
+          document.body.classList.remove('overflow-in-input');
+        } else {
+          // Keep class in sync even if the nodes are already in the right spot.
+          document.body.classList.toggle('overflow-in-input', isNarrow && alreadyInOverflow);
+        }
+      }
+    } catch {
+      // Ignore layout relocation failures; UI remains functional with default placement.
+    }
+  }
+
+  // Initial layout detection
+  updateLayoutClass();
+
+  // Set up ResizeObserver to detect width changes
+  const resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      updateLayoutClass();
+    }
+  });
+
+  // Observe body element for resize
+  resizeObserver.observe(document.body);
 
   var localMatches = [];
   var localMatchIndex = 0;
@@ -285,6 +347,36 @@ console.log('[Rifler] Webview script starting...');
     });
   }
 
+  // Overflow actions menu (for narrow layout)
+  if (moreActionsBtn && moreActionsMenu) {
+    moreActionsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moreActionsMenu.classList.toggle('open');
+    });
+
+    moreActionsMenu.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      moreActionsMenu.classList.remove('open');
+      switch (action) {
+        case 'toggle-replace':
+          if (replaceToggleBtn) replaceToggleBtn.click();
+          break;
+        case 'toggle-filters':
+          if (filterBtn) filterBtn.click();
+          break;
+        case 'clear-search':
+          if (clearSearchBtn) clearSearchBtn.click();
+          break;
+      }
+    });
+
+    document.addEventListener('click', () => {
+      moreActionsMenu.classList.remove('open');
+    });
+  }
+
   if (filterBtn && filtersContainer) {
     filterBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -315,6 +407,9 @@ console.log('[Rifler] Webview script starting...');
           const targetHeight = lastExpandedHeight || getDefaultPreviewHeight();
           applyPreviewHeight(targetHeight, { persist: true });
         }
+
+        // Preview height changes affect the results viewport; re-render virtual rows immediately.
+        scheduleVirtualRender();
         
         previewToggleBtn.innerHTML = state.previewPanelCollapsed ? 
           '<span class="material-symbols-outlined">add</span>' : 
@@ -420,12 +515,6 @@ console.log('[Rifler] Webview script starting...');
 
   if (replaceInFileBtn) {
     replaceInFileBtn.addEventListener('click', triggerReplaceInFile);
-  }
-
-  if (openInEditorBtn) {
-    openInEditorBtn.addEventListener('click', () => {
-      openActiveResult();
-    });
   }
   
   if (localReplaceClose) {
@@ -2414,8 +2503,9 @@ console.log('[Rifler] Webview script starting...');
       if (pathLabel) pathLabel.textContent = 'Project:';
       if (directoryInput) {
         directoryInput.style.display = 'block';
-        directoryInput.placeholder = state.workspaceName || 'All files';
+        directoryInput.placeholder = state.workspaceName || 'All Files';
         directoryInput.value = state.workspacePath || '';
+        directoryInput.title = state.workspacePath || '';
         directoryInput.readOnly = true;
       }
     } else if (state.currentScope === 'directory') {
@@ -2790,16 +2880,34 @@ console.log('[Rifler] Webview script starting...');
       
       item.innerHTML = 
         '<span class="material-symbols-outlined arrow-icon">' + arrowIcon + '</span>' +
-        '<div class="file-info">' +
+        '<div class="file-info" title="' + escapeAttr(displayPath) + '">' +
           '<div class="file-name-row">' +
             '<span class="seti-icon ' + getFileIconName(itemData.fileName) + '"></span>' +
-            '<span class="file-name">' + escapeHtml(itemData.fileName) + '</span>' +
+            '<span class="file-name" title="' + escapeAttr(displayPath) + '" style="cursor: pointer;">' + escapeHtml(itemData.fileName) + '</span>' +
           '</div>' +
-          '<span class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</span>' +
+          '<div class="file-path" title="' + escapeAttr(displayPath) + '">' + escapeHtml(displayPath) + '</div>' +
         '</div>' +
         '<span class="match-count">' + itemData.matchCount + '</span>';
         
-      item.addEventListener('click', () => {
+      // Click on arrow or file info area (except filename) toggles collapse
+      item.addEventListener('click', (e) => {
+        const target = e.target;
+        // If clicking on filename, open the file instead of toggling
+        if (target && target.classList.contains('file-name')) {
+          e.stopPropagation();
+          // Find the first match for this file and open it in the editor
+          const resultIndex = state.results.findIndex((r) => {
+            const path = r.relativePath || r.fileName;
+            return path === itemData.path;
+          });
+          if (resultIndex !== -1) {
+            setActiveIndex(resultIndex);
+            openResultInEditor(resultIndex);
+          }
+          return;
+        }
+        
+        // Otherwise toggle collapse/expand
         const willExpand = itemData.isCollapsed;
         if (itemData.isCollapsed) {
           // Expanding: remove from collapsedFiles and add to expandedFiles
@@ -2860,23 +2968,24 @@ console.log('[Rifler] Webview script starting...');
           '<div class="result-meta">' +
             '<span class="result-line-number">' + (match.line + 1) + '</span>' +
           '</div>' +
-          '<div class="result-preview hljs">' + previewHtml + '</div>' +
-          '<div class="result-actions">' +
-            '<button class="open-in-editor-btn" data-index="' + match.originalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
-              '<span class="material-symbols-outlined">open_in_new</span>' +
-            '</button>' +
-          '</div>';
+          '<div class="result-preview hljs">' + previewHtml + '</div>';
 
         matchEl.addEventListener('click', (e) => {
-          if (e.target && e.target.closest('.open-in-editor-btn')) return;
-          // Preserve the current scroll position of this group before re-rendering
+          // Single click selects/loads preview (no show/hide toggle)
+          if (match.originalIndex === state.activeIndex) {
+            const active = state.results?.[state.activeIndex];
+            if (active && (!state.fileContent || state.fileContent.uri !== active.uri)) {
+              loadFileContent(active);
+            }
+            return;
+          }
           if (!state.groupScrollTops) state.groupScrollTops = {};
           state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
           setActiveIndex(match.originalIndex);
         });
 
         matchEl.addEventListener('dblclick', (e) => {
-          if (e.target && e.target.closest('.open-in-editor-btn')) return;
+          // Double click opens file in editor
           openActiveResult();
         });
 
@@ -2884,15 +2993,6 @@ console.log('[Rifler] Webview script starting...');
           e.preventDefault();
           showContextMenu(e, match.originalIndex);
         });
-
-        const openBtn = matchEl.querySelector('.open-in-editor-btn');
-        if (openBtn) {
-          openBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const idx = parseInt(openBtn.dataset.index, 10);
-            openResultInEditor(idx);
-          });
-        }
 
         groupContainer.appendChild(matchEl);
       });
@@ -2948,22 +3048,22 @@ console.log('[Rifler] Webview script starting...');
       '<div class="result-meta">' +
         '<span class="result-line-number">' + (itemData.line + 1) + '</span>' +
       '</div>' +
-      '<div class="result-preview hljs">' + previewHtml + '</div>' +
-      '<div class="result-actions">' +
-        '<button class="open-in-editor-btn" data-index="' + itemData.originalIndex + '" title="Open in Editor (Ctrl+Enter)">' +
-          '<span class="material-symbols-outlined">open_in_new</span>' +
-        '</button>' +
-      '</div>';
+      '<div class="result-preview hljs">' + previewHtml + '</div>';
 
     item.addEventListener('click', (e) => {
-      const target = e.target;
-      if (target && (target.closest('.open-in-editor-btn'))) return;
+      // Single click selects/loads preview (no show/hide toggle)
+      if (itemData.originalIndex === state.activeIndex) {
+        const active = state.results?.[state.activeIndex];
+        if (active && (!state.fileContent || state.fileContent.uri !== active.uri)) {
+          loadFileContent(active);
+        }
+        return;
+      }
       setActiveIndex(itemData.originalIndex);
     });
 
     item.addEventListener('dblclick', (e) => {
-      const target = e.target;
-      if (target && (target.closest('.open-in-editor-btn'))) return;
+      // Double click opens file in editor
       openActiveResult();
     });
 
@@ -2971,15 +3071,6 @@ console.log('[Rifler] Webview script starting...');
       e.preventDefault();
       showContextMenu(e, itemData.originalIndex);
     });
-
-    const openBtn = item.querySelector('.open-in-editor-btn');
-    if (openBtn) {
-      openBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const idx = parseInt(openBtn.dataset.index, 10);
-        openResultInEditor(idx);
-      });
-    }
 
     return item;
   }
@@ -3267,7 +3358,11 @@ console.log('[Rifler] Webview script starting...');
 
   function handleCurrentDirectory(directory) {
     state.currentDirectory = directory;
-    directoryInput.value = directory;
+    // Only apply to the directory input when directory scope is active.
+    // Otherwise this overwrites the project-scope display ("All Files").
+    if (state.currentScope === 'directory' && directoryInput && !directoryInput.value) {
+      directoryInput.value = directory;
+    }
   }
 
   function handleWorkspaceInfo(name, path) {
@@ -3297,7 +3392,11 @@ console.log('[Rifler] Webview script starting...');
     }
     
     if (previewFilepath) {
-      const relPath = message.relativePath || '';
+      const resultForUri = Array.isArray(state.results)
+        ? state.results.find((r) => r && r.uri === message.uri)
+        : null;
+
+      const relPath = message.relativePath || (resultForUri && resultForUri.relativePath) || '';
       const displayPath = relPath.startsWith('/') ? relPath.substring(1) : relPath;
       previewFilepath.textContent = displayPath;
       previewFilepath.title = displayPath;
@@ -3742,6 +3841,16 @@ console.log('[Rifler] Webview script starting...');
     if (!skipLoad) {
       loadFileContent(state.results[index]);
     }
+  }
+
+  // Clicking the preview filename should open the file in the editor (Issue #96 feedback)
+  if (previewFilename) {
+    previewFilename.style.cursor = 'pointer';
+    previewFilename.addEventListener('click', () => {
+      if (state.activeIndex >= 0) {
+        openActiveResult();
+      }
+    });
   }
 
   function activateFirstMatchForPath(path) {

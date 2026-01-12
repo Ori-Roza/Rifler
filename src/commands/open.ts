@@ -4,28 +4,48 @@ import { CommandContext } from './types';
 /**
  * rifler.open - Toggle search panel based on viewMode configuration
  */
-export function openCommand(ctx: CommandContext): void {
+export async function openCommand(ctx: CommandContext): Promise<void> {
   const config = vscode.workspace.getConfiguration('rifler');
-  const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+  const panelLocation = getEffectivePanelLocation(config);
   const selectedText = getSelectedText();
 
-  if (viewMode === 'sidebar') {
+  if (panelLocation === 'sidebar') {
     if (ctx.getSidebarVisible()) {
       if (selectedText) {
         // Sidebar is visible: update search with selected text
-        ctx.viewManager.openView({
+        await ctx.viewManager.openView({
           forcedLocation: 'sidebar',
           initialQuery: selectedText,
           initialQueryFocus: false
         });
       } else {
         // No selection: toggle (close) the sidebar
-        vscode.commands.executeCommand('workbench.action.closeSidebar');
+        await vscode.commands.executeCommand('workbench.action.closeSidebar');
       }
     } else {
       // Sidebar is closed: open it
-      ctx.viewManager.openView({
+      await ctx.viewManager.openView({
         forcedLocation: 'sidebar',
+        initialQuery: selectedText,
+        initialQueryFocus: true
+      });
+    }
+  } else if (panelLocation === 'bottom') {
+    if (ctx.getBottomVisible()) {
+      if (selectedText) {
+        await ctx.viewManager.openView({
+          forcedLocation: 'bottom',
+          initialQuery: selectedText,
+          initialQueryFocus: false
+        });
+      } else {
+        // Keep behavior non-destructive: focus the panel + reveal Rifler.
+        await vscode.commands.executeCommand('workbench.action.focusPanel');
+        await vscode.commands.executeCommand('workbench.view.extension.rifler-bottom');
+      }
+    } else {
+      await ctx.viewManager.openView({
+        forcedLocation: 'bottom',
         initialQuery: selectedText,
         initialQueryFocus: true
       });
@@ -38,12 +58,35 @@ export function openCommand(ctx: CommandContext): void {
     } else {
       const selectedText = getSelectedText();
       // Use viewManager to ensure sidebar is closed for "fullscreen" feel
-      ctx.viewManager.openView({
+      await ctx.viewManager.openView({
         forcedLocation: 'window',
         initialQuery: selectedText
       });
     }
   }
+}
+
+function getEffectivePanelLocation(config: vscode.WorkspaceConfiguration): 'sidebar' | 'bottom' | 'window' {
+  const panelLocationInspection = config.inspect<'sidebar' | 'bottom' | 'window'>('panelLocation');
+  const panelLocationExplicitlyConfigured =
+    panelLocationInspection?.globalValue !== undefined ||
+    panelLocationInspection?.workspaceValue !== undefined ||
+    panelLocationInspection?.workspaceFolderValue !== undefined;
+
+  if (!panelLocationExplicitlyConfigured) {
+    const viewModeInspection = config.inspect<'sidebar' | 'tab'>('viewMode');
+    const viewModeExplicitlyConfigured =
+      viewModeInspection?.globalValue !== undefined ||
+      viewModeInspection?.workspaceValue !== undefined ||
+      viewModeInspection?.workspaceFolderValue !== undefined;
+
+    if (viewModeExplicitlyConfigured) {
+      const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+      return viewMode === 'tab' ? 'window' : 'sidebar';
+    }
+  }
+
+  return config.get<'sidebar' | 'bottom' | 'window'>('panelLocation') || 'sidebar';
 }
 
 /**

@@ -15,6 +15,58 @@ import {
 } from './utils';
 import { startRipgrepSearch } from './rgSearch';
 
+type RootSpec = { fsPath: string; type: vscode.FileType };
+
+function filterResultsToRoots(results: SearchResult[], roots: RootSpec[]): SearchResult[] {
+  if (!results.length || !roots.length) return results;
+
+  const rootSpecs = roots.map((r) => ({ root: path.resolve(r.fsPath), type: r.type }));
+
+  const isWithinDir = (filePath: string, dirPath: string): boolean => {
+    const rel = path.relative(dirPath, filePath);
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  };
+
+  const uriToFsPath = (uri: string): string => {
+    const trimmed = (uri || '').trim();
+    if (!trimmed) return '';
+
+    // Prefer a string-based conversion so this works under Jest's vscode mock
+    // (which does not implement URI parsing semantics).
+    if (trimmed.startsWith('file://')) {
+      let rest = trimmed.slice('file://'.length);
+      // Collapse leading slashes to a single slash for POSIX paths.
+      rest = rest.replace(/^\/+/, '/');
+      // Handle Windows drive letter form: /C:/...
+      if (/^\/[A-Za-z]:\//.test(rest)) {
+        rest = rest.slice(1);
+      }
+      try {
+        return decodeURIComponent(rest);
+      } catch {
+        return rest;
+      }
+    }
+
+    return trimmed;
+  };
+
+  return results.filter((r) => {
+    try {
+      const filePath = path.resolve(uriToFsPath(r.uri));
+      return rootSpecs.some(({ root, type }) => {
+        if (type === vscode.FileType.File) {
+          return filePath === root;
+        }
+        // Treat unknown roots as directories to avoid accidentally expanding scope.
+        return isWithinDir(filePath, root);
+      });
+    } catch {
+      return false;
+    }
+  });
+}
+
 export async function performSearch(
   query: string,
   scope: SearchScope,
@@ -49,10 +101,11 @@ export async function performSearch(
   }
 
   const effectiveMaxResults = Math.max(1, Math.floor(maxResults || 10000));
-  const roots = await resolveSearchRoots(scope, directoryPath, modulePath);
-  if (roots.length === 0) {
+  const rootSpecs = await resolveSearchRoots(scope, directoryPath, modulePath);
+  if (rootSpecs.length === 0) {
     return [];
   }
+  const roots = rootSpecs.map((r) => r.fsPath);
 
   cancelActiveSearch();
   const { promise, cancel } = startRipgrepSearch({
@@ -67,7 +120,8 @@ export async function performSearch(
   activeSearchCancel = cancel;
 
   try {
-    const results = await promise;
+    const rawResults = await promise;
+    const results = filterResultsToRoots(rawResults, rootSpecs);
     if (activeSearchCancel === cancel) {
       activeSearchCancel = undefined;
     }
@@ -85,28 +139,16 @@ export async function performSearch(
       const limiter = new Limiter(100);
       const perFileTimeBudgetMs = 2500;
 
-      for (const root of roots) {
-        // In legacy behavior, project scope roots were treated as directories without stat
-        const treatAsDirectory = scope === 'project';
-        let stat: vscode.FileStat | undefined;
-
-        if (!treatAsDirectory) {
-          try {
-            stat = await vscode.workspace.fs.stat(vscode.Uri.file(root));
-          } catch {
-            stat = undefined; // default to directory traversal
-          }
-        }
-
-        if (treatAsDirectory || !stat || stat.type === vscode.FileType.Directory) {
-          await fallbackSearchInDirectory(root, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
-        } else if (stat.type === vscode.FileType.File) {
-          await fallbackSearchInFile(root, regex, results, effectiveMaxResults, perFileTimeBudgetMs);
+      for (const spec of rootSpecs) {
+        if (spec.type === vscode.FileType.File) {
+          await fallbackSearchInFile(spec.fsPath, regex, results, effectiveMaxResults, perFileTimeBudgetMs);
+        } else {
+          await fallbackSearchInDirectory(spec.fsPath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
         }
 
         if (results.length >= effectiveMaxResults) break;
       }
-      return results;
+      return filterResultsToRoots(results, rootSpecs);
     } catch {
       return [];
     }
@@ -126,19 +168,15 @@ async function resolveSearchRoots(
   scope: SearchScope,
   directoryPath?: string,
   modulePath?: string
-): Promise<string[]> {
-  const roots: string[] = [];
+): Promise<RootSpec[]> {
+  const roots: RootSpec[] = [];
 
   const addIfExists = async (fsPath: string | undefined): Promise<void> => {
     if (!fsPath) return;
     try {
       const uri = vscode.Uri.file(fsPath);
       const stat = await vscode.workspace.fs.stat(uri);
-      roots.push(fsPath);
-      if (stat.type === vscode.FileType.File) {
-        // For files, ensure we only search that file path
-        return;
-      }
+      roots.push({ fsPath, type: stat.type });
     } catch {
       // Ignore missing paths
     }
@@ -152,13 +190,21 @@ async function resolveSearchRoots(
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
       for (const folder of workspaceFolders) {
-        roots.push(folder.uri.fsPath);
+        // Workspace folders are expected to be directories.
+        roots.push({ fsPath: folder.uri.fsPath, type: vscode.FileType.Directory });
       }
     }
   }
 
   // Deduplicate
-  return Array.from(new Set(roots.filter(Boolean)));
+  const seen = new Set<string>();
+  return roots
+    .filter((r) => !!r.fsPath)
+    .filter((r) => {
+      if (seen.has(r.fsPath)) return false;
+      seen.add(r.fsPath);
+      return true;
+    });
 }
 
 async function fallbackSearchInDirectory(

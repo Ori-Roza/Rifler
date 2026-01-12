@@ -4,10 +4,11 @@ import { StateStore } from '../state/StateStore';
 import { MinimizeMessage } from '../messaging/types';
 import { PanelManager } from '../services/PanelManager';
 
-export type PanelLocation = 'sidebar' | 'window';
+export type PanelLocation = 'sidebar' | 'bottom' | 'window';
 
 export class ViewManager {
   private _sidebarProvider?: RiflerSidebarProvider;
+  private _bottomProvider?: RiflerSidebarProvider;
   private _panelManager?: PanelManager;
   private _context: vscode.ExtensionContext;
   private _stateStore?: StateStore;
@@ -29,6 +30,10 @@ export class ViewManager {
     this._sidebarProvider = provider;
   }
 
+  public registerBottomProvider(provider: RiflerSidebarProvider): void {
+    this._bottomProvider = provider;
+  }
+
   public async openView(options: {
     showReplace?: boolean;
     initialQuery?: string;
@@ -43,17 +48,36 @@ export class ViewManager {
     
     let panelLocation = options.forcedLocation;
     if (!panelLocation) {
-      // Try new setting first
-      panelLocation = config.get<PanelLocation>('panelLocation');
+      const panelLocationInspection = config.inspect<PanelLocation>('panelLocation');
+      const panelLocationExplicitlyConfigured =
+        panelLocationInspection?.globalValue !== undefined ||
+        panelLocationInspection?.workspaceValue !== undefined ||
+        panelLocationInspection?.workspaceFolderValue !== undefined;
+
+      // If the new setting isn't explicitly configured, honor the deprecated setting
+      // for backwards compatibility (it may have been set by existing users/tests).
+      if (!panelLocationExplicitlyConfigured) {
+        const viewModeInspection = config.inspect<'sidebar' | 'tab'>('viewMode');
+        const viewModeExplicitlyConfigured =
+          viewModeInspection?.globalValue !== undefined ||
+          viewModeInspection?.workspaceValue !== undefined ||
+          viewModeInspection?.workspaceFolderValue !== undefined;
+
+        if (viewModeExplicitlyConfigured) {
+          const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
+          panelLocation = viewMode === 'tab' ? 'window' : 'sidebar';
+        }
+      }
+
       if (!panelLocation) {
-        // Fall back to deprecated viewMode setting
-        const viewMode = config.get<'sidebar' | 'tab'>('viewMode', 'sidebar');
-        panelLocation = viewMode === 'tab' ? 'window' : 'sidebar';
+        panelLocation = config.get<PanelLocation>('panelLocation') || 'sidebar';
       }
     }
 
     if (panelLocation === 'sidebar') {
       await this._openSidebar(options);
+    } else if (panelLocation === 'bottom') {
+      await this._openBottom(options);
     } else {
       await this._openWindow(options);
     }
@@ -94,6 +118,31 @@ export class ViewManager {
     });
   }
 
+  private async _openBottom(options: { showReplace?: boolean; initialQuery?: string; initialQueryFocus?: boolean }): Promise<void> {
+    if (this._bottomProvider) {
+      // Wait for any lingering tab to close before focusing the panel
+      await this._waitForPanelClosure();
+      await vscode.commands.executeCommand('workbench.action.focusPanel');
+      await vscode.commands.executeCommand('workbench.view.extension.rifler-bottom');
+
+      this._bottomProvider.show();
+
+      if (typeof options.initialQuery === 'string') {
+        this._bottomProvider.postMessage({
+          type: 'setSearchQuery',
+          query: options.initialQuery,
+          focus: options.initialQueryFocus !== false
+        });
+      } else {
+        this._bottomProvider.postMessage({ type: 'focusSearch' });
+      }
+
+      if (options.showReplace) {
+        this._bottomProvider.postMessage({ type: 'showReplace' });
+      }
+    }
+  }
+
   private async _waitForPanelClosure(): Promise<void> {
     const deadline = Date.now() + 500;
     while (this._panelManager?.panel && Date.now() < deadline) {
@@ -124,6 +173,10 @@ export class ViewManager {
     await this.openView({ forcedLocation: 'sidebar' });
   }
 
+  public async openInBottom(): Promise<void> {
+    await this.openView({ forcedLocation: 'bottom' });
+  }
+
   private async _performSwitchView(): Promise<void> {
     const config = vscode.workspace.getConfiguration('rifler');
     
@@ -133,11 +186,13 @@ export class ViewManager {
     if (this._panelManager?.panel) {
       currentLocation = 'window';
     } else {
-      // No panel means we're in sidebar mode (even if sidebar isn't currently visible)
-      currentLocation = 'sidebar';
+      const configured = config.get<PanelLocation>('panelLocation') || 'sidebar';
+      currentLocation = configured === 'bottom' ? 'bottom' : 'sidebar';
     }
     
-    const newLocation: PanelLocation = currentLocation === 'sidebar' ? 'window' : 'sidebar';
+    // Keep switch behavior as a simple toggle between Sidebar and Window.
+    // If currently in Bottom, switch goes to Window.
+    const newLocation: PanelLocation = currentLocation === 'window' ? 'sidebar' : 'window';
     
     console.log('[Rifler] Switching view: current =', currentLocation, 'new =', newLocation);
     
@@ -149,6 +204,10 @@ export class ViewManager {
       this._sidebarProvider.markShouldSaveOnNextHide();
       this._sidebarProvider.suppressVisibilitySideEffects(1000);
       await this._sidebarProvider.requestSaveState();
+    } else if (currentLocation === 'bottom' && this._bottomProvider) {
+      this._bottomProvider.markShouldSaveOnNextHide();
+      this._bottomProvider.suppressVisibilitySideEffects(1000);
+      await this._bottomProvider.requestSaveState();
     } else {
       // Request window panel to save its state
       await vscode.commands.executeCommand('rifler.minimize');
@@ -158,7 +217,7 @@ export class ViewManager {
     // Get the saved state from the current view
     // Sidebar uses 'rifler.sidebarState', window uses StateStore ('rifler.persistedSearchState')
     let savedState: MinimizeMessage['state'] | undefined;
-    if (currentLocation === 'sidebar') {
+    if (currentLocation === 'sidebar' || currentLocation === 'bottom') {
       savedState = store.get<MinimizeMessage['state']>('rifler.sidebarState');
     } else if (this._stateStore) {
       savedState = this._stateStore.getSavedState();
@@ -170,6 +229,9 @@ export class ViewManager {
       await vscode.commands.executeCommand('workbench.action.closeSidebar');
       // Small delay to ensure sidebar is closed before opening window
       await new Promise(resolve => setTimeout(resolve, 100));
+    } else if (currentLocation === 'bottom') {
+      // Avoid closing the entire VS Code panel (Terminal/Problems/etc.).
+      // Just proceed to opening the new location.
     } else {
       // When switching FROM tab to sidebar, close the tab panel
       await vscode.commands.executeCommand('rifler._closeWindowInternal');

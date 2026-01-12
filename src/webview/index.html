@@ -22,6 +22,7 @@
         <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">
           <span class="material-symbols-outlined">regular_expression</span>
         </button>
+        <div class="search-overflow" id="search-overflow"></div>
       </div>
     </div>
     <div class="search-controls">
@@ -34,6 +35,23 @@
       <button class="icon-btn" id="clear-search-btn" title="Clear Search (Ctrl+L)" aria-label="Clear Search">
         <span class="material-symbols-outlined">clear</span>
       </button>
+      <button class="icon-btn more-actions-btn" id="more-actions-btn" title="More actions" aria-label="More actions">
+        <span class="material-symbols-outlined">arrow_drop_down</span>
+      </button>
+      <div class="more-actions-menu" id="more-actions-menu">
+        <button data-action="toggle-replace">
+          <span class="material-symbols-outlined">swap_horiz</span>
+          <span>Toggle Replace</span>
+        </button>
+        <button data-action="toggle-filters">
+          <span class="material-symbols-outlined filled">tune</span>
+          <span>Toggle Filters</span>
+        </button>
+        <button data-action="clear-search">
+          <span class="material-symbols-outlined">clear</span>
+          <span>Clear Search</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -104,7 +122,7 @@
     <!-- Drag Handle -->
     <div class="drag-handle" id="drag-handle">
       <button class="preview-toggle-btn" id="preview-toggle-btn" title="Toggle Preview Panel (Ctrl+Shift+P)">
-        <span class="material-symbols-outlined">remove</span>
+        <span class="material-symbols-outlined">close_fullscreen</span>
       </button>
       <div class="drag-handle-bar"></div>
     </div>
@@ -121,9 +139,6 @@
         </div>
         <div class="preview-actions" id="preview-actions" style="display: none;">
           <button id="replace-in-file-btn" class="secondary" title="Replace in this file (Cmd+Shift+R)">Replace</button>
-          <button id="open-in-editor-btn" class="ghost" title="Open file in editor (Ctrl+Enter)">
-            <span class="material-symbols-outlined">open_in_full</span>
-          </button>
         </div>
       </div>
       

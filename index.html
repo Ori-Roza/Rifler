@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rifler - Fast File Search for VS Code</title>
-  <meta name="description" content="Lightning-fast file search extension for VS Code with dynamic results, regex support, and full file preview.">
+  <meta name="description" content="Lightning-fast file search extension for VS Code with dynamic results, scopes, replace, regex support, and full file preview.">
   <meta name="keywords" content="vscode, extension, search, file-search, regex, developer-tools">
   <meta property="og:title" content="Rifler - Fast File Search for VS Code">
   <meta property="og:description" content="Search your codebase 10x faster with Rifler">
@@ -520,7 +520,7 @@
     <div class="hero-content">
       <img src="https://raw.githubusercontent.com/ori-roza/rifler/master/assets/logo.jpeg" alt="Rifler" class="hero-logo">
       <h1>Search Your Code Instantly</h1>
-      <p>Rifler is a lightning-fast file search extension for VS Code. Find what you need with dynamic results, regex support, and instant file preview.</p>
+      <p>Rifler is a lightning-fast file search extension for VS Code. Search by project/module/directory/file, use regex and file masks, and jump into full-file preview and replace.</p>
       <div class="hero-buttons">
         <a href="https://marketplace.visualstudio.com/items?itemName=Ori-Roza.rifler" class="btn btn-primary">Install from Marketplace</a>
         <a href="https://github.com/ori-roza/rifler" class="btn btn-secondary">View on GitHub</a>
@@ -545,8 +545,8 @@
 
       <div class="feature-card">
         <div class="feature-icon">📋</div>
-        <h3>Sidebar View</h3>
-        <p>Open Rifler in the Activity Bar sidebar for a persistent search panel. Your search, results, and preview persist when you reopen.</p>
+        <h3>Flexible Panel Location</h3>
+        <p>Open Rifler in the sidebar, bottom panel, or a separate editor tab. Your search, results, and preview persist when you reopen.</p>
       </div>
 
       <div class="feature-card">
@@ -558,13 +558,13 @@
       <div class="feature-card">
         <div class="feature-icon">🎯</div>
         <h3>Smart Filtering</h3>
-        <p>Search entire projects, specific modules, or directories. Automatically excludes node_modules and binary files.</p>
+        <p>Search entire projects, specific modules, directories, or single files. Directory/file scope is constrained to the path you select.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">🔄</div>
         <h3>Search & Replace</h3>
-        <p>Find and replace text across multiple files instantly. Preview changes before applying them with a single click.</p>
+        <p>Replace the current match or replace all matches across results. Works with undo and integrates with the file preview editor.</p>
       </div>
 
       <div class="feature-card">
@@ -582,7 +582,7 @@
       <div class="feature-card">
         <div class="feature-icon">⌨️</div>
         <h3>Keyboard Optimized</h3>
-        <p>Navigate results and open files without touching the mouse. Use <strong>Cmd+Shift+F</strong> to search and <strong>Option+Shift+F</strong> to replace.</p>
+        <p>Navigate results and open files without touching the mouse. Select text in the editor and press <strong>Cmd+Alt+F</strong> (Mac) / <strong>Ctrl+Alt+F</strong> (Windows/Linux) to search it instantly, and use <strong>Cmd+Alt+R</strong> / <strong>Ctrl+Alt+R</strong> for replace mode.</p>
       </div>
 
       <div class="feature-card">
@@ -671,7 +671,7 @@
       <div class="step">
         <div class="step-number">2</div>
         <h3>Choose Your View</h3>
-        <p><strong>Cmd+Shift+F</strong> for main panel, <strong>Cmd+Alt+F</strong> for sidebar (Mac). Use <strong>Ctrl</strong> and <strong>Alt</strong> on Windows/Linux.</p>
+        <p>Rifler toggles with <strong>Cmd+Alt+F</strong> (Mac) / <strong>Ctrl+Alt+F</strong> (Windows/Linux). Choose sidebar/bottom/window via the <strong>rifler.panelLocation</strong> setting.</p>
       </div>
 
       <div class="step">
@@ -692,7 +692,7 @@
         <a href="mailto:ori75660@gmail.com">Contact</a>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2025 Rifler. MIT License. Made with ❤️ by <a href="https://github.com/ori-roza" target="_blank" style="color: #bbb; text-decoration: none;">Ori Roza</a></p>
+        <p>&copy; 2026 Rifler. MIT License. Made with ❤️ by <a href="https://github.com/ori-roza" target="_blank" style="color: #bbb; text-decoration: none;">Ori Roza</a></p>
       </div>
     </div>
   </footer>

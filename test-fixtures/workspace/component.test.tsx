@@ -1,1 +1,1 @@
-export const Componentupdated = () => 'mask_target_tsx';
+export const ComponentTest = () => 'mask_target_tsx';

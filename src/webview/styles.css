@@ -35,6 +35,14 @@
   padding: 0;
 }
 
+/* Ensure the HTML `hidden` attribute always hides elements.
+   Some component styles set `display: flex`, which would otherwise override
+   the browser default `[hidden] { display: none; }`.
+*/
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: var(--rifler-font-family);
   font-size: var(--rifler-font-size);
@@ -1658,6 +1666,13 @@ body.loaded {
   margin-bottom: 6px;
 }
 
+.replace-widget-row .local-widget-icon {
+  color: var(--rifler-input-placeholder);
+  font-size: 16px;
+  opacity: 0.8;
+  flex: 0 0 auto;
+}
+
 .replace-widget-row:last-child {
   margin-bottom: 0;
 }
@@ -1688,16 +1703,54 @@ body.loaded {
 .replace-widget-actions {
   display: flex;
   gap: 4px;
-  justify-content: flex-end;
+  justify-content: center;
   margin-top: 4px;
   flex-wrap: wrap;
 }
 
-.replace-widget .nav-btn {
-  padding: 2px 6px;
-  font-size: 10px;
-  min-width: 20px;
-  flex: 0 0 auto;
+#local-replace-actions {
+  margin-top: 0;
+  justify-content: center;
+  align-items: center;
+}
+
+.local-replace-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.local-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.replace-widget button.ghost {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-color: var(--rifler-border);
+  color: var(--rifler-fg-muted);
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.replace-widget button.ghost:hover {
+  background: var(--rifler-list-hover);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-focus-border);
+}
+
+.replace-widget button.ghost:active {
+  background: var(--rifler-list-hover);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-focus-border);
+  transform: none;
+  box-shadow: none;
 }
 
 .replace-match-count {
@@ -1712,9 +1765,10 @@ body.loaded {
   color: var(--rifler-button-secondary-fg);
   border: 1px solid var(--rifler-border);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 6px 12px;
   border-radius: 6px;
   font-size: 11px;
+  font-weight: 500;
   transition: all 0.12s;
   white-space: nowrap;
 }

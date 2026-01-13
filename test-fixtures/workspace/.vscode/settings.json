@@ -1,6 +1,7 @@
 {
   "editor.wordWrap": "off",
   "editor.minimap.enabled": false,
-  "rifler.viewMode": "tab",
-  "rifler.results.showCollapsed": true
+  "rifler.viewMode": "sidebar",
+  "rifler.results.showCollapsed": true,
+  "rifler.panelLocation": "sidebar"
 }

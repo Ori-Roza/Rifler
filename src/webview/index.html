@@ -138,7 +138,6 @@
           </div>
         </div>
         <div class="preview-actions" id="preview-actions" style="display: none;">
-          <button id="replace-in-file-btn" class="secondary" title="Replace in this file (Cmd+Shift+R)">Replace</button>
         </div>
       </div>
       
@@ -160,26 +159,33 @@
           </div>
           <div id="replace-widget" class="replace-widget">
             <div class="replace-widget-row">
-              <span class="replace-widget-label">Find:</span>
-              <input type="text" id="local-search-input" placeholder="Search term...">
-              <button id="local-prev-btn" class="nav-btn" title="Previous match (Shift+Enter)">
-                <span class="material-symbols-outlined">arrow_upward</span>
-              </button>
-              <button id="local-next-btn" class="nav-btn" title="Next match (Enter)">
-                <span class="material-symbols-outlined">arrow_downward</span>
-              </button>
+              <span class="material-symbols-outlined local-widget-icon">search</span>
+              <input type="text" id="local-search-input" placeholder="Search">
               <span class="replace-match-count" id="local-match-count"></span>
             </div>
-            <div class="replace-widget-row">
-              <span class="replace-widget-label">Replace:</span>
-              <input type="text" id="local-replace-input" placeholder="Replace with...">
+
+            <div class="replace-widget-row" id="local-replace-row" hidden>
+              <span class="material-symbols-outlined local-widget-icon">swap_horiz</span>
+              <input type="text" id="local-replace-input" placeholder="Replace">
             </div>
-            <div class="replace-widget-actions">
-              <button id="local-replace-btn" class="secondary" title="Replace next (Enter)">Replace</button>
-              <button id="local-replace-all-btn" class="secondary" title="Replace All (Cmd+Enter)">Replace All</button>
-              <button id="local-replace-close" title="Close (Esc)">
-                <span class="material-symbols-outlined">close</span>
-              </button>
+
+            <!-- Shared actions row: 2nd row in Find view, 3rd row in Replace view -->
+            <div class="replace-widget-actions" id="local-replace-actions">
+              <div class="local-replace-buttons" id="local-replace-buttons" hidden>
+                <button id="local-replace-btn" class="secondary" title="Replace (Enter)">Replace</button>
+                <button id="local-replace-all-btn" class="secondary" title="Replace All (Cmd+Enter)">Replace All</button>
+              </div>
+              <div class="local-controls">
+                <button id="local-prev-btn" class="ghost" title="Previous match (Shift+Enter)">
+                  <span class="material-symbols-outlined">arrow_upward</span>
+                </button>
+                <button id="local-next-btn" class="ghost" title="Next match (Enter)">
+                  <span class="material-symbols-outlined">arrow_downward</span>
+                </button>
+                <button id="local-replace-close" class="ghost" title="Close (Esc)">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

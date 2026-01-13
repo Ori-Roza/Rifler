@@ -1640,6 +1640,12 @@ body.loaded {
   color: var(--rifler-fg);
 }
 
+/* When the local find/replace widget is visible, push the editor content down
+   so the first lines are not hidden under the floating widget. */
+#editor-container.local-widget-open .editor-wrapper {
+  margin-top: var(--local-widget-offset, 44px);
+}
+
 /* Replace Widget */
 .replace-widget {
   position: absolute;
@@ -1651,7 +1657,8 @@ body.loaded {
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   padding: 8px;
   border-radius: 4px;
-  width: 320px;
+  width: var(--local-widget-width, 320px);
+  max-width: calc(100% - 16px);
   display: none;
 }
 
@@ -1664,6 +1671,29 @@ body.loaded {
   gap: 6px;
   align-items: center;
   margin-bottom: 6px;
+}
+
+.replace-widget-main-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.local-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--rifler-border);
+  opacity: 0.8;
+  flex: 0 0 auto;
+}
+
+.local-replace-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .replace-widget-row .local-widget-icon {
@@ -1685,7 +1715,8 @@ body.loaded {
 }
 
 .replace-widget input {
-  flex: 1;
+  flex: 1 1 140px;
+  min-width: 0;
   padding: 4px 8px;
   font-size: 12px;
   background-color: var(--rifler-input-bg);
@@ -1695,35 +1726,33 @@ body.loaded {
   font-family: var(--rifler-font-mono);
 }
 
+/* Find textbox shouldn't stretch too wide */
+#local-search-input {
+  flex: 0 1 170px;
+  max-width: 220px;
+}
+
+#local-replace-input {
+  flex: 1 1 180px;
+}
+
 .replace-widget input:focus {
   border-color: var(--rifler-focus-border);
   outline: none;
-}
-
-.replace-widget-actions {
-  display: flex;
-  gap: 4px;
-  justify-content: center;
-  margin-top: 4px;
-  flex-wrap: wrap;
-}
-
-#local-replace-actions {
-  margin-top: 0;
-  justify-content: center;
-  align-items: center;
 }
 
 .local-replace-buttons {
   display: flex;
   gap: 6px;
   align-items: center;
+  flex: 0 0 auto;
 }
 
 .local-controls {
   display: flex;
   gap: 4px;
   align-items: center;
+  flex: 0 0 auto;
 }
 
 .replace-widget button.ghost {
@@ -1756,8 +1785,8 @@ body.loaded {
 .replace-match-count {
   font-size: 11px;
   color: var(--rifler-fg-muted);
-  margin-left: auto;
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .replace-widget button {

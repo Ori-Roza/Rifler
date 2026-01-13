@@ -179,14 +179,52 @@ console.log('[Rifler] Webview script starting...');
   const localSearchInput = document.getElementById('local-search-input');
   const localReplaceInput = document.getElementById('local-replace-input');
   const localReplaceRow = document.getElementById('local-replace-row');
-  const localReplaceActions = document.getElementById('local-replace-actions');
   const localReplaceButtons = document.getElementById('local-replace-buttons');
   const localMatchCount = document.getElementById('local-match-count');
+  const localSepAfterSearch = document.getElementById('local-sep-after-search');
   const localReplaceBtn = document.getElementById('local-replace-btn');
   const localReplaceAllBtn = document.getElementById('local-replace-all-btn');
   const localReplaceClose = document.getElementById('local-replace-close');
   const localPrevBtn = document.getElementById('local-prev-btn');
   const localNextBtn = document.getElementById('local-next-btn');
+
+  function syncLocalWidgetWidth() {
+    if (!replaceWidget || !editorContainer) return;
+    const editorWidth = editorContainer.getBoundingClientRect().width;
+    const sidebarWidth = resultsPanel ? resultsPanel.getBoundingClientRect().width : 0;
+    const currentMode = (replaceWidget.dataset && replaceWidget.dataset.mode)
+      ? replaceWidget.dataset.mode
+      : ((localReplaceRow && localReplaceRow.hidden) ? 'find' : 'replace');
+
+    let rawTarget = sidebarWidth > 0 ? sidebarWidth : 320;
+    // Find-only view can be narrower for a cleaner look.
+    if (currentMode === 'find') {
+      rawTarget = Math.min(rawTarget, 420);
+    }
+    const clamped = Math.min(rawTarget, Math.max(240, editorWidth - 16));
+    const px = Math.max(240, Math.floor(clamped));
+    replaceWidget.style.setProperty('--local-widget-width', `${px}px`);
+
+    // If the widget is visible, reserve vertical space so it doesn't cover the first editor rows.
+    const isVisible = replaceWidget.classList.contains('visible');
+    if (isVisible) {
+      editorContainer.classList.add('local-widget-open');
+      // Use the rendered widget height (plus a small gap).
+      const height = Math.ceil(replaceWidget.getBoundingClientRect().height);
+      const offset = Math.max(36, height + 8);
+      editorContainer.style.setProperty('--local-widget-offset', `${offset}px`);
+    }
+  }
+
+  // Keep local widget width aligned with the sidebar width.
+  syncLocalWidgetWidth();
+  window.addEventListener('resize', syncLocalWidgetWidth);
+  try {
+    if (resultsPanel) new ResizeObserver(syncLocalWidgetWidth).observe(resultsPanel);
+    if (editorContainer) new ResizeObserver(syncLocalWidgetWidth).observe(editorContainer);
+  } catch {
+    // ResizeObserver may be unavailable in some environments; window resize still covers most cases.
+  }
 
   console.log('[Rifler] DOM Elements loaded:', {
     queryInput: !!queryInput,
@@ -531,6 +569,11 @@ console.log('[Rifler] Webview script starting...');
       replaceWidget.dataset.mode = '';
     }
 
+    if (editorContainer) {
+      editorContainer.classList.remove('local-widget-open');
+      editorContainer.style.removeProperty('--local-widget-offset');
+    }
+
     localMatches = [];
     localMatchIndex = 0;
     updateHighlights();
@@ -571,6 +614,9 @@ console.log('[Rifler] Webview script starting...');
     // Toggle widget "view": Find-only vs Replace
     if (localReplaceRow) localReplaceRow.hidden = mode === 'find';
     if (localReplaceButtons) localReplaceButtons.hidden = mode === 'find';
+    // In Replace view, the match count should appear after the second textbox,
+    // so hide the separator that would otherwise place it after the first.
+    if (localSepAfterSearch) localSepAfterSearch.hidden = mode === 'replace';
 
     if (!isEditMode) {
       enterEditMode();
@@ -578,23 +624,20 @@ console.log('[Rifler] Webview script starting...');
 
     // Ensure widget is visible
     if (!isVisible) {
-      if (localSearchInput) localSearchInput.value = state.currentQuery || '';
+      // Local find/replace should start blank (do not mirror the main search query).
+      if (localSearchInput) localSearchInput.value = '';
       if (localReplaceInput) localReplaceInput.value = '';
       replaceWidget.classList.add('visible');
       updateLocalMatches();
     }
 
-    // Focus the appropriate field
-    if (focusTarget === 'replace') {
-      if (localReplaceInput) {
-        localReplaceInput.focus();
-        localReplaceInput.select();
-      }
-    } else {
-      if (localSearchInput) {
-        localSearchInput.focus();
-        localSearchInput.select();
-      }
+    // Ensure the widget doesn't cover the first editor lines.
+    syncLocalWidgetWidth();
+
+    // Always focus the first textbox (Search) when opening.
+    if (localSearchInput) {
+      localSearchInput.focus();
+      localSearchInput.select();
     }
   }
 

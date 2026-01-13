@@ -158,23 +158,24 @@
             </div>
           </div>
           <div id="replace-widget" class="replace-widget">
-            <div class="replace-widget-row">
-              <span class="material-symbols-outlined local-widget-icon">search</span>
+            <div class="replace-widget-main-row">
               <input type="text" id="local-search-input" placeholder="Search">
+              <span id="local-sep-after-search" class="local-divider" aria-hidden="true"></span>
+
+              <div id="local-replace-row" class="local-replace-inline" hidden>
+                <input type="text" id="local-replace-input" placeholder="Replace">
+                <span class="local-divider" aria-hidden="true"></span>
+              </div>
+
               <span class="replace-match-count" id="local-match-count"></span>
-            </div>
 
-            <div class="replace-widget-row" id="local-replace-row" hidden>
-              <span class="material-symbols-outlined local-widget-icon">swap_horiz</span>
-              <input type="text" id="local-replace-input" placeholder="Replace">
-            </div>
+              <span class="local-divider" aria-hidden="true"></span>
 
-            <!-- Shared actions row: 2nd row in Find view, 3rd row in Replace view -->
-            <div class="replace-widget-actions" id="local-replace-actions">
               <div class="local-replace-buttons" id="local-replace-buttons" hidden>
                 <button id="local-replace-btn" class="secondary" title="Replace (Enter)">Replace</button>
                 <button id="local-replace-all-btn" class="secondary" title="Replace All (Cmd+Enter)">Replace All</button>
               </div>
+
               <div class="local-controls">
                 <button id="local-prev-btn" class="ghost" title="Previous match (Shift+Enter)">
                   <span class="material-symbols-outlined">arrow_upward</span>

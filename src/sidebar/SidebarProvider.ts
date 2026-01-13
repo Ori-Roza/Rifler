@@ -6,6 +6,7 @@ import { replaceAll } from '../replacer';
 import { getWebviewHtml } from '../webview/webviewUtils';
 import { MessageHandler } from '../messaging/handler';
 import { registerCommonHandlers } from '../messaging/registerCommonHandlers';
+import { StateStore } from '../state/StateStore';
 
 interface SidebarState {
   query?: string;
@@ -57,6 +58,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
+    private readonly stateStore?: StateStore,
     options: { viewType?: string; stateKey?: string; logLabel?: string } = {}
   ) {
     this._context = context;
@@ -112,7 +114,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       sendCurrentDirectory: () => this._sendCurrentDirectory(),
       sendWorkspaceInfo: () => this._sendWorkspaceInfo(),
       sendFileContent: (uri, query, options, activeIndex) => this._sendFileContent(uri, query, options, activeIndex),
-      applyEdits: (uri, content) => this._applyEdits(uri, content)
+      applyEdits: (uri, content) => this._applyEdits(uri, content),
+      stateStore: this.stateStore
     });
 
     // Handle messages from the webview
@@ -199,6 +202,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       '__diag_ping',
       '__test_searchCompleted',
       '__test_searchResultsReceived',
+      '__test_clearSearchHistory',
       'error'
     ]);
     if (commonTypes.has(message.type)) {
@@ -230,6 +234,14 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
             });
           }
           this._pendingInitOptions = undefined;
+        }
+
+        // Send search history after restore/pending init so UI can show recent entries
+        if (this.stateStore) {
+          this._view?.webview.postMessage({
+            type: 'searchHistory',
+            entries: this.stateStore.getSearchHistory()
+          });
         }
         break;
       }
@@ -293,6 +305,25 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       results,
       activeIndex
     });
+
+    if (this.stateStore) {
+      this.stateStore.recordSearch({
+        query: message.query,
+        scope: message.scope,
+        directoryPath: message.directoryPath,
+        modulePath: message.modulePath,
+        options: {
+          matchCase: !!message.options.matchCase,
+          wholeWord: !!message.options.wholeWord,
+          useRegex: !!message.options.useRegex,
+          fileMask: message.options.fileMask || ''
+        }
+      });
+      this._view?.webview.postMessage({
+        type: 'searchHistory',
+        entries: this.stateStore.getSearchHistory()
+      });
+    }
 
     // Save search state for persistence
     const cfg = vscode.workspace.getConfiguration('rifler');

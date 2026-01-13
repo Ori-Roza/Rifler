@@ -4,12 +4,38 @@ import { StateStore } from '../state/StateStore';
 
 describe('StateStore Tests', () => {
   let mockContext: vscode.ExtensionContext;
+  let workspaceStateUpdate: jest.Mock;
+  let workspaceStateGet: jest.Mock;
+  let configGet: jest.Mock;
 
   beforeEach(() => {
+    configGet = jest.fn((key: string, defaultValue?: any) => {
+      switch (key) {
+        case 'persistenceScope':
+          return 'workspace';
+        case 'persistSearchState':
+          return true;
+        case 'results.showCollapsed':
+          return false;
+        case 'searchHistory.maxEntries':
+          return 5;
+        default:
+          return defaultValue;
+      }
+    });
+
+    (vscode.workspace.getConfiguration as unknown as jest.Mock).mockReturnValue({
+      get: configGet,
+      update: jest.fn().mockResolvedValue(undefined)
+    });
+
     // Create a mock extension context with proper mock implementation
+    workspaceStateUpdate = jest.fn().mockResolvedValue(undefined);
+    workspaceStateGet = jest.fn((key: string, defaultValue?: any) => defaultValue);
+
     const mockWorkspaceState = {
-      get: (key: string, defaultValue?: any) => defaultValue,
-      update: async () => {},
+      get: workspaceStateGet,
+      update: workspaceStateUpdate,
       keys: () => []
     };
 
@@ -23,6 +49,61 @@ describe('StateStore Tests', () => {
       globalState: mockGlobalState,
       workspaceState: mockWorkspaceState
     } as unknown as vscode.ExtensionContext;
+  });
+
+  describe('Search History', () => {
+    test('should record searches and trim to maxEntries (default 5)', () => {
+      const store = new StateStore(mockContext);
+
+      for (let i = 0; i < 6; i++) {
+        store.recordSearch({
+          query: `q${i}`,
+          scope: 'project',
+          options: { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
+        });
+      }
+
+      const history = store.getSearchHistory();
+      assert.strictEqual(history.length, 5);
+      assert.strictEqual(history[0].query, 'q5');
+      assert.strictEqual(history[4].query, 'q1');
+      expect(workspaceStateUpdate).toHaveBeenCalled();
+    });
+
+    test('should dedupe by query (case-insensitive) and keep the newest entry', () => {
+      const store = new StateStore(mockContext);
+      store.recordSearch({
+        query: 'Same',
+        scope: 'project',
+        options: { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
+      });
+      store.recordSearch({
+        query: 'same',
+        scope: 'directory',
+        directoryPath: '/tmp',
+        options: { matchCase: true, wholeWord: true, useRegex: false, fileMask: '*.ts' }
+      });
+
+      const history = store.getSearchHistory();
+      assert.strictEqual(history.length, 1);
+      assert.strictEqual(history[0].query, 'same');
+      assert.strictEqual(history[0].scope, 'directory');
+      assert.strictEqual(history[0].directoryPath, '/tmp');
+      assert.strictEqual(history[0].options.matchCase, true);
+    });
+
+    test('should clear history and persist the cleared list', () => {
+      const store = new StateStore(mockContext);
+      store.recordSearch({
+        query: 'to-clear',
+        scope: 'project',
+        options: { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
+      });
+      store.clearSearchHistory();
+      const history = store.getSearchHistory();
+      assert.strictEqual(history.length, 0);
+      expect(workspaceStateUpdate).toHaveBeenCalledWith('rifler.searchHistory', []);
+    });
   });
 
   describe('Results Show Collapsed Setting', () => {

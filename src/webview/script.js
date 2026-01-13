@@ -296,6 +296,14 @@ console.log('[Rifler] Webview script starting...');
   var localMatches = [];
   var localMatchIndex = 0;
   var searchBoxFocusedOnStartup = false;
+  try {
+    if (queryInput) {
+      queryInput.focus();
+      searchBoxFocusedOnStartup = true;
+    }
+  } catch {
+    // Ignore focus failures; rAF focus below will retry.
+  }
 
   function syncSearchOptionToggles() {
     if (matchCaseToggle) matchCaseToggle.classList.toggle('active', state.options.matchCase);
@@ -2277,6 +2285,14 @@ console.log('[Rifler] Webview script starting...');
       case '__test_setActiveIndex':
         if (typeof message.index === 'number') {
           setActiveIndex(message.index);
+        }
+        break;
+      case '__test_clickOpenInEditor':
+        // Test-only helper: simulate clicking "Open in Editor" for a specific result.
+        // The UI element can vary across layouts, so we drive the underlying behavior.
+        if (typeof message.index === 'number') {
+          setActiveIndex(message.index);
+          openActiveResult();
         }
         break;
       case '__test_getPreviewScrollInfo':

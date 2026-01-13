@@ -830,7 +830,7 @@ class AutomationTestClass {
     });
     const uiAfterReplace = await uiAfterReplacePromise;
     assert.strictEqual(uiAfterReplace.localReplaceWidgetVisible, true, 'Local find/replace widget should stay visible after Cmd/Ctrl+R');
-    assert.strictEqual(uiAfterReplace.activeElementId, 'local-replace-input', 'Replace input should be focused after Cmd/Ctrl+R');
+    assert.strictEqual(uiAfterReplace.activeElementId, 'local-search-input', 'Search input should be focused after Cmd/Ctrl+R');
     assert.strictEqual(uiAfterReplace.localReplaceRowVisible, true, 'Replace row should be visible in Replace view');
 
     log('   ✅ Preview editor find/replace shortcuts work as expected');

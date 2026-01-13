@@ -119,6 +119,16 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     deps.postMessage({ type: 'validationResult', field: 'fileMask', isValid: result.isValid, message: result.message, fallbackToAll: result.fallbackToAll });
   });
 
+  // UI-only / client-side state messages (no backend action required).
+  // These may be emitted by the webview (especially during E2E automation).
+  handler.registerHandler('toggleReplace', async () => {
+    // no-op
+  });
+
+  handler.registerHandler('validationResult', async () => {
+    // no-op
+  });
+
   handler.registerHandler('__diag_ping', async () => {
     console.log('Received webview diag ping');
   });

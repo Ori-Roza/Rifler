@@ -178,12 +178,53 @@ console.log('[Rifler] Webview script starting...');
   const replaceWidget = document.getElementById('replace-widget');
   const localSearchInput = document.getElementById('local-search-input');
   const localReplaceInput = document.getElementById('local-replace-input');
+  const localReplaceRow = document.getElementById('local-replace-row');
+  const localReplaceButtons = document.getElementById('local-replace-buttons');
   const localMatchCount = document.getElementById('local-match-count');
+  const localSepAfterSearch = document.getElementById('local-sep-after-search');
   const localReplaceBtn = document.getElementById('local-replace-btn');
   const localReplaceAllBtn = document.getElementById('local-replace-all-btn');
   const localReplaceClose = document.getElementById('local-replace-close');
   const localPrevBtn = document.getElementById('local-prev-btn');
   const localNextBtn = document.getElementById('local-next-btn');
+
+  function syncLocalWidgetWidth() {
+    if (!replaceWidget || !editorContainer) return;
+    const editorWidth = editorContainer.getBoundingClientRect().width;
+    const sidebarWidth = resultsPanel ? resultsPanel.getBoundingClientRect().width : 0;
+    const currentMode = (replaceWidget.dataset && replaceWidget.dataset.mode)
+      ? replaceWidget.dataset.mode
+      : ((localReplaceRow && localReplaceRow.hidden) ? 'find' : 'replace');
+
+    let rawTarget = sidebarWidth > 0 ? sidebarWidth : 320;
+    // Find-only view can be narrower for a cleaner look.
+    if (currentMode === 'find') {
+      rawTarget = Math.min(rawTarget, 420);
+    }
+    const clamped = Math.min(rawTarget, Math.max(240, editorWidth - 16));
+    const px = Math.max(240, Math.floor(clamped));
+    replaceWidget.style.setProperty('--local-widget-width', `${px}px`);
+
+    // If the widget is visible, reserve vertical space so it doesn't cover the first editor rows.
+    const isVisible = replaceWidget.classList.contains('visible');
+    if (isVisible) {
+      editorContainer.classList.add('local-widget-open');
+      // Use the rendered widget height (plus a small gap).
+      const height = Math.ceil(replaceWidget.getBoundingClientRect().height);
+      const offset = Math.max(36, height + 8);
+      editorContainer.style.setProperty('--local-widget-offset', `${offset}px`);
+    }
+  }
+
+  // Keep local widget width aligned with the sidebar width.
+  syncLocalWidgetWidth();
+  window.addEventListener('resize', syncLocalWidgetWidth);
+  try {
+    if (resultsPanel) new ResizeObserver(syncLocalWidgetWidth).observe(resultsPanel);
+    if (editorContainer) new ResizeObserver(syncLocalWidgetWidth).observe(editorContainer);
+  } catch {
+    // ResizeObserver may be unavailable in some environments; window resize still covers most cases.
+  }
 
   console.log('[Rifler] DOM Elements loaded:', {
     queryInput: !!queryInput,
@@ -255,6 +296,20 @@ console.log('[Rifler] Webview script starting...');
   var localMatches = [];
   var localMatchIndex = 0;
   var searchBoxFocusedOnStartup = false;
+  try {
+    if (queryInput) {
+      queryInput.focus();
+      searchBoxFocusedOnStartup = true;
+    }
+  } catch {
+    // Ignore focus failures; rAF focus below will retry.
+  }
+
+  function syncSearchOptionToggles() {
+    if (matchCaseToggle) matchCaseToggle.classList.toggle('active', state.options.matchCase);
+    if (wholeWordToggle) wholeWordToggle.classList.toggle('active', state.options.wholeWord);
+    if (useRegexToggle) useRegexToggle.classList.toggle('active', state.options.useRegex);
+  }
 
   // Wait for DOM to be fully ready before showing content
   requestAnimationFrame(() => {
@@ -329,6 +384,31 @@ console.log('[Rifler] Webview script starting...');
       }
     }
   });
+
+  // Preview editor shortcuts should work even when focus is inside the local widget.
+  // Capture so VS Code / browser find doesn't steal Cmd/Ctrl+F.
+  document.addEventListener('keydown', (e) => {
+    const isFindShortcut = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === 'KeyF';
+    const isReplaceShortcut = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === 'KeyR';
+    if (!isFindShortcut && !isReplaceShortcut) return;
+
+    // Only when the preview editor area is active (textarea or the widget itself).
+    const active = document.activeElement;
+    const inEditorArea = !!(editorContainer && active && editorContainer.contains(active));
+    if (!inEditorArea) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof e.stopImmediatePropagation === 'function') {
+      e.stopImmediatePropagation();
+    }
+
+    if (isFindShortcut) {
+      triggerFindInFile();
+    } else {
+      triggerReplaceInFileShortcut();
+    }
+  }, true);
 
   if (clearSearchBtn) {
     clearSearchBtn.addEventListener('click', () => {
@@ -489,28 +569,92 @@ console.log('[Rifler] Webview script starting...');
     });
   }
 
+  function closeLocalFindReplaceWidget(options) {
+    if (!replaceWidget) return;
+
+    replaceWidget.classList.remove('visible');
+    if (replaceWidget.dataset) {
+      replaceWidget.dataset.mode = '';
+    }
+
+    if (editorContainer) {
+      editorContainer.classList.remove('local-widget-open');
+      editorContainer.style.removeProperty('--local-widget-offset');
+    }
+
+    localMatches = [];
+    localMatchIndex = 0;
+    updateHighlights();
+
+    const shouldRefocusEditor = !(options && options.refocusEditor === false);
+    if (shouldRefocusEditor && isEditMode && fileEditor) {
+      fileEditor.focus();
+    }
+  }
+
   function triggerReplaceInFile() {
+    openLocalFindReplaceWidget({ focusTarget: 'replace', mode: 'replace' });
+  }
+
+  function openLocalFindReplaceWidget(options) {
     if (!state.fileContent) return;
-    
+    if (!replaceWidget) return;
+
+    const focusTarget = (options && options.focusTarget) ? options.focusTarget : 'find';
+    const mode = (options && options.mode) ? options.mode : (focusTarget === 'replace' ? 'replace' : 'find');
+
+    const isVisible = replaceWidget.classList.contains('visible');
+    const currentMode = (replaceWidget.dataset && replaceWidget.dataset.mode)
+      ? replaceWidget.dataset.mode
+      : ((localReplaceRow && localReplaceRow.hidden) ? 'find' : 'replace');
+
+    // Shortcut behavior: if the widget is already open in the same mode,
+    // pressing the shortcut again should close it.
+    if (isVisible && currentMode === mode) {
+      closeLocalFindReplaceWidget();
+      return;
+    }
+
+    if (replaceWidget.dataset) {
+      replaceWidget.dataset.mode = mode;
+    }
+
+    // Toggle widget "view": Find-only vs Replace
+    if (localReplaceRow) localReplaceRow.hidden = mode === 'find';
+    if (localReplaceButtons) localReplaceButtons.hidden = mode === 'find';
+    // In Replace view, the match count should appear after the second textbox,
+    // so hide the separator that would otherwise place it after the first.
+    if (localSepAfterSearch) localSepAfterSearch.hidden = mode === 'replace';
+
     if (!isEditMode) {
       enterEditMode();
     }
-    
-    if (replaceWidget) {
-      const isVisible = replaceWidget.classList.contains('visible');
-      if (isVisible) {
-        replaceWidget.classList.remove('visible');
-      } else {
-        if (localSearchInput) localSearchInput.value = state.currentQuery || '';
-        if (localReplaceInput) localReplaceInput.value = '';
-        replaceWidget.classList.add('visible');
-        if (localSearchInput) {
-          localSearchInput.focus();
-          localSearchInput.select();
-        }
-        updateLocalMatches();
-      }
+
+    // Ensure widget is visible
+    if (!isVisible) {
+      // Local find/replace should start blank (do not mirror the main search query).
+      if (localSearchInput) localSearchInput.value = '';
+      if (localReplaceInput) localReplaceInput.value = '';
+      replaceWidget.classList.add('visible');
+      updateLocalMatches();
     }
+
+    // Ensure the widget doesn't cover the first editor lines.
+    syncLocalWidgetWidth();
+
+    // Always focus the first textbox (Search) when opening.
+    if (localSearchInput) {
+      localSearchInput.focus();
+      localSearchInput.select();
+    }
+  }
+
+  function triggerFindInFile() {
+    openLocalFindReplaceWidget({ focusTarget: 'find', mode: 'find' });
+  }
+
+  function triggerReplaceInFileShortcut() {
+    openLocalFindReplaceWidget({ focusTarget: 'replace', mode: 'replace' });
   }
 
   if (replaceInFileBtn) {
@@ -518,15 +662,7 @@ console.log('[Rifler] Webview script starting...');
   }
   
   if (localReplaceClose) {
-    localReplaceClose.addEventListener('click', () => {
-      if (replaceWidget) replaceWidget.classList.remove('visible');
-      localMatches = [];
-      localMatchIndex = 0;
-      updateHighlights();
-      if (isEditMode && fileEditor) {
-        fileEditor.focus();
-      }
-    });
+    localReplaceClose.addEventListener('click', () => closeLocalFindReplaceWidget());
   }
 
   if (localSearchInput) {
@@ -550,12 +686,7 @@ console.log('[Rifler] Webview script starting...');
         e.preventDefault();
         navigateLocalMatch(1);
       } else if (e.key === 'Escape') {
-        if (replaceWidget) replaceWidget.classList.remove('visible');
-        localMatches = [];
-        updateHighlights();
-        if (isEditMode && fileEditor) {
-          fileEditor.focus();
-        }
+        closeLocalFindReplaceWidget();
       }
     });
   }
@@ -575,22 +706,19 @@ console.log('[Rifler] Webview script starting...');
         e.preventDefault();
         navigateLocalMatch(1);
       } else if (e.key === 'Escape') {
-        if (replaceWidget) replaceWidget.classList.remove('visible');
-        localMatches = [];
-        updateHighlights();
-        if (isEditMode && fileEditor) {
-          fileEditor.focus();
-        }
+        closeLocalFindReplaceWidget();
       }
     });
+  }
+
+  if (localReplaceAllBtn) {
+    localReplaceAllBtn.addEventListener('click', triggerLocalReplaceAll);
   }
 
   if (localReplaceBtn) {
     localReplaceBtn.addEventListener('click', triggerLocalReplace);
   }
-  if (localReplaceAllBtn) {
-    localReplaceAllBtn.addEventListener('click', triggerLocalReplaceAll);
-  }
+
   if (localPrevBtn) {
     localPrevBtn.addEventListener('click', () => navigateLocalMatch(-1));
   }
@@ -641,7 +769,7 @@ console.log('[Rifler] Webview script starting...');
     if (localMatches.length > 0) {
       localMatchCount.textContent = '1 of ' + localMatches.length;
     } else {
-      localMatchCount.textContent = 'No results';
+      localMatchCount.textContent = '0 results';
     }
   }
 
@@ -1085,7 +1213,18 @@ console.log('[Rifler] Webview script starting...');
       }, 150);
     });
     fileEditor.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      // Preview editor shortcuts (only when the editor textarea is focused)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === 'KeyF') {
+        // Find in file (within the preview editor)
+        e.preventDefault();
+        e.stopPropagation();
+        triggerFindInFile();
+      } else if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === 'KeyR') {
+        // Replace in file (within the preview editor)
+        e.preventDefault();
+        e.stopPropagation();
+        triggerReplaceInFileShortcut();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         if (saveTimeout) clearTimeout(saveTimeout);
         saveFile();
@@ -1465,7 +1604,7 @@ console.log('[Rifler] Webview script starting...');
   if (matchCaseToggle) {
     matchCaseToggle.addEventListener('click', () => {
       state.options.matchCase = !state.options.matchCase;
-      matchCaseToggle.classList.toggle('active', state.options.matchCase);
+      syncSearchOptionToggles();
       runSearch();
     });
   }
@@ -1473,7 +1612,7 @@ console.log('[Rifler] Webview script starting...');
   if (wholeWordToggle) {
     wholeWordToggle.addEventListener('click', () => {
       state.options.wholeWord = !state.options.wholeWord;
-      wholeWordToggle.classList.toggle('active', state.options.wholeWord);
+      syncSearchOptionToggles();
       runSearch();
     });
   }
@@ -1481,7 +1620,7 @@ console.log('[Rifler] Webview script starting...');
   if (useRegexToggle) {
     useRegexToggle.addEventListener('click', () => {
       state.options.useRegex = !state.options.useRegex;
-      useRegexToggle.classList.toggle('active', state.options.useRegex);
+      syncSearchOptionToggles();
       
       if (state.options.useRegex) {
         validateRegexPattern();
@@ -2143,14 +2282,17 @@ console.log('[Rifler] Webview script starting...');
           isFocused: document.activeElement === queryInput || searchBoxFocusedOnStartup
         });
         break;
-      case '__test_clickOpenInEditor':
-        if (typeof message.index === 'number') {
-          openResultInEditor(message.index);
-        }
-        break;
       case '__test_setActiveIndex':
         if (typeof message.index === 'number') {
           setActiveIndex(message.index);
+        }
+        break;
+      case '__test_clickOpenInEditor':
+        // Test-only helper: simulate clicking "Open in Editor" for a specific result.
+        // The UI element can vary across layouts, so we drive the underlying behavior.
+        if (typeof message.index === 'number') {
+          setActiveIndex(message.index);
+          openActiveResult();
         }
         break;
       case '__test_getPreviewScrollInfo':
@@ -2207,6 +2349,48 @@ console.log('[Rifler] Webview script starting...');
           openActiveResult();
         }
         break;
+      case '__test_enterEditMode':
+        if (!isEditMode) {
+          enterEditMode();
+        }
+        if (fileEditor) {
+          fileEditor.focus();
+        }
+        vscode.postMessage({ type: '__test_enterEditModeDone', isEditMode: !!isEditMode });
+        break;
+      case '__test_simulatePreviewEditorKeydown': {
+        if (!fileEditor) {
+          vscode.postMessage({ type: '__test_simulatePreviewEditorKeydownDone', ok: false, reason: 'no-file-editor' });
+          break;
+        }
+
+        // Ensure editor is focused (requirement: shortcut works when preview editor is focused)
+        if (!isEditMode) {
+          enterEditMode();
+        }
+        fileEditor.focus();
+
+        const key = typeof message.key === 'string' ? message.key : '';
+        const code = typeof message.code === 'string' ? message.code : '';
+        const metaKey = !!message.metaKey;
+        const ctrlKey = !!message.ctrlKey;
+        const shiftKey = !!message.shiftKey;
+        const altKey = !!message.altKey;
+
+        const evt = new KeyboardEvent('keydown', {
+          key,
+          code,
+          metaKey,
+          ctrlKey,
+          shiftKey,
+          altKey,
+          bubbles: true,
+          cancelable: true
+        });
+        fileEditor.dispatchEvent(evt);
+        vscode.postMessage({ type: '__test_simulatePreviewEditorKeydownDone', ok: true });
+        break;
+      }
       case '__test_getContextMenuInfo':
         vscode.postMessage({
           type: '__test_contextMenuInfo',
@@ -2216,13 +2400,18 @@ console.log('[Rifler] Webview script starting...');
         });
         break;
       case '__test_getUiStatus':
+        const activeEl = document.activeElement;
         vscode.postMessage({
           type: '__test_uiStatus',
           summaryBarVisible: resultsSummaryBar ? getComputedStyle(resultsSummaryBar).display !== 'none' : false,
           filtersVisible: filtersContainer ? !filtersContainer.classList.contains('hidden') : false,
           replaceVisible: replaceRow ? replaceRow.classList.contains('visible') : false,
+          localReplaceWidgetVisible: replaceWidget ? replaceWidget.classList.contains('visible') : false,
+          localReplaceRowVisible: localReplaceRow ? !localReplaceRow.hidden : false,
           previewVisible: previewPanelContainer ? getComputedStyle(previewPanelContainer).display !== 'none' : false,
-          resultsCountText: resultsCountText ? resultsCountText.textContent : ''
+          resultsCountText: resultsCountText ? resultsCountText.textContent : '',
+          activeElementId: activeEl && activeEl instanceof HTMLElement ? activeEl.id : null,
+          activeElementTag: activeEl ? activeEl.tagName : null
         });
         break;
       case '__test_toggleFilters':

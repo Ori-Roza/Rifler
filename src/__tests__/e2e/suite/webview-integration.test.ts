@@ -734,6 +734,108 @@ class AutomationTestClass {
     log('   ✅ Find feature automation successful: textbox ID retrieved, term written, results verified');
   });
 
+  test('Preview editor: Cmd/Ctrl+F finds in file and Cmd/Ctrl+R opens replace (when preview editor focused)', async function() {
+    this.timeout(25000);
+
+    await step('Opening Rifler search panel');
+    await vscode.commands.executeCommand('__test_ensurePanelOpen');
+    await new Promise(resolve => setTimeout(resolve, 2500));
+
+    const currentPanel = testHelpers.getCurrentPanel();
+    if (!currentPanel) {
+      throw new Error('Rifler panel was not created');
+    }
+
+    await step('Triggering search to load preview');
+    const searchTerm = 'find_this_text';
+
+    const searchResultsPromise = new Promise<any[]>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timeout waiting for search results')), 12000);
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_searchCompleted') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message.results);
+        }
+      });
+    });
+
+    currentPanel.webview.postMessage({ type: '__test_setSearchInput', value: searchTerm });
+    const results = await searchResultsPromise;
+    assert.ok(results.length >= 1, 'Expected at least one result');
+
+    await step('Selecting first result to ensure preview is loaded');
+    currentPanel.webview.postMessage({ type: '__test_setActiveIndex', index: 0 });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    await step('Entering preview edit mode (focus preview editor)');
+    const enterEditModePromise = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timeout waiting for enterEditMode ack')), 5000);
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_enterEditModeDone') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve();
+        }
+      });
+    });
+    currentPanel.webview.postMessage({ type: '__test_enterEditMode' });
+    await enterEditModePromise;
+
+    await step('Simulating Cmd/Ctrl+F in preview editor');
+    currentPanel.webview.postMessage({
+      type: '__test_simulatePreviewEditorKeydown',
+      key: 'f',
+      code: 'KeyF',
+      // Run both flags true to be platform-agnostic; handler checks (metaKey || ctrlKey)
+      metaKey: true,
+      ctrlKey: true
+    });
+
+    const uiAfterFindPromise = new Promise<any>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timeout waiting for UI status after Cmd/Ctrl+F')), 5000);
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_uiStatus') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message);
+        }
+      });
+      currentPanel.webview.postMessage({ type: '__test_getUiStatus' });
+    });
+    const uiAfterFind = await uiAfterFindPromise;
+    assert.strictEqual(uiAfterFind.localReplaceWidgetVisible, true, 'Local find/replace widget should be visible after Cmd/Ctrl+F');
+    assert.strictEqual(uiAfterFind.activeElementId, 'local-search-input', 'Find input should be focused after Cmd/Ctrl+F');
+    assert.strictEqual(uiAfterFind.localReplaceRowVisible, false, 'Replace row should be hidden in Find view');
+
+    await step('Simulating Cmd/Ctrl+R in preview editor');
+    currentPanel.webview.postMessage({
+      type: '__test_simulatePreviewEditorKeydown',
+      key: 'r',
+      code: 'KeyR',
+      metaKey: true,
+      ctrlKey: true
+    });
+
+    const uiAfterReplacePromise = new Promise<any>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timeout waiting for UI status after Cmd/Ctrl+R')), 5000);
+      const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {
+        if (message.type === '__test_uiStatus') {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(message);
+        }
+      });
+      currentPanel.webview.postMessage({ type: '__test_getUiStatus' });
+    });
+    const uiAfterReplace = await uiAfterReplacePromise;
+    assert.strictEqual(uiAfterReplace.localReplaceWidgetVisible, true, 'Local find/replace widget should stay visible after Cmd/Ctrl+R');
+    assert.strictEqual(uiAfterReplace.activeElementId, 'local-search-input', 'Search input should be focused after Cmd/Ctrl+R');
+    assert.strictEqual(uiAfterReplace.localReplaceRowVisible, true, 'Replace row should be visible in Replace view');
+
+    log('   ✅ Preview editor find/replace shortcuts work as expected');
+  });
+
   test('Find feature automation: apply file mask and get results', async function() {
     this.timeout(15000);
 

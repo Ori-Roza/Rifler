@@ -35,6 +35,14 @@
   padding: 0;
 }
 
+/* Ensure the HTML `hidden` attribute always hides elements.
+   Some component styles set `display: flex`, which would otherwise override
+   the browser default `[hidden] { display: none; }`.
+*/
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: var(--rifler-font-family);
   font-size: var(--rifler-font-size);
@@ -1632,6 +1640,12 @@ body.loaded {
   color: var(--rifler-fg);
 }
 
+/* When the local find/replace widget is visible, push the editor content down
+   so the first lines are not hidden under the floating widget. */
+#editor-container.local-widget-open .editor-wrapper {
+  margin-top: var(--local-widget-offset, 44px);
+}
+
 /* Replace Widget */
 .replace-widget {
   position: absolute;
@@ -1643,7 +1657,8 @@ body.loaded {
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   padding: 8px;
   border-radius: 4px;
-  width: 320px;
+  width: var(--local-widget-width, 320px);
+  max-width: calc(100% - 16px);
   display: none;
 }
 
@@ -1658,6 +1673,36 @@ body.loaded {
   margin-bottom: 6px;
 }
 
+.replace-widget-main-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.local-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--rifler-border);
+  opacity: 0.8;
+  flex: 0 0 auto;
+}
+
+.local-replace-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.replace-widget-row .local-widget-icon {
+  color: var(--rifler-input-placeholder);
+  font-size: 16px;
+  opacity: 0.8;
+  flex: 0 0 auto;
+}
+
 .replace-widget-row:last-child {
   margin-bottom: 0;
 }
@@ -1670,7 +1715,8 @@ body.loaded {
 }
 
 .replace-widget input {
-  flex: 1;
+  flex: 1 1 140px;
+  min-width: 0;
   padding: 4px 8px;
   font-size: 12px;
   background-color: var(--rifler-input-bg);
@@ -1680,31 +1726,67 @@ body.loaded {
   font-family: var(--rifler-font-mono);
 }
 
+/* Find textbox shouldn't stretch too wide */
+#local-search-input {
+  flex: 0 1 170px;
+  max-width: 220px;
+}
+
+#local-replace-input {
+  flex: 1 1 180px;
+}
+
 .replace-widget input:focus {
   border-color: var(--rifler-focus-border);
   outline: none;
 }
 
-.replace-widget-actions {
+.local-replace-buttons {
   display: flex;
-  gap: 4px;
-  justify-content: flex-end;
-  margin-top: 4px;
-  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  flex: 0 0 auto;
 }
 
-.replace-widget .nav-btn {
-  padding: 2px 6px;
-  font-size: 10px;
-  min-width: 20px;
+.local-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
   flex: 0 0 auto;
+}
+
+.replace-widget button.ghost {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-color: var(--rifler-border);
+  color: var(--rifler-fg-muted);
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.replace-widget button.ghost:hover {
+  background: var(--rifler-list-hover);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-focus-border);
+}
+
+.replace-widget button.ghost:active {
+  background: var(--rifler-list-hover);
+  color: var(--rifler-fg);
+  border-color: var(--rifler-focus-border);
+  transform: none;
+  box-shadow: none;
 }
 
 .replace-match-count {
   font-size: 11px;
   color: var(--rifler-fg-muted);
-  margin-left: auto;
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .replace-widget button {
@@ -1712,9 +1794,10 @@ body.loaded {
   color: var(--rifler-button-secondary-fg);
   border: 1px solid var(--rifler-border);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 6px 12px;
   border-radius: 6px;
   font-size: 11px;
+  font-weight: 500;
   transition: all 0.12s;
   white-space: nowrap;
 }

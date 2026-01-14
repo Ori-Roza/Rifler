@@ -4,6 +4,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
+import { testHelpers } from '../../../extension';
+
 // Import actual search/replace functions to test them directly
 import { performSearch } from '../../../search';
 import { replaceOne, replaceAll } from '../../../replacer';
@@ -594,6 +596,22 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
   test('rifler.open should open tab panel when viewMode is tab', async function() {
     this.timeout(15000);
 
+    async function retryAssert(fn: () => void | Promise<void>, timeout = 8000, interval = 250) {
+      const start = Date.now();
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        try {
+          await fn();
+          return;
+        } catch (e) {
+          if (Date.now() - start > timeout) {
+            throw e;
+          }
+          await new Promise(resolve => setTimeout(resolve, interval));
+        }
+      }
+    }
+
     // Set viewMode to tab
     const config = vscode.workspace.getConfiguration('rifler');
     // Ensure the new setting doesn't override the legacy one for this test
@@ -604,28 +622,41 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     // Execute rifler.open - should open tab panel
     await vscode.commands.executeCommand('rifler.open');
-    await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Check if Rifler tab is open
-    const hasRiflerTab = vscode.window.tabGroups.all.some(group =>
-      group.tabs.some(tab => tab.label === 'Rifler')
-    );
+    await retryAssert(() => {
+      const panel = testHelpers.getCurrentPanel();
+      assert.ok(panel, 'Tab panel should open when viewMode=tab');
+    });
 
     // Clean up - close the tab
-    if (hasRiflerTab) {
-      await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-    }
+    await vscode.commands.executeCommand('rifler._closeWindowInternal');
 
     // Reset viewMode to sidebar
     await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
     await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Global);
     await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Workspace);
 
-    assert.ok(hasRiflerTab, 'Tab panel should open when viewMode=tab');
+    assert.ok(true);
   });
 
   test('rifler.open should toggle tab panel closed when viewMode is tab and tab is already open', async function() {
     this.timeout(20000);
+
+    async function retryAssert(fn: () => void | Promise<void>, timeout = 8000, interval = 250) {
+      const start = Date.now();
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        try {
+          await fn();
+          return;
+        } catch (e) {
+          if (Date.now() - start > timeout) {
+            throw e;
+          }
+          await new Promise(resolve => setTimeout(resolve, interval));
+        }
+      }
+    }
 
     // Set viewMode to tab
     const config = vscode.workspace.getConfiguration('rifler');
@@ -635,53 +666,32 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     await config.update('viewMode', 'tab', vscode.ConfigurationTarget.Workspace);
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Ensure no Rifler tab exists first
-    const existingRiflerTabs = vscode.window.tabGroups.all.filter(group =>
-      group.tabs.some(tab => tab.label === 'Rifler')
-    );
-    for (const group of existingRiflerTabs) {
-      for (const tab of group.tabs) {
-        if (tab.label === 'Rifler') {
-          await vscode.window.tabGroups.close(tab);
-        }
-      }
-    }
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Ensure no existing panel
+    await vscode.commands.executeCommand('rifler._closeWindowInternal');
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Open tab first
     await vscode.commands.executeCommand('rifler.open');
-    await new Promise(resolve => setTimeout(resolve, 2500));
 
-    // Verify tab is open - try multiple times as timing can be flaky
-    let hasRiflerTabBefore = vscode.window.tabGroups.all.some(group =>
-      group.tabs.some(tab => tab.label === 'Rifler')
-    );
-    
-    // If not found, wait a bit more
-    if (!hasRiflerTabBefore) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      hasRiflerTabBefore = vscode.window.tabGroups.all.some(group =>
-        group.tabs.some(tab => tab.label === 'Rifler')
-      );
-    }
-
-    assert.ok(hasRiflerTabBefore, 'Tab should be open before toggle');
+    await retryAssert(() => {
+      const panel = testHelpers.getCurrentPanel();
+      assert.ok(panel, 'Tab should be open before toggle');
+    });
 
     // Toggle to close
     await vscode.commands.executeCommand('rifler.open');
-    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // Verify tab is closed
-    const hasRiflerTabAfter = vscode.window.tabGroups.all.some(group =>
-      group.tabs.some(tab => tab.label === 'Rifler')
-    );
+    await retryAssert(() => {
+      const panel = testHelpers.getCurrentPanel();
+      assert.ok(!panel, 'Tab should be closed after toggle');
+    });
 
     // Reset viewMode to sidebar
     await config.update('viewMode', 'sidebar', vscode.ConfigurationTarget.Workspace);
     await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Global);
     await config.update('panelLocation', undefined, vscode.ConfigurationTarget.Workspace);
 
-    assert.ok(!hasRiflerTabAfter, 'Tab should be closed after toggle');
+    assert.ok(true);
   });
 
   test('Sidebar should restore search query after viewing preview and reopening', async function() {

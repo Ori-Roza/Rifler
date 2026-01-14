@@ -5,7 +5,6 @@ import {
   SearchResult,
   buildSearchRegex,
   findWorkspaceModules,
-  formatRiflerSearchTooltip,
   getOpenKeybindingHint
 } from '../utils';
 import { IncomingMessage } from '../messaging/types';
@@ -198,8 +197,12 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   private _updateViewTitle(): void {
     if (!this._view) return;
     const cfg = vscode.workspace.getConfiguration('rifler');
-    const hint = getOpenKeybindingHint(cfg);
-    this._view.title = formatRiflerSearchTooltip(hint);
+    const hint = getOpenKeybindingHint(cfg).trim();
+    this._view.title = hint ? `Search (${hint})` : 'Search';
+  }
+
+  public __test_getViewTitle(): string | undefined {
+    return this._view?.title;
   }
 
   private async _handleMessage(message: { type: string; [key: string]: unknown }): Promise<void> {

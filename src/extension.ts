@@ -209,6 +209,8 @@ let stateStore: StateStore;
 let viewManager: ViewManager;
 let panelManager: PanelManager;
 let panelActivePreview: { uri: string; query: string; options: SearchOptions } | undefined;
+let sidebarProviderRef: RiflerSidebarProvider;
+let bottomProviderRef: RiflerSidebarProvider;
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('Rifler extension is now active');
@@ -253,6 +255,7 @@ export async function activate(context: vscode.ExtensionContext) {
     viewType: RiflerSidebarProvider.sidebarViewType,
     logLabel: 'SidebarProvider'
   });
+  sidebarProviderRef = sidebarProvider;
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       RiflerSidebarProvider.sidebarViewType,
@@ -266,6 +269,7 @@ export async function activate(context: vscode.ExtensionContext) {
     viewType: RiflerSidebarProvider.bottomViewType,
     logLabel: 'BottomProvider'
   });
+  bottomProviderRef = bottomProvider;
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       RiflerSidebarProvider.bottomViewType,
@@ -410,6 +414,9 @@ export async function activate(context: vscode.ExtensionContext) {
             resultsShowCollapsed
           });
         }
+
+        // Always refresh the panel title (keybinding hint may have changed)
+        panelManager.updateTitleFromConfig();
         
         // Also update sidebar if visible
         sidebarProvider.sendConfigUpdate(resultsShowCollapsed);
@@ -499,7 +506,9 @@ export function deactivate() {
 export const testHelpers = {
   getPanelManager: () => panelManager,
   getCurrentPanel: () => panelManager?.panel,
-  getStateStore: () => stateStore
+  getStateStore: () => stateStore,
+  getSidebarTitle: () => sidebarProviderRef?.__test_getViewTitle(),
+  getBottomTitle: () => bottomProviderRef?.__test_getViewTitle()
 };
 
 // Re-export messaging types for backward compatibility with tests

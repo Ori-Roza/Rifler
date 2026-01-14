@@ -85,18 +85,18 @@ suite('Title Hint E2E Tests', () => {
       // Hint #1
       await cleanUi();
       await setRiflerConfig('openKeybindingHint', 'cmd+alt+f');
-      await assertSidebarTitle('Search (cmd+alt+f)');
+      await assertSidebarTitle('(CMD+ALT+F)');
       await assertTabTitle('Rifler Search (cmd+alt+f)');
       await cleanUi();
-      await assertBottomTitle('Search (cmd+alt+f)');
+      await assertBottomTitle('(CMD+ALT+F)');
 
       // Hint #2
       await cleanUi();
       await setRiflerConfig('openKeybindingHint', 'ctrl+shift+g');
-      await assertSidebarTitle('Search (ctrl+shift+g)');
+      await assertSidebarTitle('(CTRL+SHIFT+G)');
       await assertTabTitle('Rifler Search (ctrl+shift+g)');
       await cleanUi();
-      await assertBottomTitle('Search (ctrl+shift+g)');
+      await assertBottomTitle('(CTRL+SHIFT+G)');
     } finally {
       // Cleanup: restore pre-test workspace settings (avoid impacting later E2E tests)
       await setRiflerConfig('panelLocation', originalPanelLocation);

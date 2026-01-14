@@ -417,7 +417,23 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
   });
 
   test('rifler.open should replace existing search query with new selected text', async function() {
-    this.timeout(15000);
+    this.timeout(30000);
+
+    async function retryAssert(fn: () => void | Promise<void>, timeout = 15000, interval = 250) {
+      const start = Date.now();
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        try {
+          await fn();
+          return;
+        } catch (e) {
+          if (Date.now() - start > timeout) {
+            throw e;
+          }
+          await new Promise(resolve => setTimeout(resolve, interval));
+        }
+      }
+    }
 
     // Set viewMode to sidebar
     const config = vscode.workspace.getConfiguration('rifler');
@@ -435,8 +451,11 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Open sidebar with first search
-    await vscode.commands.executeCommand('rifler.open');
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    void vscode.commands.executeCommand('rifler.open');
+    await retryAssert(async () => {
+      const visible = await vscode.commands.executeCommand('__test_getSidebarVisible');
+      assert.strictEqual(visible, true, 'Sidebar should be visible after first open');
+    });
 
     // Select completely different text
     const startPos2 = new vscode.Position(1, 10); // "sidebarHelloWorld"
@@ -446,8 +465,11 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Execute rifler.open again with new selection
-    await vscode.commands.executeCommand('rifler.open');
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    void vscode.commands.executeCommand('rifler.open');
+    await retryAssert(async () => {
+      const visible = await vscode.commands.executeCommand('__test_getSidebarVisible');
+      assert.strictEqual(visible, true, 'Sidebar should remain visible after second open');
+    });
 
     // The search should be updated (sidebar still open, new query applied)
     assert.ok(true, 'Search query should be replaced with new selected text');

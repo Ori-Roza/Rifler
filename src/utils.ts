@@ -33,8 +33,18 @@ export type SearchScope = 'project' | 'directory' | 'module';
 export function getOpenKeybindingHint(cfg?: vscode.WorkspaceConfiguration): string {
   const config = cfg ?? vscode.workspace.getConfiguration('rifler');
   // Only treat the hint as "set" if it was explicitly configured.
-  const inspected = typeof (config as any).inspect === 'function'
-    ? (config as any).inspect('openKeybindingHint')
+  type InspectResult<T> = {
+    workspaceFolderValue?: T;
+    workspaceValue?: T;
+    globalValue?: T;
+  };
+
+  const inspectFn = (config as unknown as {
+    inspect?: <T>(section: string) => InspectResult<T>;
+  }).inspect;
+
+  const inspected = typeof inspectFn === 'function'
+    ? inspectFn<string>('openKeybindingHint')
     : undefined;
 
   const explicitValue: unknown =

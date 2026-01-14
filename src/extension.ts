@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import {
   SearchOptions,
   findWorkspaceModules,
-  buildSearchRegex
+  buildSearchRegex,
+  getOpenKeybindingHint
 } from './utils';
 import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
@@ -402,12 +403,14 @@ export async function activate(context: vscode.ExtensionContext) {
       if (e.affectsConfiguration('rifler')) {
         const config = vscode.workspace.getConfiguration('rifler');
         const resultsShowCollapsed = config.get<boolean>('results.showCollapsed', false);
+        const openKeybindingHint = getOpenKeybindingHint(config);
         
         // Send updated config to panel webview if visible
         if (panelManager.panel?.visible) {
           panelManager.panel.webview.postMessage({
             type: 'config',
-            resultsShowCollapsed
+            resultsShowCollapsed,
+            openKeybindingHint
           });
         }
         

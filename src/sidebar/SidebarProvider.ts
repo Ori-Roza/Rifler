@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { SearchScope, SearchOptions, SearchResult, buildSearchRegex, findWorkspaceModules } from '../utils';
+import { SearchScope, SearchOptions, SearchResult, buildSearchRegex, findWorkspaceModules, getOpenKeybindingHint } from '../utils';
 import { IncomingMessage } from '../messaging/types';
 import { performSearch } from '../search';
 import { replaceAll } from '../replacer';
@@ -657,12 +657,14 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       const replaceKeybinding = cfg.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
       const maxResults = cfg.get<number>('maxResults', 10000);
       const resultsShowCollapsed = cfg.get<boolean>('results.showCollapsed', false);
+      const openKeybindingHint = getOpenKeybindingHint(cfg);
 
       this._view.webview.postMessage({
         type: 'config',
         replaceKeybinding,
         maxResults,
-        resultsShowCollapsed
+        resultsShowCollapsed,
+        openKeybindingHint
       });
 
       console.log(`${this._logLabel}._restoreState: state =`, state ? 'exists' : 'undefined', state);
@@ -791,7 +793,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     if (this._view) {
       this._view.webview.postMessage({
         type: 'config',
-        resultsShowCollapsed
+        resultsShowCollapsed,
+        openKeybindingHint: getOpenKeybindingHint(vscode.workspace.getConfiguration('rifler'))
       });
     }
   }

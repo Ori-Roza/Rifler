@@ -30,6 +30,34 @@ export interface SearchResult {
 /** Scope options for search */
 export type SearchScope = 'project' | 'directory' | 'module';
 
+export function getOpenKeybindingHint(cfg?: vscode.WorkspaceConfiguration): string {
+  const config = cfg ?? vscode.workspace.getConfiguration('rifler');
+  // Only treat the hint as "set" if it was explicitly configured.
+  const inspected = typeof (config as any).inspect === 'function'
+    ? (config as any).inspect('openKeybindingHint')
+    : undefined;
+
+  const explicitValue: unknown =
+    inspected?.workspaceFolderValue ??
+    inspected?.workspaceValue ??
+    inspected?.globalValue;
+
+  const raw = typeof explicitValue === 'string'
+    ? explicitValue
+    : (config.get<string>('openKeybindingHint', '') ?? '');
+
+  const trimmed = String(raw).trim();
+  if (trimmed) return trimmed;
+
+  // Best-effort platform defaults (cannot reliably read user's effective keybinding).
+  return process.platform === 'darwin' ? 'cmd+alt+f' : 'ctrl+alt+f';
+}
+
+export function formatRiflerSearchTooltip(openKeybindingHint: string | undefined): string {
+  const trimmed = (openKeybindingHint ?? '').trim();
+  return trimmed ? `Rifler Search (${trimmed})` : 'Rifler Search';
+}
+
 // ============================================================================
 // Search Utilities
 // ============================================================================

@@ -1,5 +1,13 @@
 import * as vscode from 'vscode';
-import { SearchScope, SearchOptions, SearchResult, buildSearchRegex, findWorkspaceModules, getOpenKeybindingHint } from '../utils';
+import {
+  SearchScope,
+  SearchOptions,
+  SearchResult,
+  buildSearchRegex,
+  findWorkspaceModules,
+  formatRiflerSearchTooltip,
+  getOpenKeybindingHint
+} from '../utils';
 import { IncomingMessage } from '../messaging/types';
 import { performSearch } from '../search';
 import { replaceAll } from '../replacer';
@@ -93,6 +101,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     this._webviewReady = false;
     console.log(`Rifler ${this._logLabel} WebviewView resolved`);
 
+    this._updateViewTitle();
+
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [this.context.extensionUri]
@@ -183,6 +193,13 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     if (webviewView.visible) {
       this._restoreState();
     }
+  }
+
+  private _updateViewTitle(): void {
+    if (!this._view) return;
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const hint = getOpenKeybindingHint(cfg);
+    this._view.title = formatRiflerSearchTooltip(hint);
   }
 
   private async _handleMessage(message: { type: string; [key: string]: unknown }): Promise<void> {
@@ -652,19 +669,19 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
     const state = store.get(this._stateKey);
 
+    this._updateViewTitle();
+
     if (this._view) {
       // Send configuration to webview
       const replaceKeybinding = cfg.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
       const maxResults = cfg.get<number>('maxResults', 10000);
       const resultsShowCollapsed = cfg.get<boolean>('results.showCollapsed', false);
-      const openKeybindingHint = getOpenKeybindingHint(cfg);
 
       this._view.webview.postMessage({
         type: 'config',
         replaceKeybinding,
         maxResults,
-        resultsShowCollapsed,
-        openKeybindingHint
+        resultsShowCollapsed
       });
 
       console.log(`${this._logLabel}._restoreState: state =`, state ? 'exists' : 'undefined', state);
@@ -790,11 +807,11 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public sendConfigUpdate(resultsShowCollapsed: boolean): void {
+    this._updateViewTitle();
     if (this._view) {
       this._view.webview.postMessage({
         type: 'config',
-        resultsShowCollapsed,
-        openKeybindingHint: getOpenKeybindingHint(vscode.workspace.getConfiguration('rifler'))
+        resultsShowCollapsed
       });
     }
   }

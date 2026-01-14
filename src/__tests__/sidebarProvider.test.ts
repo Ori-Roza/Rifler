@@ -42,42 +42,4 @@ describe('RiflerSidebarProvider - current directory default', () => {
     expect(currentDirMsg).toBeDefined();
     expect(currentDirMsg.directory).toBe(workspacePath);
   });
-
-  test('includes openKeybindingHint in initial config message', () => {
-    const messages: any[] = [];
-
-    // Mock configuration used by _restoreState
-    (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
-      get: jest.fn((key: string, defaultValue?: any) => {
-        if (key === 'persistenceScope') return 'workspace';
-        if (key === 'replaceInPreviewKeybinding') return 'ctrl+shift+r';
-        if (key === 'maxResults') return 10000;
-        if (key === 'results.showCollapsed') return false;
-        if (key === 'openKeybindingHint') return 'cmd+alt+f';
-        return defaultValue;
-      })
-    });
-
-    const provider = new RiflerSidebarProvider({
-      extensionUri: vscode.Uri.parse('/tmp/ext'),
-      subscriptions: [],
-      workspaceState: { update: jest.fn(), get: jest.fn() },
-      globalState: { update: jest.fn(), get: jest.fn() }
-    } as any);
-
-    (provider as any)._view = {
-      webview: {
-        postMessage: (msg: any) => {
-          messages.push(msg);
-          return Promise.resolve(true);
-        }
-      }
-    } as any;
-
-    (provider as any)._restoreState();
-
-    const configMsg = messages.find(m => m.type === 'config');
-    expect(configMsg).toBeDefined();
-    expect(configMsg.openKeybindingHint).toBe('cmd+alt+f');
-  });
 });

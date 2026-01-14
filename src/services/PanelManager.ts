@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { MinimizeMessage, IncomingMessage } from '../messaging/types';
 import { StateStore } from '../state/StateStore';
 import { MessageHandler } from '../messaging/handler';
-import { formatRiflerSearchTooltip, getOpenKeybindingHint } from '../utils';
 
 export type GetWebviewHtmlFn = (webview: vscode.Webview, extensionUri: vscode.Uri) => string;
 
@@ -181,7 +180,7 @@ export class PanelManager {
     }
 
     this.statusBarItem.text = '$(bookmark) Rifler';
-    this.statusBarItem.tooltip = formatRiflerSearchTooltip(getOpenKeybindingHint());
+    this.statusBarItem.tooltip = 'Click to restore Rifler';
     this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     this.statusBarItem.show();
   }
@@ -260,19 +259,16 @@ export class PanelManager {
     const replaceKeybinding = config.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
     const maxResults = config.get<number>('maxResults', 10000);
     const resultsShowCollapsed = config.get<boolean>('results.showCollapsed', false);
-    const openKeybindingHint = getOpenKeybindingHint(config);
     console.log('[Rifler] Initializing webview with config:', {
       replaceKeybinding,
       maxResults,
-      resultsShowCollapsed,
-      openKeybindingHint
+      resultsShowCollapsed
     });
     this.currentPanel.webview.postMessage({
       type: 'config',
       replaceKeybinding,
       maxResults,
-      resultsShowCollapsed,
-      openKeybindingHint
+      resultsShowCollapsed
     });
 
     if (shouldShowReplace) {

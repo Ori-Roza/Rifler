@@ -46,7 +46,6 @@ console.log('[Rifler] Webview script starting...');
     searchStartTime: 0,
     lastSearchDuration: 0,
     replaceKeybinding: 'ctrl+shift+r',
-    openKeybindingHint: '',
     maxResultsCap: 10000,
       searchHistory: [],
     collapsedFiles: new Set(),
@@ -141,7 +140,6 @@ console.log('[Rifler] Webview script starting...');
   const dragHandle = document.getElementById('drag-handle');
   const previewPanelContainer = document.getElementById('preview-panel-container');
   const resultsCountText = document.getElementById('results-count-text');
-  const openShortcutHint = document.getElementById('rifler-open-shortcut-hint');
   const resultsSummaryBar = document.querySelector('.results-summary-bar');
   const collapseAllBtn = document.getElementById('collapse-all-btn');
   
@@ -241,19 +239,6 @@ console.log('[Rifler] Webview script starting...');
     dragHandle: !!dragHandle,
     filtersContainer: !!filtersContainer
   });
-
-  function updateOpenShortcutHint() {
-    if (!openShortcutHint) return;
-    const trimmed = String(state.openKeybindingHint || '').trim();
-    if (!trimmed) {
-      openShortcutHint.textContent = '';
-      openShortcutHint.style.display = 'none';
-      return;
-    }
-
-    openShortcutHint.textContent = `Rifler Search (${trimmed})`;
-    openShortcutHint.style.display = '';
-  }
 
   // ===== Width Detection for Responsive Layouts (Issue #98) =====
   function updateLayoutClass() {
@@ -2284,10 +2269,6 @@ console.log('[Rifler] Webview script starting...');
         }
         if (typeof message.resultsShowCollapsed === 'boolean') {
           state.resultsShowCollapsed = message.resultsShowCollapsed;
-        }
-        if (typeof message.openKeybindingHint === 'string') {
-          state.openKeybindingHint = message.openKeybindingHint;
-          updateOpenShortcutHint();
         }
         break;
       case 'focusSearch':

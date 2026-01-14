@@ -228,10 +228,8 @@ export interface ValidationResultMessage {
 
 export interface ConfigMessage {
   type: 'config';
-  replaceKeybinding?: string;
-  maxResults?: number;
-  resultsShowCollapsed?: boolean;
-  openKeybindingHint?: string;
+  replaceKeybinding: string;
+  maxResults: number;
 }
 
 export interface ShowReplaceMessage {

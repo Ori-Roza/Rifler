@@ -36,14 +36,14 @@
       "activitybar": [
         {
           "id": "rifler-sidebar",
-          "title": "Rifler",
+          "title": "Rifler Search",
           "icon": "assets/icon-activitybar.svg"
         }
       ],
       "panel": [
         {
           "id": "rifler-bottom",
-          "title": "Rifler",
+          "title": "Rifler Search",
           "icon": "assets/icon-activitybar.svg"
         }
       ]
@@ -188,7 +188,7 @@
         },
         "rifler.openKeybindingHint": {
           "type": "string",
-          "default": "ctrl+alt+f",
+          "default": "",
           "markdownDescription": "**Note:** This is a hint only. To change the actual keybinding for opening Rifler, go to **Keyboard Shortcuts** (`Cmd+K Cmd+S` on Mac, `Ctrl+K Ctrl+S` on Windows/Linux) and search for `rifler.open`. The default is `Cmd+Alt+F` (Mac) / `Ctrl+Alt+F` (Windows/Linux).",
           "order": 3
         },

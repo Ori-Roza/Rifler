@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { MinimizeMessage, IncomingMessage } from '../messaging/types';
 import { StateStore } from '../state/StateStore';
 import { MessageHandler } from '../messaging/handler';
+import { formatRiflerSearchTooltip, getOpenKeybindingHint } from '../utils';
 
 export type GetWebviewHtmlFn = (webview: vscode.Webview, extensionUri: vscode.Uri) => string;
 
@@ -58,6 +59,7 @@ export class PanelManager {
           // Panel was disposed, clear the reference and create a new one
           this.currentPanel = undefined;
         } else {
+          this.updateTitleFromConfig();
           // Panel is still valid, reveal it and send messages as needed
           this.currentPanel.reveal(vscode.ViewColumn.Two);
           if (showReplace) {
@@ -86,7 +88,7 @@ export class PanelManager {
     // Create a new webview panel
     this.currentPanel = vscode.window.createWebviewPanel(
       'rifler',
-      'Rifler',
+      'Rifler Search',
       {
         viewColumn: vscode.ViewColumn.Two,
         preserveFocus: false
@@ -97,6 +99,8 @@ export class PanelManager {
         localResourceRoots: [this.extensionUri]
       }
     );
+
+    this.updateTitleFromConfig();
 
     this.currentPanel.webview.html = this.getWebviewHtml(
       this.currentPanel.webview,
@@ -151,6 +155,13 @@ export class PanelManager {
       null,
       this.context.subscriptions
     );
+  }
+
+  public updateTitleFromConfig(): void {
+    if (!this.currentPanel) return;
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const hint = getOpenKeybindingHint(cfg);
+    this.currentPanel.title = formatRiflerSearchTooltip(hint);
   }
 
   /**

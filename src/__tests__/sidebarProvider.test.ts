@@ -42,4 +42,23 @@ describe('RiflerSidebarProvider - current directory default', () => {
     expect(currentDirMsg).toBeDefined();
     expect(currentDirMsg.directory).toBe(workspacePath);
   });
+
+  test('sets view title to Search (<hint>)', () => {
+    (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
+      inspect: jest.fn(() => ({ globalValue: 'cmd+alt+f' })),
+      get: jest.fn((_key: string, defaultValue?: any) => defaultValue)
+    });
+
+    const provider = new RiflerSidebarProvider({
+      extensionUri: vscode.Uri.parse('/tmp/ext'),
+      subscriptions: [],
+      workspaceState: { update: jest.fn(), get: jest.fn() },
+      globalState: { update: jest.fn(), get: jest.fn() }
+    } as any);
+
+    (provider as any)._view = { title: '' } as any;
+    (provider as any)._updateViewTitle();
+
+    expect((provider as any)._view.title).toBe('Search (cmd+alt+f)');
+  });
 });

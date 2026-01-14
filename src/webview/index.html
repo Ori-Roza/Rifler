@@ -9,8 +9,12 @@
 <section class="search-section">
   <div class="search-box">
     <div class="search-input-group">
-      <span class="material-symbols-outlined search-icon">search</span>
+      <button type="button" class="search-history-btn" id="search-history-btn" title="Search history" aria-label="Search history">
+        <span class="material-symbols-outlined search-icon" aria-hidden="true">search</span>
+        <span class="material-symbols-outlined search-history-caret" aria-hidden="true">arrow_drop_down</span>
+      </button>
       <input type="text" id="query" class="search-input" placeholder="Search..." autofocus />
+      <div class="search-history-menu" id="search-history-menu"></div>
       <div id="query-validation-message" class="validation-message"></div>
       <div class="search-options">
         <button type="button" class="option-btn" id="match-case" title="Match Case (Alt+C)" data-option="case">

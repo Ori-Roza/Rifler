@@ -210,6 +210,13 @@
           "default": false,
           "markdownDescription": "Show search results in a collapsed state by default. When enabled, file groups will be collapsed to show only match counts until expanded.",
           "order": 6
+        },
+        "rifler.searchHistory.maxEntries": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "markdownDescription": "Maximum number of recent searches kept in history (shown when clicking the magnifying glass icon).",
+          "order": 7
         }
       }
     }

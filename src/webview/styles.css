@@ -347,6 +347,42 @@ body.loaded {
   position: relative;
 }
 
+.search-history-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.1s;
+}
+
+.search-history-btn:hover {
+  background-color: var(--rifler-list-hover);
+}
+
+.search-history-btn:hover .material-symbols-outlined {
+  color: var(--rifler-fg);
+  opacity: 1;
+}
+
+.search-history-caret {
+  font-size: 18px;
+  color: var(--rifler-fg-muted);
+  opacity: 0.6;
+  margin-left: -4px;
+}
+
+.search-history-btn:focus-visible {
+  outline: 1px solid var(--rifler-focus-border);
+  outline-offset: 2px;
+}
+
 .search-input::placeholder {
   color: var(--rifler-input-placeholder);
   opacity: 0.7;
@@ -820,7 +856,8 @@ body.loaded {
 .search-controls .more-actions-btn {
   display: none;
 }
-.more-actions-menu {
+.more-actions-menu,
+.search-history-menu {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
@@ -834,12 +871,20 @@ body.loaded {
   max-width: calc(100vw - 16px);
   z-index: 50;
 }
-.more-actions-menu.open {
+.search-history-menu {
+  right: auto;
+  left: 0;
+  min-width: 220px;
+}
+
+.more-actions-menu.open,
+.search-history-menu.open {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.more-actions-menu button {
+.more-actions-menu button,
+.search-history-menu button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -852,14 +897,17 @@ body.loaded {
   text-align: left;
   transition: background-color 0.12s;
 }
-.more-actions-menu button span:last-child {
+.more-actions-menu button span:last-child,
+.search-history-menu button span:last-child {
   font-size: 12px;
   line-height: 1.2;
 }
-.more-actions-menu button:hover {
+.more-actions-menu button:hover,
+.search-history-menu button:hover {
   background: var(--rifler-list-hover);
 }
-.more-actions-menu .material-symbols-outlined {
+.more-actions-menu .material-symbols-outlined,
+.search-history-menu .material-symbols-outlined {
   font-size: 18px;
   opacity: 0.8;
 }

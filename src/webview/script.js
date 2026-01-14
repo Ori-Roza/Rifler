@@ -47,6 +47,7 @@ console.log('[Rifler] Webview script starting...');
     lastSearchDuration: 0,
     replaceKeybinding: 'ctrl+shift+r',
     maxResultsCap: 10000,
+      searchHistory: [],
     collapsedFiles: new Set(),
     expandedFiles: new Set(), // Track files explicitly expanded by user
     previewPanelCollapsed: false, // Track preview panel state
@@ -60,6 +61,8 @@ console.log('[Rifler] Webview script starting...');
     groupScrollTops: {}, // Persist scroll positions for grouped result containers
     loadingTimeout: null // Track loading overlay timeout
   };
+
+    let pendingTestHistoryEcho = false;
 
   const vscode = acquireVsCodeApi();
 
@@ -130,6 +133,8 @@ console.log('[Rifler] Webview script starting...');
   const replaceToggleBtn = document.getElementById('replace-toggle-btn');
   const moreActionsBtn = document.getElementById('more-actions-btn');
   const moreActionsMenu = document.getElementById('more-actions-menu');
+    const searchHistoryBtn = document.getElementById('search-history-btn');
+    const searchHistoryMenu = document.getElementById('search-history-menu');
   const searchOverflow = document.getElementById('search-overflow');
   const searchControls = document.querySelector('.search-controls');
   const dragHandle = document.getElementById('drag-handle');
@@ -427,10 +432,121 @@ console.log('[Rifler] Webview script starting...');
     });
   }
 
+    function renderSearchHistoryMenu() {
+      if (!searchHistoryMenu) return;
+
+      const entries = Array.isArray(state.searchHistory) ? state.searchHistory : [];
+      searchHistoryMenu.innerHTML = '';
+
+      if (entries.length === 0) {
+        const emptyBtn = document.createElement('button');
+        emptyBtn.disabled = true;
+        const icon = document.createElement('span');
+        icon.className = 'material-symbols-outlined';
+        icon.textContent = 'search';
+        const label = document.createElement('span');
+        label.textContent = 'No recent searches';
+        emptyBtn.appendChild(icon);
+        emptyBtn.appendChild(label);
+        searchHistoryMenu.appendChild(emptyBtn);
+        return;
+      }
+
+      entries.forEach((entry, index) => {
+        const btn = document.createElement('button');
+        btn.dataset.index = String(index);
+
+        const icon = document.createElement('span');
+        icon.className = 'material-symbols-outlined';
+        icon.textContent = 'search';
+
+        const label = document.createElement('span');
+        label.textContent = String(entry?.query || '');
+
+        btn.appendChild(icon);
+        btn.appendChild(label);
+
+        searchHistoryMenu.appendChild(btn);
+      });
+    }
+
+    function applySearchHistoryEntry(entry) {
+      if (!entry) return;
+
+      // Apply query
+      if (queryInput) {
+        queryInput.value = String(entry.query || '');
+        state.currentQuery = queryInput.value;
+      }
+
+      // Apply scope + paths
+      if (entry.scope) {
+        state.currentScope = entry.scope;
+        if (scopeSelect) {
+          scopeSelect.value = entry.scope;
+        }
+        updateScopeInputs();
+      }
+      if (directoryInput && typeof entry.directoryPath === 'string') {
+        directoryInput.value = entry.directoryPath;
+      }
+      if (moduleSelect && typeof entry.modulePath === 'string') {
+        moduleSelect.value = entry.modulePath;
+      }
+
+      // Apply options
+      if (entry.options) {
+        state.options.matchCase = !!entry.options.matchCase;
+        state.options.wholeWord = !!entry.options.wholeWord;
+        state.options.useRegex = !!entry.options.useRegex;
+        state.options.fileMask = entry.options.fileMask || '';
+
+        if (matchCaseToggle) matchCaseToggle.classList.toggle('active', state.options.matchCase);
+        if (wholeWordToggle) wholeWordToggle.classList.toggle('active', state.options.wholeWord);
+        if (useRegexToggle) useRegexToggle.classList.toggle('active', state.options.useRegex);
+        if (fileMaskInput) fileMaskInput.value = state.options.fileMask;
+      }
+    }
+
+    // Search history dropdown (triggered by magnifying glass)
+    if (searchHistoryBtn && searchHistoryMenu) {
+      renderSearchHistoryMenu();
+
+      searchHistoryBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Close the overflow menu if open
+        if (moreActionsMenu) {
+          moreActionsMenu.classList.remove('open');
+        }
+        renderSearchHistoryMenu();
+        searchHistoryMenu.classList.toggle('open');
+      });
+
+      searchHistoryMenu.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn || btn.disabled) return;
+        const idxRaw = btn.dataset.index;
+        const idx = Number(idxRaw);
+        if (!Number.isFinite(idx)) return;
+        const entries = Array.isArray(state.searchHistory) ? state.searchHistory : [];
+        const entry = entries[idx];
+        if (!entry) return;
+
+        searchHistoryMenu.classList.remove('open');
+        applySearchHistoryEntry(entry);
+        // Start search immediately
+        runSearch();
+      });
+    }
+
   // Overflow actions menu (for narrow layout)
   if (moreActionsBtn && moreActionsMenu) {
     moreActionsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+        if (searchHistoryMenu) {
+          searchHistoryMenu.classList.remove('open');
+        }
       moreActionsMenu.classList.toggle('open');
     });
 
@@ -454,6 +570,9 @@ console.log('[Rifler] Webview script starting...');
 
     document.addEventListener('click', () => {
       moreActionsMenu.classList.remove('open');
+      if (searchHistoryMenu) {
+        searchHistoryMenu.classList.remove('open');
+      }
     });
   }
 
@@ -2085,6 +2204,14 @@ console.log('[Rifler] Webview script starting...');
     const message = event.data;
     console.log('Webview received message:', message.type, message);
     switch (message.type) {
+      case 'searchHistory':
+        state.searchHistory = Array.isArray(message.entries) ? message.entries : [];
+        renderSearchHistoryMenu();
+        if (pendingTestHistoryEcho) {
+          pendingTestHistoryEcho = false;
+          vscode.postMessage({ type: '__test_searchHistory', entries: state.searchHistory });
+        }
+        break;
       case 'toggleReplace':
         toggleReplace();
         break;
@@ -2671,6 +2798,24 @@ console.log('[Rifler] Webview script starting...');
         // Handle conflict when VS Code has edited the file while Rifler is in edit mode
         showEditConflictBanner(message.uri, message.reason);
         break;
+      case '__test_clearSearchHistory':
+        pendingTestHistoryEcho = true;
+        vscode.postMessage({ type: '__test_clearSearchHistory' });
+        break;
+      case '__test_getSearchHistory':
+        vscode.postMessage({ type: '__test_searchHistory', entries: Array.isArray(state.searchHistory) ? state.searchHistory : [] });
+        break;
+      case '__test_selectSearchHistoryIndex': {
+        const idx = Number(message.index);
+        const entries = Array.isArray(state.searchHistory) ? state.searchHistory : [];
+        if (!Number.isFinite(idx) || idx < 0 || idx >= entries.length) {
+          break;
+        }
+        const entry = entries[idx];
+        applySearchHistoryEntry(entry);
+        runSearch();
+        break;
+      }
     }
   });
 

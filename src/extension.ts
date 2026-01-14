@@ -249,7 +249,7 @@ export async function activate(context: vscode.ExtensionContext) {
   viewManager.setPanelManager(panelManager);
 
   // Register sidebar provider
-  const sidebarProvider = new RiflerSidebarProvider(context, {
+  const sidebarProvider = new RiflerSidebarProvider(context, stateStore, {
     viewType: RiflerSidebarProvider.sidebarViewType,
     logLabel: 'SidebarProvider'
   });
@@ -262,7 +262,7 @@ export async function activate(context: vscode.ExtensionContext) {
   viewManager.registerSidebarProvider(sidebarProvider);
 
   // Register bottom panel provider
-  const bottomProvider = new RiflerSidebarProvider(context, {
+  const bottomProvider = new RiflerSidebarProvider(context, stateStore, {
     viewType: RiflerSidebarProvider.bottomViewType,
     logLabel: 'BottomProvider'
   });

@@ -300,6 +300,12 @@ export class PanelManager {
       type: 'restorePreviewPanelState',
       collapsed: this.stateStore.getPreviewPanelCollapsed()
     });
+
+    // Send search history (for magnifying-glass dropdown)
+    this.currentPanel.webview.postMessage({
+      type: 'searchHistory',
+      entries: this.stateStore.getSearchHistory()
+    });
   }
 }
 

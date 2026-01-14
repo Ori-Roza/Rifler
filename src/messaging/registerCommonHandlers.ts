@@ -34,7 +34,30 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       msg.modulePath
     );
     console.log('[Rifler] Search returned', results.length, 'results');
+
+    if (deps.stateStore) {
+      deps.stateStore.recordSearch({
+        query: msg.query,
+        scope: msg.scope,
+        directoryPath: msg.directoryPath,
+        modulePath: msg.modulePath,
+        options: {
+          matchCase: !!msg.options.matchCase,
+          wholeWord: !!msg.options.wholeWord,
+          useRegex: !!msg.options.useRegex,
+          fileMask: msg.options.fileMask || ''
+        }
+      });
+      deps.postMessage({ type: 'searchHistory', entries: deps.stateStore.getSearchHistory() });
+    }
+
     deps.postMessage({ type: 'searchResults', results, maxResults: 10000 });
+  });
+
+  handler.registerHandler('__test_clearSearchHistory', async () => {
+    if (!deps.stateStore) return;
+    deps.stateStore.clearSearchHistory();
+    deps.postMessage({ type: 'searchHistory', entries: deps.stateStore.getSearchHistory() });
   });
 
   handler.registerHandler('openLocation', async (message) => {

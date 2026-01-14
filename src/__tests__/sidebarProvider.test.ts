@@ -43,7 +43,7 @@ describe('RiflerSidebarProvider - current directory default', () => {
     expect(currentDirMsg.directory).toBe(workspacePath);
   });
 
-  test('sets view title to Search (<hint>)', () => {
+  test('sets view title to hint only', () => {
     (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
       inspect: jest.fn(() => ({ globalValue: 'cmd+alt+f' })),
       get: jest.fn((_key: string, defaultValue?: any) => defaultValue)
@@ -56,9 +56,10 @@ describe('RiflerSidebarProvider - current directory default', () => {
       globalState: { update: jest.fn(), get: jest.fn() }
     } as any);
 
-    (provider as any)._view = { title: '' } as any;
+    (provider as any)._view = { title: '', description: '' } as any;
     (provider as any)._updateViewTitle();
 
-    expect((provider as any)._view.title).toBe('Search (cmd+alt+f)');
+    expect((provider as any)._view.title).toBe('(CMD+ALT+F)');
+    expect((provider as any)._view.description).toBe('');
   });
 });

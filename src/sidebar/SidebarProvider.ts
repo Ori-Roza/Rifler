@@ -198,11 +198,20 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     if (!this._view) return;
     const cfg = vscode.workspace.getConfiguration('rifler');
     const hint = getOpenKeybindingHint(cfg).trim();
-    this._view.title = hint ? `Search (${hint})` : 'Search';
+    const displayHint = hint ? `(${hint.toUpperCase()})` : '';
+
+    // VS Code renders contributed view headers as: "<Container Title>: <View Title>".
+    // We can't remove the colon, but we can remove the redundant "Search" by using only the hint.
+    this._view.title = displayHint;
+    this._view.description = '';
   }
 
   public __test_getViewTitle(): string | undefined {
     return this._view?.title;
+  }
+
+  public __test_getViewDescription(): string | undefined {
+    return this._view?.description;
   }
 
   private async _handleMessage(message: { type: string; [key: string]: unknown }): Promise<void> {

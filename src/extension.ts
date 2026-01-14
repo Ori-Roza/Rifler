@@ -508,7 +508,9 @@ export const testHelpers = {
   getCurrentPanel: () => panelManager?.panel,
   getStateStore: () => stateStore,
   getSidebarTitle: () => sidebarProviderRef?.__test_getViewTitle(),
-  getBottomTitle: () => bottomProviderRef?.__test_getViewTitle()
+  getSidebarDescription: () => sidebarProviderRef?.__test_getViewDescription(),
+  getBottomTitle: () => bottomProviderRef?.__test_getViewTitle(),
+  getBottomDescription: () => bottomProviderRef?.__test_getViewDescription()
 };
 
 // Re-export messaging types for backward compatibility with tests

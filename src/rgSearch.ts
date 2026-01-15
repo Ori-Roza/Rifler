@@ -220,6 +220,12 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
     args.push('--word-regexp');
   }
 
+  // When smart excludes are disabled, tell ripgrep to ignore VCS files (like .gitignore)
+  // so that node_modules and other excluded-by-default dirs can be searched
+  if (smartExcludesEnabled === false) {
+    args.push('--no-ignore-vcs');
+  }
+
   args.push(...buildGlobArgs(fileMask, smartExcludesEnabled ?? true));
 
   args.push('-e', query, '--', ...roots);

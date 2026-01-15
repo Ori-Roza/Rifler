@@ -39,7 +39,9 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       msg.scope,
       { ...msg.options, fileMask: mergedFileMask },
       msg.directoryPath,
-      msg.modulePath
+      msg.modulePath,
+      10000,
+      msg.smartExcludesEnabled ?? true
     );
     console.log('[Rifler] Search returned', results.length, 'results');
 

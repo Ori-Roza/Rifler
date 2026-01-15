@@ -129,6 +129,14 @@ suite('Rifler Smart Excludes E2E', () => {
     const panel = testHelpers.getCurrentPanel();
     assert.ok(panel, 'Panel should be open');
 
+    // Verify files exist before searching
+    const regularFileExists = fs.existsSync(regularFile);
+    const nodeModulesFileExists = fs.existsSync(nodeModulesFile);
+    console.log('[E2E] File check - regular:', regularFileExists, regularFile);
+    console.log('[E2E] File check - node_modules:', nodeModulesFileExists, nodeModulesFile);
+    assert.ok(regularFileExists, 'Regular file should exist');
+    assert.ok(nodeModulesFileExists, 'node_modules file should exist');
+
     // Disable smart excludes checkbox
     panel.webview.postMessage({ type: '__test_setSmartExcludes', enabled: false });
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -139,6 +147,11 @@ suite('Rifler Smart Excludes E2E', () => {
 
     const msg = await searchDone;
     const results = Array.isArray(msg.results) ? msg.results : [];
+
+    console.log('[E2E] Search returned', results.length, 'results when smart excludes OFF');
+    results.forEach((r, i) => {
+      console.log(`  [${i}] ${vscode.Uri.parse(r.uri).fsPath}`);
+    });
 
     // Should find BOTH files (regular and node_modules)
     assert.ok(results.length >= 2, 'Expected at least two results (regular file + node_modules file)');

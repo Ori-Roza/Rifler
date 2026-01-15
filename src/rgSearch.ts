@@ -12,6 +12,7 @@ interface RipgrepSearchParams {
   roots: string[];
   maxResults: number;
   workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined;
+  smartExcludesEnabled?: boolean;
 }
 
 type RipgrepMatchEvent = {
@@ -118,8 +119,10 @@ async function spawnWithFallback(
   throw new Error(`Failed to spawn ripgrep. Attempts: ${detail}`);
 }
 
-function buildGlobArgs(fileMask: string): string[] {
+function buildGlobArgs(fileMask: string, smartExcludesEnabled: boolean = true): string[] {
   const args: string[] = [];
+  
+  console.log('[rgSearch] buildGlobArgs called: smartExcludesEnabled=', smartExcludesEnabled);
 
   const trimmed = fileMask.trim();
   if (trimmed) {
@@ -133,8 +136,14 @@ function buildGlobArgs(fileMask: string): string[] {
     }
   }
 
-  for (const exclude of EXCLUDE_DIRS) {
-    args.push('--glob', `!${exclude}/**`);
+  // Only exclude default directories if smart excludes are enabled
+  if (smartExcludesEnabled) {
+    console.log('[rgSearch] Adding default EXCLUDE_DIRS');
+    for (const exclude of EXCLUDE_DIRS) {
+      args.push('--glob', `!${exclude}/**`);
+    }
+  } else {
+    console.log('[rgSearch] NOT adding EXCLUDE_DIRS because smartExcludesEnabled is false');
   }
 
   return args;
@@ -195,7 +204,7 @@ function isMatchEvent(evt: RipgrepJsonEvent): evt is RipgrepMatchEvent {
 }
 
 export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Promise<SearchResult[]>; cancel: () => void } {
-  const { query, options, fileMask, roots, maxResults, workspaceFolders } = params;
+  const { query, options, fileMask, roots, maxResults, workspaceFolders, smartExcludesEnabled } = params;
 
   const args: string[] = ['--json', '--no-config'];
 
@@ -211,7 +220,7 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
     args.push('--word-regexp');
   }
 
-  args.push(...buildGlobArgs(fileMask));
+  args.push(...buildGlobArgs(fileMask, smartExcludesEnabled ?? true));
 
   args.push('-e', query, '--', ...roots);
 

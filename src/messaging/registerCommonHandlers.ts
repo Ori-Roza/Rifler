@@ -4,6 +4,7 @@ import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
 import { validateRegex, validateFileMask, SearchOptions, SearchScope } from '../utils';
 import { StateStore } from '../state/StateStore';
+import { detectProjectTypes } from '../projectDetector';
 
 export interface CommonHandlerDeps {
   postMessage: (message: Record<string, unknown>) => void;
@@ -18,18 +19,25 @@ export interface CommonHandlerDeps {
 
 export function registerCommonHandlers(handler: MessageHandler, deps: CommonHandlerDeps) {
   handler.registerHandler('runSearch', async (message) => {
-    const msg = message as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; };
+    const msg = message as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; smartExcludesEnabled?: boolean; exclusionPatterns?: string };
     console.log('[Rifler] runSearch handler called:', {
       query: msg.query,
       scope: msg.scope,
       hasDirectoryPath: !!msg.directoryPath,
       directoryPath: msg.directoryPath,
-      options: msg.options
+      options: msg.options,
+      smartExcludesEnabled: msg.smartExcludesEnabled,
+      exclusionPatterns: msg.exclusionPatterns
     });
+
+    const mergedFileMask = (msg.smartExcludesEnabled && msg.exclusionPatterns)
+      ? (msg.options.fileMask ? `${msg.options.fileMask},${msg.exclusionPatterns}` : msg.exclusionPatterns)
+      : (msg.options.fileMask || '');
+
     const results = await performSearch(
       msg.query,
       msg.scope,
-      msg.options,
+      { ...msg.options, fileMask: mergedFileMask },
       msg.directoryPath,
       msg.modulePath
     );
@@ -176,6 +184,37 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     const msg = message as { collapsed: boolean };
     if (deps.stateStore) {
       deps.stateStore.setPreviewPanelCollapsed(msg.collapsed);
+    }
+  });
+
+  handler.registerHandler('getProjectExclusions', async () => {
+    console.log('[Rifler] getProjectExclusions handler called');
+    const detectedProjects = await detectProjectTypes();
+    console.log('[Rifler] Detected projects:', detectedProjects);
+    
+    // Load saved preferences from state if available
+    let projects = detectedProjects.detectedProjects;
+    if (deps.stateStore) {
+      const savedPreferences = deps.stateStore.getProjectExclusionPreferences();
+      console.log('[Rifler] Loaded saved preferences:', savedPreferences);
+      projects = projects.map(project => ({
+        ...project,
+        enabled: savedPreferences[project.id] ?? project.enabled
+      }));
+    }
+    
+    console.log('[Rifler] Sending projectExclusions message with', projects.length, 'projects');
+    deps.postMessage({ type: 'projectExclusions', projects });
+  });
+
+  handler.registerHandler('updateProjectExclusions', async (message) => {
+    const msg = message as { projects: Array<{ id: string; enabled: boolean }> };
+    if (deps.stateStore) {
+      const preferences: Record<string, boolean> = {};
+      msg.projects.forEach(p => {
+        preferences[p.id] = p.enabled;
+      });
+      deps.stateStore.setProjectExclusionPreferences(preferences);
     }
   });
 }

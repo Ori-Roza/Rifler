@@ -28,6 +28,7 @@ export class StateStore {
   private previewPanelCollapsed = false;
   private resultsShowCollapsed = false;
   private searchHistory: SearchHistoryEntry[] = [];
+  private projectExclusionPreferences: Record<string, boolean> = {};
   private visibilityCallbacks: Array<(visible: boolean) => void> = [];
   private bottomVisibilityCallbacks: Array<(visible: boolean) => void> = [];
 
@@ -84,6 +85,10 @@ export class StateStore {
 
       this.searchHistory = deduped;
       store.update('rifler.searchHistory', this.searchHistory);
+
+      // Load project exclusion preferences
+      const exclusions = store.get<Record<string, boolean>>('rifler.projectExclusionPreferences', {});
+      this.projectExclusionPreferences = exclusions || {};
     } else {
       this.savedState = undefined;
       this.previewPanelCollapsed = false;
@@ -209,4 +214,20 @@ export class StateStore {
 
   setResultsShowCollapsed(collapsed: boolean): void {
     this.resultsShowCollapsed = collapsed;
-  }}
+  }
+
+  getProjectExclusionPreferences(): Record<string, boolean> {
+    return { ...this.projectExclusionPreferences };
+  }
+
+  setProjectExclusionPreferences(preferences: Record<string, boolean>): void {
+    this.projectExclusionPreferences = preferences;
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+    const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
+    const store = scope === 'global' ? this.context.globalState : this.context.workspaceState;
+    if (persist) {
+      store.update('rifler.projectExclusionPreferences', preferences);
+    }
+  }
+}

@@ -52,6 +52,8 @@ console.log('[Rifler] Webview script starting...');
     expandedFiles: new Set(), // Track files explicitly expanded by user
     previewPanelCollapsed: false, // Track preview panel state
     resultsShowCollapsed: false, // Show results collapsed by default if enabled in settings
+    projectExclusions: [], // Store detected project types with exclusion patterns
+    smartExcludesEnabled: true,
     options: {
       matchCase: false,
       wholeWord: false,
@@ -142,6 +144,7 @@ console.log('[Rifler] Webview script starting...');
   const resultsCountText = document.getElementById('results-count-text');
   const resultsSummaryBar = document.querySelector('.results-summary-bar');
   const collapseAllBtn = document.getElementById('collapse-all-btn');
+  const smartExcludeToggle = document.getElementById('smart-exclude-toggle');
   
   // Create a fallback for resultsCount if needed (backward compatibility)
   let resultsCount = document.getElementById('results-count');
@@ -340,6 +343,8 @@ console.log('[Rifler] Webview script starting...');
   vscode.postMessage({ type: 'getModules' });
   vscode.postMessage({ type: 'getCurrentDirectory' });
   vscode.postMessage({ type: 'getWorkspaceInfo' });
+  console.log('[Rifler] Sending getProjectExclusions message');
+  vscode.postMessage({ type: 'getProjectExclusions' });
   
   // Initialize results count display
   clearResultsCountDisplay();
@@ -581,6 +586,24 @@ console.log('[Rifler] Webview script starting...');
       e.stopPropagation();
       const isHidden = filtersContainer.classList.toggle('hidden');
       filterBtn.classList.toggle('active', !isHidden);
+    });
+  }
+
+  if (smartExcludeToggle) {
+    // Load from webview state if available
+    const savedState = vscode.getState() || {};
+    if (typeof savedState.smartExcludesEnabled === 'boolean') {
+      state.smartExcludesEnabled = savedState.smartExcludesEnabled;
+    }
+    smartExcludeToggle.checked = state.smartExcludesEnabled;
+    smartExcludeToggle.addEventListener('change', () => {
+      state.smartExcludesEnabled = smartExcludeToggle.checked;
+      // Persist to webview state
+      const currentState = vscode.getState() || {};
+      vscode.setState({ ...currentState, smartExcludesEnabled: state.smartExcludesEnabled });
+      if (state.currentQuery && state.currentQuery.length >= 2) {
+        runSearch();
+      }
     });
   }
   
@@ -1796,6 +1819,7 @@ console.log('[Rifler] Webview script starting...');
         modulePath: moduleSelect.value,
         options: state.options,
         showReplace: replaceRow.classList.contains('visible'),
+        smartExcludesEnabled: state.smartExcludesEnabled,
         results: state.results,
         activeIndex: state.activeIndex,
         lastPreview: state.lastPreview
@@ -2323,6 +2347,10 @@ console.log('[Rifler] Webview script starting...');
           fallbackToAll: message.fallbackToAll
         });
         break;
+      case 'projectExclusions':
+        console.log('[Rifler] Received projectExclusions message:', message);
+        state.projectExclusions = message.projects || [];
+        break;
       case 'restoreState':
         if (message.state) {
           const s = message.state;
@@ -2343,6 +2371,15 @@ console.log('[Rifler] Webview script starting...');
             scopeSelect.value = state.currentScope;
           }
           updateScopeInputs();
+          
+          // Restore smart excludes state
+          if (typeof s.smartExcludesEnabled === 'boolean') {
+            state.smartExcludesEnabled = s.smartExcludesEnabled;
+            const smartExcludeToggle = document.getElementById('smart-exclude-toggle');
+            if (smartExcludeToggle) {
+              smartExcludeToggle.checked = s.smartExcludesEnabled;
+            }
+          }
           
           if (s.showReplace === true) {
             toggleReplace(true);
@@ -2779,6 +2816,16 @@ console.log('[Rifler] Webview script starting...');
           handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex, preserveScroll: true });
         }
         break;
+      case '__test_setSmartExcludes':
+        // Set smart excludes checkbox state for E2E tests
+        if (typeof message.enabled === 'boolean') {
+          state.smartExcludesEnabled = message.enabled;
+          const smartExcludeToggle = document.getElementById('smart-exclude-toggle');
+          if (smartExcludeToggle) {
+            smartExcludeToggle.checked = message.enabled;
+          }
+        }
+        break;
       case '__test_setSearchInput':
         if (queryInput && message.value !== undefined) {
           queryInput.value = message.value;
@@ -2866,6 +2913,21 @@ console.log('[Rifler] Webview script starting...');
     if (scopeSelect && scopeSelect.value !== state.currentScope) {
       scopeSelect.value = state.currentScope;
     }
+  }
+
+  function getActiveExcludePatterns() {
+    if (!state.smartExcludesEnabled || state.projectExclusions.length === 0) {
+      return '';
+    }
+
+    const patterns = [];
+    state.projectExclusions.forEach(project => {
+      patterns.push(...project.excludePatterns);
+    });
+
+    return Array.from(new Set(patterns))
+      .map((pattern) => `!${pattern}`)
+      .join(',');
   }
 
   function showPlaceholder(text) {
@@ -2961,7 +3023,9 @@ console.log('[Rifler] Webview script starting...');
         type: 'runSearch',
         query: query,
         scope: state.currentScope,
-        options: state.options
+        options: { ...state.options },
+        smartExcludesEnabled: state.smartExcludesEnabled,
+        exclusionPatterns: getActiveExcludePatterns()
       };
 
       if (state.currentScope === 'directory') {

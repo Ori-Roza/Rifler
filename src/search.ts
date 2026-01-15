@@ -73,7 +73,8 @@ export async function performSearch(
   options: SearchOptions,
   directoryPath?: string,
   modulePath?: string,
-  maxResults: number = 10000
+  maxResults: number = 10000,
+  smartExcludesEnabled: boolean = true
 ): Promise<SearchResult[]> {
   if (!query.trim() || query.length < 2) {
     return [];
@@ -114,7 +115,8 @@ export async function performSearch(
     fileMask: options.fileMask,
     roots,
     maxResults: effectiveMaxResults,
-    workspaceFolders: vscode.workspace.workspaceFolders
+    workspaceFolders: vscode.workspace.workspaceFolders,
+    smartExcludesEnabled
   });
 
   activeSearchCancel = cancel;
@@ -143,7 +145,7 @@ export async function performSearch(
         if (spec.type === vscode.FileType.File) {
           await fallbackSearchInFile(spec.fsPath, regex, results, effectiveMaxResults, perFileTimeBudgetMs);
         } else {
-          await fallbackSearchInDirectory(spec.fsPath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs);
+          await fallbackSearchInDirectory(spec.fsPath, regex, options.fileMask, results, effectiveMaxResults, limiter, perFileTimeBudgetMs, smartExcludesEnabled);
         }
 
         if (results.length >= effectiveMaxResults) break;
@@ -214,7 +216,8 @@ async function fallbackSearchInDirectory(
   results: SearchResult[],
   maxResults: number,
   limiter: Limiter,
-  perFileTimeBudgetMs: number
+  perFileTimeBudgetMs: number,
+  smartExcludesEnabled: boolean = true
 ): Promise<void> {
   try {
     const uri = vscode.Uri.file(dirPath);
@@ -225,8 +228,9 @@ async function fallbackSearchInDirectory(
       const [entryName, entryType] = entry;
       const fullPath = path.join(dirPath, entryName);
       if (entryType === vscode.FileType.Directory) {
-        if (!EXCLUDE_DIRS.has(entryName) && !entryName.startsWith('.')) {
-          tasks.push(fallbackSearchInDirectory(fullPath, regex, fileMask, results, maxResults, limiter, perFileTimeBudgetMs));
+        const shouldExclude = smartExcludesEnabled && EXCLUDE_DIRS.has(entryName);
+        if (!shouldExclude && !entryName.startsWith('.')) {
+          tasks.push(fallbackSearchInDirectory(fullPath, regex, fileMask, results, maxResults, limiter, perFileTimeBudgetMs, smartExcludesEnabled));
         }
       } else if (entryType === vscode.FileType.File) {
         const ext = path.extname(entryName).toLowerCase();

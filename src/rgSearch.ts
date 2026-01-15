@@ -12,6 +12,7 @@ interface RipgrepSearchParams {
   roots: string[];
   maxResults: number;
   workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined;
+  smartExcludesEnabled?: boolean;
 }
 
 type RipgrepMatchEvent = {
@@ -118,7 +119,7 @@ async function spawnWithFallback(
   throw new Error(`Failed to spawn ripgrep. Attempts: ${detail}`);
 }
 
-function buildGlobArgs(fileMask: string): string[] {
+function buildGlobArgs(fileMask: string, smartExcludesEnabled: boolean = true): string[] {
   const args: string[] = [];
 
   const trimmed = fileMask.trim();
@@ -133,8 +134,11 @@ function buildGlobArgs(fileMask: string): string[] {
     }
   }
 
-  for (const exclude of EXCLUDE_DIRS) {
-    args.push('--glob', `!${exclude}/**`);
+  // Only exclude default directories if smart excludes are enabled
+  if (smartExcludesEnabled) {
+    for (const exclude of EXCLUDE_DIRS) {
+      args.push('--glob', `!${exclude}/**`);
+    }
   }
 
   return args;
@@ -195,7 +199,7 @@ function isMatchEvent(evt: RipgrepJsonEvent): evt is RipgrepMatchEvent {
 }
 
 export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Promise<SearchResult[]>; cancel: () => void } {
-  const { query, options, fileMask, roots, maxResults, workspaceFolders } = params;
+  const { query, options, fileMask, roots, maxResults, workspaceFolders, smartExcludesEnabled } = params;
 
   const args: string[] = ['--json', '--no-config'];
 
@@ -211,7 +215,13 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
     args.push('--word-regexp');
   }
 
-  args.push(...buildGlobArgs(fileMask));
+  // Disable .gitignore and other ignore files when smart excludes are OFF
+  // This allows searching in node_modules and other typically-ignored directories
+  if (smartExcludesEnabled === false) {
+    args.push('--no-ignore');
+  }
+
+  args.push(...buildGlobArgs(fileMask, smartExcludesEnabled ?? true));
 
   args.push('-e', query, '--', ...roots);
 

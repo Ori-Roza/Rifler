@@ -16,6 +16,7 @@ export interface MinimizeMessage {
     options: SearchOptions;
     showReplace: boolean;
     showFilters?: boolean;
+    smartExcludesEnabled?: boolean;
     results?: SearchResult[];
     activeIndex?: number;
     lastPreview?: unknown;
@@ -100,6 +101,15 @@ export interface SaveFileMessage {
   content: string;
 }
 
+export interface GetProjectExclusionsMessage {
+  type: 'getProjectExclusions';
+}
+
+export interface UpdateProjectExclusionsMessage {
+  type: 'updateProjectExclusions';
+  projects: Array<{ id: string; enabled: boolean }>;
+}
+
 // Test-only message types
 export interface TestSearchCompletedMessage {
   type: '__test_searchCompleted';
@@ -171,6 +181,8 @@ export type IncomingMessage =
   | MinimizeMessage
   | ValidateRegexMessage
   | ValidateFileMaskMessage
+  | GetProjectExclusionsMessage
+  | UpdateProjectExclusionsMessage
   | TestSearchCompletedMessage
   | TestSearchResultsReceivedMessage
   | TestResultsListStatusMessage
@@ -263,6 +275,17 @@ export interface ErrorMessage {
   message: string;
 }
 
+export interface ProjectExclusionsMessage {
+  type: 'projectExclusions';
+  projects: Array<{
+    id: string;
+    name: string;
+    detectedBy: string;
+    excludePatterns: string[];
+    enabled: boolean;
+  }>;
+}
+
 /**
  * Union type of all possible messages from extension to webview
  */
@@ -280,4 +303,5 @@ export type OutgoingMessage =
   | FocusSearchMessage
   | ToggleReplaceMessage
   | RequestStateForMinimizeMessage
+  | ProjectExclusionsMessage
   | ErrorMessage;

@@ -106,6 +106,7 @@ src/
 ### Unit Tests
 Located in `src/__tests__/`, unit tests cover:
 - Search functionality with various scopes and options
+- Smart excludes (node_modules filtering) with ON/OFF states
 - Replace operations
 - File masking and filtering
 - Utility functions

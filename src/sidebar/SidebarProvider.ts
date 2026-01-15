@@ -223,11 +223,14 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       'replaceAll',
       'getModules',
       'getCurrentDirectory',
+      'getWorkspaceInfo',
       'getFileContent',
       'applyEdits',
       'validateRegex',
       'validateFileMask',
       'validateDirectory',
+      'getProjectExclusions',
+      'updateProjectExclusions',
       '__diag_ping',
       '__test_searchCompleted',
       '__test_searchResultsReceived',
@@ -242,7 +245,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     switch (message.type) {
       case 'runSearch': {
         // Handle search locally to persist state after each search
-        const searchMessage = message as unknown as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number };
+        const searchMessage = message as unknown as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number; smartExcludesEnabled?: boolean };
         await this._runSearch(searchMessage);
         break;
       }
@@ -314,7 +317,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async _runSearch(message: { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number }): Promise<void> {
+  private async _runSearch(message: { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number; smartExcludesEnabled?: boolean }): Promise<void> {
     if (!message.query || !message.scope || !message.options) {
       return;
     }
@@ -324,7 +327,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       message.scope as SearchScope,
       message.options,
       message.directoryPath,
-      message.modulePath
+      message.modulePath,
+      10000,
+      message.smartExcludesEnabled ?? true
     );
 
     const activeIndex = message.activeIndex ?? (results.length > 0 ? 0 : -1);

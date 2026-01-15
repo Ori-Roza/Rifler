@@ -590,9 +590,17 @@ console.log('[Rifler] Webview script starting...');
   }
 
   if (smartExcludeToggle) {
+    // Load from webview state if available
+    const savedState = vscode.getState() || {};
+    if (typeof savedState.smartExcludesEnabled === 'boolean') {
+      state.smartExcludesEnabled = savedState.smartExcludesEnabled;
+    }
     smartExcludeToggle.checked = state.smartExcludesEnabled;
     smartExcludeToggle.addEventListener('change', () => {
       state.smartExcludesEnabled = smartExcludeToggle.checked;
+      // Persist to webview state
+      const currentState = vscode.getState() || {};
+      vscode.setState({ ...currentState, smartExcludesEnabled: state.smartExcludesEnabled });
       if (state.currentQuery && state.currentQuery.length >= 2) {
         runSearch();
       }
@@ -1811,6 +1819,7 @@ console.log('[Rifler] Webview script starting...');
         modulePath: moduleSelect.value,
         options: state.options,
         showReplace: replaceRow.classList.contains('visible'),
+        smartExcludesEnabled: state.smartExcludesEnabled,
         results: state.results,
         activeIndex: state.activeIndex,
         lastPreview: state.lastPreview
@@ -2362,6 +2371,15 @@ console.log('[Rifler] Webview script starting...');
             scopeSelect.value = state.currentScope;
           }
           updateScopeInputs();
+          
+          // Restore smart excludes state
+          if (typeof s.smartExcludesEnabled === 'boolean') {
+            state.smartExcludesEnabled = s.smartExcludesEnabled;
+            const smartExcludeToggle = document.getElementById('smart-exclude-toggle');
+            if (smartExcludeToggle) {
+              smartExcludeToggle.checked = s.smartExcludesEnabled;
+            }
+          }
           
           if (s.showReplace === true) {
             toggleReplace(true);

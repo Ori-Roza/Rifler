@@ -32,6 +32,10 @@
   - **Regex** - Use regular expressions
   - **File Mask** - Filter by file patterns (e.g., `*.ts`, `*.js, *.py`)
     - Supports PyCharm-style include/exclude masks: comma/semicolon separated; `!` to exclude. Examples: `*.py`; `main.py, util.py`; `!*.txt`; `*.tsx,!*.test.tsx,!*.stories.tsx`; `*test*`.
+  - **Smart Excludes** - Toggle to control automatic exclusion of common directories
+    - **ON (default)** - Excludes node_modules, .git, dist, build, and other common directories
+    - **OFF** - Searches all directories including node_modules (useful for searching dependencies)
+    - State persists across sessions
 - **Search & Replace**
   - **Replace One** - Replace current match and move to next
   - **Replace All** - Replace all occurrences in search results
@@ -81,9 +85,10 @@ Press `Cmd+Alt+F` (Mac) or `Ctrl+Alt+F` (Windows/Linux) to **toggle** Rifler ope
 2. Type your search query (results appear dynamically after 2+ characters)
 3. Toggle search options as needed (Match Case, Words, Regex)
 4. Use File Mask to filter results (e.g., `*.ts, *.js`)
-5. Select scope (Project/Module/Directory)
-6. Navigate results with arrow keys and preview files
-7. Click on preview to edit inline, or double-click to open in main editor
+5. Toggle **Smart Excludes** (ON by default) to include/exclude common directories like node_modules
+6. Select scope (Project/Module/Directory)
+7. Navigate results with arrow keys and preview files
+8. Click on preview to edit inline, or double-click to open in main editor
 
 ### Replace in Search Results
 1. Press `Cmd+Alt+R` (Mac) or `Ctrl+Alt+R` (Windows/Linux) to open replace mode

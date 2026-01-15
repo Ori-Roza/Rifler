@@ -121,8 +121,6 @@ async function spawnWithFallback(
 
 function buildGlobArgs(fileMask: string, smartExcludesEnabled: boolean = true): string[] {
   const args: string[] = [];
-  
-  console.log('[rgSearch] buildGlobArgs called: smartExcludesEnabled=', smartExcludesEnabled);
 
   const trimmed = fileMask.trim();
   if (trimmed) {
@@ -138,12 +136,9 @@ function buildGlobArgs(fileMask: string, smartExcludesEnabled: boolean = true): 
 
   // Only exclude default directories if smart excludes are enabled
   if (smartExcludesEnabled) {
-    console.log('[rgSearch] Adding default EXCLUDE_DIRS');
     for (const exclude of EXCLUDE_DIRS) {
       args.push('--glob', `!${exclude}/**`);
     }
-  } else {
-    console.log('[rgSearch] NOT adding EXCLUDE_DIRS because smartExcludesEnabled is false');
   }
 
   return args;
@@ -220,10 +215,10 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
     args.push('--word-regexp');
   }
 
-  // When smart excludes are disabled, tell ripgrep to ignore VCS files (like .gitignore)
-  // so that node_modules and other excluded-by-default dirs can be searched
+  // Disable .gitignore and other ignore files when smart excludes are OFF
+  // This allows searching in node_modules and other typically-ignored directories
   if (smartExcludesEnabled === false) {
-    args.push('--no-ignore-vcs');
+    args.push('--no-ignore');
   }
 
   args.push(...buildGlobArgs(fileMask, smartExcludesEnabled ?? true));

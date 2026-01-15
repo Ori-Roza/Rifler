@@ -16,6 +16,7 @@ export interface MinimizeMessage {
     options: SearchOptions;
     showReplace: boolean;
     showFilters?: boolean;
+    smartExcludesEnabled?: boolean;
     results?: SearchResult[];
     activeIndex?: number;
     lastPreview?: unknown;

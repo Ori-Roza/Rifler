@@ -5,6 +5,8 @@
   # Rifler
 
   Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview with inline editing.
+  
+  ⭐ **Rated 5.0 on VS Code Marketplace** | ⬇️ **80+ installs and growing**
 </div>
 
 <div align="center">
@@ -285,3 +287,9 @@ View test results and coverage in the Actions tab.
 ## License
 
 MIT
+
+---
+
+<div align="center">
+  <p><strong>If Rifler helps you, a quick ⭐ or review goes a long way 🙏</strong></p>
+</div>

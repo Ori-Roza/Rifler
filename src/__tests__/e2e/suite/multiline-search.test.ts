@@ -187,4 +187,43 @@ Final section.
     assert.strictEqual(results.length, 0, 'Should not find pattern with incorrect line count');
     log('   ✅ No false positives for incorrect pattern');
   });
+
+  test('performSearch regex dot should NOT match newlines (no dotall)', async function() {
+    this.timeout(30000);
+
+    log('\n🔹 Testing that regex . does NOT match newlines');
+    log('   🔍 Query: "function.*console" (regex - should NOT match across lines)');
+
+    // This pattern uses .* which should NOT match newlines
+    // If dotall was enabled, this would incorrectly match functions with console on different lines
+    const results = await performSearch(
+      'function.*console',
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: true, fileMask: 'multiline-test-file.md', multiline: true }
+    );
+
+    log(`   📊 Found ${results.length} result(s)`);
+    // The test file has "function hello() {" on one line and "console.log" on the next
+    // Without dotall, .* should NOT match across lines, so this should find 0 results
+    assert.strictEqual(results.length, 0, 'Regex .* should NOT match across newlines');
+    log('   ✅ Dot does not match newlines (dotall disabled)');
+  });
+
+  test('performSearch regex with explicit newline should match across lines', async function() {
+    this.timeout(30000);
+
+    log('\n🔹 Testing regex with explicit \\n matches across lines');
+    log('   🔍 Query: "function hello\\(\\) \\{\\n  console" (regex with explicit newline)');
+
+    // This pattern uses explicit \n to match across lines
+    const results = await performSearch(
+      'function hello\\(\\) \\{\n  console',
+      'project',
+      { matchCase: false, wholeWord: false, useRegex: true, fileMask: 'multiline-test-file.md', multiline: true }
+    );
+
+    log(`   📊 Found ${results.length} result(s)`);
+    assert.ok(results.length >= 1, 'Should find pattern with explicit newline');
+    log('   ✅ Explicit newline in regex matches correctly');
+  });
 });

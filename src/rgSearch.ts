@@ -224,7 +224,10 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
   }
 
   if (options.multiline) {
-    args.push('--multiline', '--multiline-dotall');
+    // Use --multiline only, NOT --multiline-dotall
+    // This way . does NOT match newlines, preventing greedy cross-line matching
+    // Users can still match across lines with explicit \n in their pattern
+    args.push('--multiline');
   }
 
   if (!options.matchCase) {

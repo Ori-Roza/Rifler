@@ -99,7 +99,10 @@ export function buildSearchRegex(query: string, options: SearchOptions): RegExp 
     }
     
     const multiline = !!options.multiline;
-    const flags = `${options.matchCase ? 'g' : 'gi'}${multiline ? 'ms' : ''}`;
+    // Use 'm' flag for multiline (^ and $ match at line boundaries)
+    // Don't use 's' flag - users expect '.' to NOT match newlines by default
+    // Users who want '.' to match newlines can use [\s\S] or enable 's' flag explicitly
+    const flags = `${options.matchCase ? 'g' : 'gi'}${multiline ? 'm' : ''}`;
     return new RegExp(pattern, flags);
   } catch {
     // Invalid regex

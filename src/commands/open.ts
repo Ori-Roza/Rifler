@@ -5,64 +5,69 @@ import { CommandContext } from './types';
  * rifler.open - Toggle search panel based on viewMode configuration
  */
 export async function openCommand(ctx: CommandContext): Promise<void> {
-  const config = vscode.workspace.getConfiguration('rifler');
-  const panelLocation = getEffectivePanelLocation(config);
-  const selectedText = getSelectedText();
+  try {
+    const config = vscode.workspace.getConfiguration('rifler');
+    const panelLocation = getEffectivePanelLocation(config);
+    const selectedText = getSelectedText();
 
-  if (panelLocation === 'sidebar') {
-    if (ctx.getSidebarVisible()) {
+    if (panelLocation === 'sidebar') {
       if (selectedText) {
-        // Sidebar is visible: update search with selected text
+        // Has selection: always open sidebar and insert text
+        console.log('[Rifler] opening sidebar with selection');
         await ctx.viewManager.openView({
           forcedLocation: 'sidebar',
           initialQuery: selectedText,
           initialQueryFocus: false
         });
       } else {
-        // No selection: toggle (close) the sidebar
-        await vscode.commands.executeCommand('workbench.action.closeSidebar');
+        // No selection: check if Rifler is visible and toggle accordingly
+        const riflerVisible = ctx.getSidebarVisible();
+        console.log('[Rifler] toggling, riflerVisible:', riflerVisible);
+        
+        if (riflerVisible) {
+          // Rifler is visible: close the sidebar
+          console.log('[Rifler] closing sidebar');
+          await vscode.commands.executeCommand('workbench.action.closeSidebar');
+        } else {
+          // Rifler is not visible: open it
+          console.log('[Rifler] opening sidebar');
+          await ctx.viewManager.openView({
+            forcedLocation: 'sidebar',
+            initialQueryFocus: true
+          });
+        }
       }
-    } else {
-      // Sidebar is closed: open it
-      await ctx.viewManager.openView({
-        forcedLocation: 'sidebar',
-        initialQuery: selectedText,
-        initialQueryFocus: true
-      });
-    }
-  } else if (panelLocation === 'bottom') {
-    if (ctx.getBottomVisible()) {
+    } else if (panelLocation === 'bottom') {
       if (selectedText) {
+        // Has selection: always open bottom panel and insert text
+        console.log('[Rifler] opening bottom panel with selection');
         await ctx.viewManager.openView({
           forcedLocation: 'bottom',
           initialQuery: selectedText,
           initialQueryFocus: false
         });
       } else {
-        // Keep behavior non-destructive: focus the panel + reveal Rifler.
-        await vscode.commands.executeCommand('workbench.action.focusPanel');
-        await vscode.commands.executeCommand('workbench.view.extension.rifler-bottom');
+        // No selection: toggle bottom panel visibility
+        console.log('[Rifler] toggling bottom panel visibility');
+        await vscode.commands.executeCommand('workbench.action.togglePanel');
       }
     } else {
-      await ctx.viewManager.openView({
-        forcedLocation: 'bottom',
-        initialQuery: selectedText,
-        initialQueryFocus: true
-      });
+      if (ctx.panelManager.panel) {
+        ctx.panelManager.panel.dispose();
+      } else if (ctx.panelManager.minimized) {
+        ctx.panelManager.restore();
+      } else {
+        const selectedText = getSelectedText();
+        // Use viewManager to ensure sidebar is closed for "fullscreen" feel
+        await ctx.viewManager.openView({
+          forcedLocation: 'window',
+          initialQuery: selectedText
+        });
+      }
     }
-  } else {
-    if (ctx.panelManager.panel) {
-      ctx.panelManager.panel.dispose();
-    } else if (ctx.panelManager.minimized) {
-      ctx.panelManager.restore();
-    } else {
-      const selectedText = getSelectedText();
-      // Use viewManager to ensure sidebar is closed for "fullscreen" feel
-      await ctx.viewManager.openView({
-        forcedLocation: 'window',
-        initialQuery: selectedText
-      });
-    }
+  } catch (error) {
+    console.error('[Rifler] openCommand error:', error);
+    vscode.window.showErrorMessage(`Rifler error: ${error}`);
   }
 }
 

@@ -1,4 +1,4 @@
 {
-    "rifler.panelLocation": "bottom",
-    "rifler.viewMode": "tab"
+    "rifler.panelLocation": "sidebar",
+    "rifler.viewMode": "sidebar"
 }

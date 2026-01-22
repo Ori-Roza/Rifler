@@ -87,10 +87,11 @@ export class ViewManager {
     if (this._sidebarProvider) {
       // Wait for any lingering tab to close before focusing the sidebar
       await this._waitForPanelClosure();
-      await vscode.commands.executeCommand('workbench.action.focusSideBar');
-      await vscode.commands.executeCommand('workbench.view.extension.rifler-sidebar');
       
-      // Then show the sidebar provider view
+      // Focus the Rifler sidebar view container (this switches from Explorer/etc to Rifler)
+      await vscode.commands.executeCommand('rifler.sidebarView.focus');
+      
+      // Show the sidebar provider view
       this._sidebarProvider.show();
       
       if (typeof options.initialQuery === 'string') {

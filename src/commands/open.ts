@@ -47,9 +47,22 @@ export async function openCommand(ctx: CommandContext): Promise<void> {
           initialQueryFocus: false
         });
       } else {
-        // No selection: toggle bottom panel visibility
-        console.log('[Rifler] toggling bottom panel visibility');
-        await vscode.commands.executeCommand('workbench.action.togglePanel');
+        // No selection: check if Rifler bottom is visible and toggle accordingly
+        const riflerBottomVisible = ctx.getBottomVisible();
+        console.log('[Rifler] toggling bottom, riflerBottomVisible:', riflerBottomVisible);
+        
+        if (riflerBottomVisible) {
+          // Rifler bottom is visible: close the panel
+          console.log('[Rifler] closing bottom panel');
+          await vscode.commands.executeCommand('workbench.action.closePanel');
+        } else {
+          // Rifler bottom is not visible: open it
+          console.log('[Rifler] opening bottom panel');
+          await ctx.viewManager.openView({
+            forcedLocation: 'bottom',
+            initialQueryFocus: true
+          });
+        }
       }
     } else {
       if (ctx.panelManager.panel) {

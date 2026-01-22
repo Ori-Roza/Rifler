@@ -2359,9 +2359,12 @@ console.log('[Rifler] Webview script starting...');
         state.results = [];
         state.activeIndex = -1;
         state.lastPreview = null;
+        state.fileContent = null;
         state.lastSearchDuration = 0;
         state.collapsedFiles.clear();
         state.expandedFiles.clear();
+        // Clear cache key so next render will always re-render content
+        if (previewContent) previewContent.dataset.lastRenderedCacheKey = '';
         applyQueryRows(1, { skipSearch: true });
         recomputeMultilineOption({ skipSearch: true });
         applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
@@ -3239,6 +3242,8 @@ console.log('[Rifler] Webview script starting...');
     if (results.length === 0) {
       showPlaceholder('No results found');
       previewContent.innerHTML = '<div class="empty-state">No results</div>';
+      // Clear cache key so next render will always re-render content
+      previewContent.dataset.lastRenderedCacheKey = '';
       previewFilename.textContent = '';
       applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
       return;

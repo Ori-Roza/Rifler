@@ -9,6 +9,7 @@ export interface SearchOptions {
   matchCase: boolean;
   wholeWord: boolean;
   useRegex: boolean;
+  multiline?: boolean;
   fileMask: string;
 }
 
@@ -82,15 +83,23 @@ export function buildSearchRegex(query: string, options: SearchOptions): RegExp 
     if (options.useRegex) {
       pattern = query;
     } else {
-      // Escape special regex characters
-      pattern = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // For non-regex mode: escape special regex characters
+      // But preserve literal newlines by converting them to \n regex pattern
+      const hasLiteralNewlines = query.includes('\n');
+      if (hasLiteralNewlines && options.multiline) {
+        // Split by newlines, escape each part, then rejoin with \n
+        pattern = query.split('\n').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\n');
+      } else {
+        pattern = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
     }
     
     if (options.wholeWord) {
       pattern = `\\b${pattern}\\b`;
     }
     
-    const flags = options.matchCase ? 'g' : 'gi';
+    const multiline = !!options.multiline;
+    const flags = `${options.matchCase ? 'g' : 'gi'}${multiline ? 'ms' : ''}`;
     return new RegExp(pattern, flags);
   } catch {
     // Invalid regex
@@ -450,7 +459,7 @@ export interface MaskValidationResult {
  * @param useRegex Whether regex mode is enabled
  * @returns ValidationResult with error details if invalid
  */
-export function validateRegex(pattern: string, useRegex: boolean): ValidationResult {
+export function validateRegex(pattern: string, useRegex: boolean, multiline: boolean = false): ValidationResult {
   if (!pattern || pattern.length === 0) {
     return { isValid: false, error: 'Search pattern cannot be empty' };
   }
@@ -462,7 +471,8 @@ export function validateRegex(pattern: string, useRegex: boolean): ValidationRes
 
   // In regex mode, try to compile the pattern
   try {
-    new RegExp(pattern, 'g');
+    const flags = `g${multiline ? 'ms' : ''}`;
+    new RegExp(pattern, flags);
     return { isValid: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Invalid regex pattern';

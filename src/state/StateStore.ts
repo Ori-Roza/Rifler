@@ -11,8 +11,10 @@ export interface SearchHistoryEntry {
     matchCase: boolean;
     wholeWord: boolean;
     useRegex: boolean;
+    multiline?: boolean;
     fileMask: string;
   };
+  queryRows?: number;
   ts: number;
 }
 
@@ -66,8 +68,10 @@ export class StateStore {
               matchCase: !!h?.options?.matchCase,
               wholeWord: !!h?.options?.wholeWord,
               useRegex: !!h?.options?.useRegex,
+              multiline: !!h?.options?.multiline,
               fileMask: h?.options?.fileMask || ''
             },
+            queryRows: typeof h?.queryRows === 'number' ? h.queryRows : undefined,
             ts: typeof h?.ts === 'number' ? h.ts : 0
           } satisfies SearchHistoryEntry;
         })

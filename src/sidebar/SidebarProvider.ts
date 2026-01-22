@@ -317,7 +317,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async _runSearch(message: { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number; smartExcludesEnabled?: boolean }): Promise<void> {
+  private async _runSearch(message: { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number; smartExcludesEnabled?: boolean; queryRows?: number }): Promise<void> {
     if (!message.query || !message.scope || !message.options) {
       return;
     }
@@ -350,8 +350,10 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           matchCase: !!message.options.matchCase,
           wholeWord: !!message.options.wholeWord,
           useRegex: !!message.options.useRegex,
+          multiline: !!message.options.multiline,
           fileMask: message.options.fileMask || ''
-        }
+        },
+        queryRows: message.queryRows
       });
       this._view?.webview.postMessage({
         type: 'searchHistory',
@@ -369,6 +371,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         query: message.query,
         scope: message.scope,
         options: message.options,
+        queryRows: message.queryRows,
         directoryPath: message.directoryPath,
         modulePath: message.modulePath,
         results: results,
@@ -481,9 +484,13 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _sendFileContent(uriString: string | undefined, query: string | undefined, options: SearchOptions | undefined, activeIndex?: number): Promise<void> {
-    if (!uriString || !query || !options) {
+    if (!uriString) {
       return;
     }
+    
+    // Use empty defaults if query/options missing - still show file content without highlights
+    const safeQuery = query || '';
+    const safeOptions: SearchOptions = options || { matchCase: false, wholeWord: false, useRegex: false, multiline: false, fileMask: '' };
 
     try {
       const uri = vscode.Uri.parse(uriString);
@@ -501,27 +508,87 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       // Find all matches in the file using buildSearchRegex from utils
       const matches: Array<{ line: number; start: number; end: number }> = [];
       const lines = text.split('\n');
-      const regex = buildSearchRegex(query, options);
+      const regex = safeQuery ? buildSearchRegex(safeQuery, safeOptions) : null;
 
       if (regex) {
-        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-          const line = lines[lineIndex];
-          let match: RegExpExecArray | null;
-
-          // Reset regex for each line
+        // Detect multiline: if query has newlines, always use multiline matching
+        const isMultiline = safeQuery.includes('\n');
+        
+        if (isMultiline) {
+          // For multiline patterns, search the entire content
           regex.lastIndex = 0;
-
-          while ((match = regex.exec(line)) !== null) {
-            matches.push({
-              line: lineIndex,
-              start: match.index,
-              end: match.index + match[0].length
-            });
-            // Prevent infinite loop for zero-length matches
+          let match: RegExpExecArray | null;
+          while ((match = regex.exec(text)) !== null) {
+            // Find which line this match starts on
+            const beforeMatch = text.substring(0, match.index);
+            const lineNo = (beforeMatch.match(/\n/g) || []).length;
+            const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+            const start = match.index - lineStart;
+            
+            // Find all lines this match spans
+            const matchText = match[0];
+            const matchLines = matchText.split('\n');
+            
+            // Add match for each line it spans
+            for (let i = 0; i < matchLines.length; i++) {
+              const currentLine = lineNo + i;
+              const lineText = lines[currentLine] || '';
+              
+              if (i === 0) {
+                // First line: from start position to end of match on this line
+                matches.push({
+                  line: currentLine,
+                  start: start,
+                  end: Math.min(start + matchLines[i].length, lineText.length)
+                });
+              } else if (i === matchLines.length - 1) {
+                // Last line: from beginning to end of match
+                matches.push({
+                  line: currentLine,
+                  start: 0,
+                  end: matchLines[i].length
+                });
+              } else {
+                // Middle lines: entire line is highlighted
+                matches.push({
+                  line: currentLine,
+                  start: 0,
+                  end: lineText.length
+                });
+              }
+            }
+            
             if (match[0].length === 0) regex.lastIndex++;
+          }
+        } else {
+          // Single-line matching (original logic)
+          for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+            const line = lines[lineIndex];
+            let match: RegExpExecArray | null;
+
+            // Reset regex for each line
+            regex.lastIndex = 0;
+
+            while ((match = regex.exec(line)) !== null) {
+              matches.push({
+                line: lineIndex,
+                start: match.index,
+                end: match.index + match[0].length
+              });
+              // Prevent infinite loop for zero-length matches
+              if (match[0].length === 0) regex.lastIndex++;
+            }
           }
         }
       }
+      
+      console.log('[Rifler] _sendFileContent matches:', {
+        query: safeQuery,
+        hasNewline: safeQuery.includes('\n'),
+        isMultiline: safeQuery.includes('\n'),
+        matchCount: matches.length,
+        sampleMatches: matches.slice(0, 5)
+      });
 
       // Get language ID for icon
       const languageId = this.getLanguageIdFromFilename(fileName);
@@ -540,7 +607,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       };
 
       // Track active preview for live refresh
-      this._activePreview = { uri: uriString, query, options, activeIndex };
+      this._activePreview = { uri: uriString, query: safeQuery, options: safeOptions, activeIndex };
 
       this._view?.webview.postMessage(payload);
 
@@ -581,13 +648,64 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     const regex = buildSearchRegex(this._activePreview.query, this._activePreview.options);
 
     if (regex) {
-      for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-        const line = lines[lineIndex];
+      const isMultiline = this._activePreview.options.multiline && this._activePreview.query.includes('\n');
+      
+      if (isMultiline) {
+        // For multiline patterns, search the entire content
         regex.lastIndex = 0;
         let match: RegExpExecArray | null;
-        while ((match = regex.exec(line)) !== null) {
-          matches.push({ line: lineIndex, start: match.index, end: match.index + match[0].length });
+        while ((match = regex.exec(text)) !== null) {
+          // Find which line this match starts on
+          const beforeMatch = text.substring(0, match.index);
+          const lineNo = (beforeMatch.match(/\n/g) || []).length;
+          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+          const start = match.index - lineStart;
+          
+          // Find all lines this match spans
+          const matchText = match[0];
+          const matchLines = matchText.split('\n');
+          
+          // Add match for each line it spans
+          for (let i = 0; i < matchLines.length; i++) {
+            const currentLine = lineNo + i;
+            const lineText = lines[currentLine] || '';
+            
+            if (i === 0) {
+              // First line: from start position to end of match on this line
+              matches.push({
+                line: currentLine,
+                start: start,
+                end: Math.min(start + matchLines[i].length, lineText.length)
+              });
+            } else if (i === matchLines.length - 1) {
+              // Last line: from beginning to end of match
+              matches.push({
+                line: currentLine,
+                start: 0,
+                end: matchLines[i].length
+              });
+            } else {
+              // Middle lines: entire line is highlighted
+              matches.push({
+                line: currentLine,
+                start: 0,
+                end: lineText.length
+              });
+            }
+          }
+          
           if (match[0].length === 0) regex.lastIndex++;
+        }
+      } else {
+        // Single-line matching (original logic)
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+          const line = lines[lineIndex];
+          regex.lastIndex = 0;
+          let match: RegExpExecArray | null;
+          while ((match = regex.exec(line)) !== null) {
+            matches.push({ line: lineIndex, start: match.index, end: match.index + match[0].length });
+            if (match[0].length === 0) regex.lastIndex++;
+          }
         }
       }
     }

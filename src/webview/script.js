@@ -40,6 +40,7 @@ console.log('[Rifler] Webview script starting...');
     workspaceName: '',
     workspacePath: '',
     currentQuery: '',
+    queryRows: 1,
     fileContent: null,
     lastPreview: null,
     searchTimeout: null,
@@ -58,6 +59,7 @@ console.log('[Rifler] Webview script starting...');
       matchCase: false,
       wholeWord: false,
       useRegex: false,
+      multiline: false,
       fileMask: ''
     },
     groupScrollTops: {}, // Persist scroll positions for grouped result containers
@@ -103,6 +105,7 @@ console.log('[Rifler] Webview script starting...');
 
   // DOM Elements - Updated for Issue #83 redesign
   const queryInput = document.getElementById('query');
+  const searchInputGroup = document.querySelector('.search-input-group');
   const replaceRow = document.getElementById('replace-row');
   if (replaceRow) {
     replaceRow.classList.remove('visible');
@@ -313,10 +316,46 @@ console.log('[Rifler] Webview script starting...');
     // Ignore focus failures; rAF focus below will retry.
   }
 
+  applyQueryRows(state.queryRows, { skipSearch: true });
+
   function syncSearchOptionToggles() {
     if (matchCaseToggle) matchCaseToggle.classList.toggle('active', state.options.matchCase);
     if (wholeWordToggle) wholeWordToggle.classList.toggle('active', state.options.wholeWord);
     if (useRegexToggle) useRegexToggle.classList.toggle('active', state.options.useRegex);
+  }
+
+  function applyQueryRows(rows, { skipSearch, preventShrink } = { skipSearch: false, preventShrink: false }) {
+    const normalized = Math.min(4, Math.max(1, rows || 1));
+    state.queryRows = normalized;
+    if (queryInput && 'rows' in queryInput) {
+      queryInput.rows = normalized;
+      queryInput.classList.remove('multiline-1', 'multiline-2', 'multiline-3', 'multiline-4');
+      queryInput.classList.add(`multiline-${normalized}`);
+    }
+    if (searchInputGroup) {
+      searchInputGroup.style.setProperty('--search-rows', String(normalized));
+    }
+    recomputeMultilineOption({ skipSearch, preventShrink });
+  }
+
+  function recomputeMultilineOption({ skipSearch, preventShrink } = { skipSearch: false, preventShrink: false }) {
+    const text = queryInput ? String(queryInput.value || '') : '';
+    const hasNewline = text.includes('\n');
+    const lineCount = text.split('\n').length;
+    const nextMultiline = (state.queryRows || 1) > 1 || hasNewline;
+    const changed = state.options.multiline !== nextMultiline;
+    state.options.multiline = nextMultiline;
+    
+    // Auto-adjust rows based on actual line count
+    const targetRows = Math.max(1, Math.min(3, lineCount));
+    if (state.queryRows !== targetRows) {
+      applyQueryRows(targetRows, { skipSearch: true, preventShrink: true });
+      // Don't return early - we need to potentially trigger search below
+    }
+    
+    if ((changed || (state.queryRows !== targetRows)) && !skipSearch) {
+      runSearch();
+    }
   }
 
   // Wait for DOM to be fully ready before showing content
@@ -434,6 +473,8 @@ console.log('[Rifler] Webview script starting...');
       vscode.postMessage({ type: 'clearState' });
       
       vscode.postMessage({ type: 'minimize', state: {} });
+
+      applyQueryRows(1, { skipSearch: true });
     });
   }
 
@@ -504,6 +545,7 @@ console.log('[Rifler] Webview script starting...');
         state.options.matchCase = !!entry.options.matchCase;
         state.options.wholeWord = !!entry.options.wholeWord;
         state.options.useRegex = !!entry.options.useRegex;
+        state.options.multiline = !!entry.options.multiline;
         state.options.fileMask = entry.options.fileMask || '';
 
         if (matchCaseToggle) matchCaseToggle.classList.toggle('active', state.options.matchCase);
@@ -511,6 +553,13 @@ console.log('[Rifler] Webview script starting...');
         if (useRegexToggle) useRegexToggle.classList.toggle('active', state.options.useRegex);
         if (fileMaskInput) fileMaskInput.value = state.options.fileMask;
       }
+
+      // Apply query rows from history if present; otherwise infer from multiline flag
+      const inferredRows = typeof entry.queryRows === 'number'
+        ? Math.max(1, Math.min(4, entry.queryRows))
+        : (state.options.multiline ? 2 : 1);
+      applyQueryRows(inferredRows, { skipSearch: true });
+      recomputeMultilineOption({ skipSearch: true });
     }
 
     // Search history dropdown (triggered by magnifying glass)
@@ -1685,7 +1734,8 @@ console.log('[Rifler] Webview script starting...');
       vscode.postMessage({
         type: 'validateRegex',
         pattern: pattern,
-        useRegex: useRegex
+        useRegex: useRegex,
+        multiline: state.options.multiline
       });
     }
   }
@@ -1702,6 +1752,7 @@ console.log('[Rifler] Webview script starting...');
   queryInput.addEventListener('input', () => {
     console.log('Input event triggered, value:', queryInput.value);
     clearTimeout(state.searchTimeout);
+    recomputeMultilineOption({ skipSearch: true });
     
     if (isEditMode) {
       exitEditMode(true);
@@ -1818,6 +1869,7 @@ console.log('[Rifler] Webview script starting...');
         directoryPath: directoryInput.value,
         modulePath: moduleSelect.value,
         options: state.options,
+        queryRows: state.queryRows,
         showReplace: replaceRow.classList.contains('visible'),
         smartExcludesEnabled: state.smartExcludesEnabled,
         results: state.results,
@@ -2052,7 +2104,7 @@ console.log('[Rifler] Webview script starting...');
 
   document.addEventListener('keydown', (e) => {
     var activeEl = document.activeElement;
-    var isInEditor = activeEl === fileEditor || activeEl === localSearchInput || activeEl === localReplaceInput;
+    var isInEditor = activeEl === fileEditor || activeEl === localSearchInput || activeEl === localReplaceInput || activeEl === queryInput;
     
     if (e.altKey && !e.shiftKey && e.code === 'KeyR') {
       e.preventDefault();
@@ -2307,9 +2359,14 @@ console.log('[Rifler] Webview script starting...');
         state.results = [];
         state.activeIndex = -1;
         state.lastPreview = null;
+        state.fileContent = null;
         state.lastSearchDuration = 0;
         state.collapsedFiles.clear();
         state.expandedFiles.clear();
+        // Clear cache key so next render will always re-render content
+        if (previewContent) previewContent.dataset.lastRenderedCacheKey = '';
+        applyQueryRows(1, { skipSearch: true });
+        recomputeMultilineOption({ skipSearch: true });
         applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
         handleSearchResults([], { skipAutoLoad: true });
         break;
@@ -2360,12 +2417,16 @@ console.log('[Rifler] Webview script starting...');
           state.currentScope = s.scope || 'project';
           directoryInput.value = s.directoryPath || '';
           moduleSelect.value = s.modulePath || '';
-          state.options = s.options || { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' };
+          state.options = s.options || { matchCase: false, wholeWord: false, useRegex: false, multiline: false, fileMask: '' };
+          state.options.multiline = !!state.options.multiline;
+          state.queryRows = typeof s.queryRows === 'number' ? s.queryRows : 1;
           
           matchCaseToggle.classList.toggle('active', state.options.matchCase);
           wholeWordToggle.classList.toggle('active', state.options.wholeWord);
           useRegexToggle.classList.toggle('active', state.options.useRegex);
           fileMaskInput.value = state.options.fileMask || '';
+          applyQueryRows(state.queryRows, { skipSearch: true });
+          recomputeMultilineOption({ skipSearch: true });
           
           if (scopeSelect) {
             scopeSelect.value = state.currentScope;
@@ -2994,7 +3055,10 @@ console.log('[Rifler] Webview script starting...');
         exitEditMode(true);
       }
       
-      const query = queryInput.value.trim();
+      // Don't trim when multiline is enabled - preserve newlines
+      const query = state.options.multiline 
+        ? queryInput.value 
+        : queryInput.value.trim();
       state.currentQuery = query;
       
       console.log('runSearch called, query:', query, 'length:', query.length, 'useRegex:', state.options.useRegex);
@@ -3024,9 +3088,18 @@ console.log('[Rifler] Webview script starting...');
         query: query,
         scope: state.currentScope,
         options: { ...state.options },
+        queryRows: state.queryRows,
         smartExcludesEnabled: state.smartExcludesEnabled,
         exclusionPatterns: getActiveExcludePatterns()
       };
+
+      console.log('[Rifler Webview] Search state:', {
+        query,
+        queryRows: state.queryRows,
+        multiline: state.options.multiline,
+        hasNewline: query.includes('\n'),
+        lineCount: query.split('\n').length
+      });
 
       if (state.currentScope === 'directory') {
         message.directoryPath = directoryInput.value.trim();
@@ -3169,6 +3242,8 @@ console.log('[Rifler] Webview script starting...');
     if (results.length === 0) {
       showPlaceholder('No results found');
       previewContent.innerHTML = '<div class="empty-state">No results</div>';
+      // Clear cache key so next render will always re-render content
+      previewContent.dataset.lastRenderedCacheKey = '';
       previewFilename.textContent = '';
       applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
       return;
@@ -3929,20 +4004,38 @@ console.log('[Rifler] Webview script starting...');
       return;
     }
 
+    // Calculate multiline range first - needed for both cached and fresh renders
+    const currentQuery = queryInput ? queryInput.value : '';
+    const queryHasNewlines = currentQuery && currentQuery.includes('\n');
+    const queryLineCount = queryHasNewlines ? currentQuery.split('\n').length : 1;
+    const currentResult = state.results[state.activeIndex];
+    const currentLine = currentResult ? currentResult.line : -1;
+    const activeLineStart = currentLine;
+    const activeLineEnd = currentLine + queryLineCount - 1;
+
     // Prevent rendering the same content multiple times, but always scroll to current line
-    if (previewContent.dataset.lastRenderedUri === fileData.uri && 
-      previewContent.dataset.lastRenderedContent === fileData.content) {
-      // Content is already rendered, just update the active line highlight and scroll
-      const currentResult = state.results[state.activeIndex];
-      const currentLine = currentResult ? currentResult.line : -1;
+    // Include query, matches count and activeIndex in cache key to detect when highlighting changes
+    const matchCount = fileData.matches ? fileData.matches.length : 0;
+    const cacheKey = `${fileData.uri}|${currentQuery}|${matchCount}|${state.activeIndex}`;
+    
+    if (previewContent.dataset.lastRenderedCacheKey === cacheKey) {
+      // Content and matches are identical, just update the active line highlight and scroll
       
-      // Update active line class
+      // Update active line class - for multiline, update range
       previewContent.querySelectorAll('.pvLine.isActive').forEach(el => el.classList.remove('isActive'));
       
       if (currentLine >= 0) {
+        // Mark all lines in the active range
+        for (let lineIdx = activeLineStart; lineIdx <= activeLineEnd; lineIdx++) {
+          const lineEl = previewContent.querySelector('[data-line="' + lineIdx + '"]');
+          if (lineEl) {
+            lineEl.classList.add('isActive');
+          }
+        }
+        
         const currentLineEl = previewContent.querySelector('[data-line="' + currentLine + '"]');
         if (currentLineEl) {
-          console.log('[Rifler] Updating active line highlight and scrolling to line:', currentLine);
+          console.log('[Rifler] Updating active line highlight and scrolling to line:', currentLine, 'range:', activeLineStart, '-', activeLineEnd);
           currentLineEl.classList.add('isActive');
           
           // Use scrollIntoView with a small timeout to ensure layout is ready
@@ -3986,10 +4079,12 @@ console.log('[Rifler] Webview script starting...');
     }
 
     const lines = fileData.content.split('\n');
-    const currentResult = state.results[state.activeIndex];
-    const currentLine = currentResult ? currentResult.line : -1;
 
     console.log('[Rifler] renderFilePreview: Rendering', lines.length, 'lines. Total matches:', fileData.matches ? fileData.matches.length : 0);
+    console.log('[Rifler] Active line range:', activeLineStart, 'to', activeLineEnd, '(queryLineCount:', queryLineCount, 'queryHasNewlines:', queryHasNewlines, ')');
+    if (fileData.matches && fileData.matches.length > 0) {
+      console.log('[Rifler] Sample matches:', fileData.matches.slice(0, 5));
+    }
 
     const language = getLanguageFromFilename(fileData.fileName);
     console.log('[Rifler] Detected language:', language);
@@ -4018,7 +4113,7 @@ console.log('[Rifler] Webview script starting...');
     const renderLineWithMatches = (rawLine, ranges) => {
       const safeRanges = (Array.isArray(ranges) ? ranges : [])
         .map(r => ({ start: Number(r.start), end: Number(r.end) }))
-        .filter(r => Number.isFinite(r.start) && Number.isFinite(r.end) && r.end > r.start)
+        .filter(r => Number.isFinite(r.start) && Number.isFinite(r.end) && r.end >= r.start)
         .sort((a, b) => a.start - b.start);
 
       if (safeRanges.length === 0) {
@@ -4028,10 +4123,21 @@ console.log('[Rifler] Webview script starting...');
         return '<span class="pvSeg" data-start="0">' + content + '</span>';
       }
 
+      // Special case: if there's a zero-length match at start (empty line part of multiline match)
+      // Just show as an active line without highlight styling
+      const hasZeroLengthMatch = safeRanges.some(r => r.start === 0 && r.end === 0);
+      if (hasZeroLengthMatch && rawLine.length === 0) {
+        // Empty line that's part of a multiline match - show as plain empty line (isActive handles styling)
+        return '<span class="pvSeg" data-start="0"> </span>';
+      }
+
       let html = '';
       let cursor = 0;
 
       for (const r of safeRanges) {
+        // Skip zero-length ranges for rendering (but we still got isHit class from having matches)
+        if (r.end === r.start) continue;
+        
         // Ensure we don't go backwards and stay within bounds
         const start = Math.max(cursor, Math.min(rawLine.length, r.start));
         const end = Math.max(start, Math.min(rawLine.length, r.end));
@@ -4056,10 +4162,18 @@ console.log('[Rifler] Webview script starting...');
     lines.forEach((line, idx) => {
       const lineMatches = fileData.matches ? fileData.matches.filter(m => m.line === idx) : [];
       const hasMatch = lineMatches.length > 0;
-      const isCurrentLine = idx === currentLine;
+      // For multiline matches, mark all lines in the active range as "active" (styling)
+      // hasMatch controls the text highlight (isHit), isCurrentLine controls the line styling (isActive)
+      const isCurrentLine = idx >= activeLineStart && idx <= activeLineEnd;
+
+      // Log lines in the active range to debug multiline active line behavior
+      if (idx >= activeLineStart && idx <= activeLineEnd) {
+        console.log('[Rifler] Active range line', idx, '- hasMatch:', hasMatch, 'isCurrentLine:', isCurrentLine, 'lineContent:', JSON.stringify(line.substring(0, 30)));
+      }
 
       let lineClass = 'pvLine';
-      if (hasMatch) lineClass += ' isHit';
+      // Only add isHit (text highlight) if line has actual content - empty lines just get isActive
+      if (hasMatch && line.length > 0) lineClass += ' isHit';
       if (isCurrentLine) lineClass += ' isActive';
 
       const lineContent = renderLineWithMatches(line, lineMatches);
@@ -4084,8 +4198,7 @@ console.log('[Rifler] Webview script starting...');
     rebuildLineElementCache();
     
     // Update cache markers to prevent duplicate renders
-    previewContent.dataset.lastRenderedUri = fileData.uri;
-    previewContent.dataset.lastRenderedContent = fileData.content;
+    previewContent.dataset.lastRenderedCacheKey = cacheKey;
     
     // Force a layout recalculation
     previewContent.offsetHeight; 
@@ -4143,10 +4256,19 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function loadFileContent(result) {
+    // Use queryInput.value as fallback if state.currentQuery is empty
+    const query = state.currentQuery || (queryInput ? queryInput.value : '');
+    
+    // Ensure multiline option is set correctly based on query content
+    const queryHasNewlines = query.includes('\n');
+    if (queryHasNewlines && !state.options.multiline) {
+      state.options.multiline = true;
+    }
+    
     vscode.postMessage({
       type: 'getFileContent',
       uri: result.uri,
-      query: state.currentQuery,
+      query: query,
       options: state.options,
       activeIndex: state.activeIndex
     });

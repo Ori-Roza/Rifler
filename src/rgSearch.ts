@@ -203,8 +203,31 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
 
   const args: string[] = ['--json', '--no-config'];
 
-  if (!options.useRegex) {
+  // When multiline is enabled and query contains newlines, we need to handle escaping
+  let searchQuery = query;
+  let useRegex = options.useRegex;
+  
+  if (options.multiline && query.includes('\n')) {
+    // For non-regex mode, escape special regex chars except the newline we're converting
+    if (!options.useRegex) {
+      // Escape regex special characters
+      searchQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    // Convert literal newlines to \n for ripgrep
+    searchQuery = searchQuery.replace(/\n/g, '\\n');
+    // Force regex mode for multiline patterns
+    useRegex = true;
+  }
+
+  if (!useRegex) {
     args.push('--fixed-strings');
+  }
+
+  if (options.multiline) {
+    // Use --multiline only, NOT --multiline-dotall
+    // This way . does NOT match newlines, preventing greedy cross-line matching
+    // Users can still match across lines with explicit \n in their pattern
+    args.push('--multiline');
   }
 
   if (!options.matchCase) {
@@ -223,7 +246,19 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
 
   args.push(...buildGlobArgs(fileMask, smartExcludesEnabled ?? true));
 
-  args.push('-e', query, '--', ...roots);
+  args.push('-e', searchQuery, '--', ...roots);
+
+  // Debug logging
+  if (options.multiline || query.includes('\n')) {
+    console.log('[Rifler] Multiline search:', {
+      originalQuery: query,
+      searchQuery,
+      useRegex,
+      hasNewline: query.includes('\n'),
+      multilineEnabled: options.multiline
+    });
+    console.log('[Rifler] ripgrep args:', args.slice(0, 10));
+  }
 
   let child: ChildProcessWithoutNullStreams | undefined;
   let cancelled = false;

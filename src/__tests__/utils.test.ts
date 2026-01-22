@@ -80,6 +80,15 @@ describe('buildSearchRegex', () => {
     const regex = buildSearchRegex('', defaultOptions);
     expect(regex).not.toBeNull();
   });
+
+  test('should include multiline and dotall flags when multiline is enabled', () => {
+    const options = { ...defaultOptions, useRegex: true, multiline: true } as SearchOptions;
+    const regex = buildSearchRegex('foo.bar', options);
+    expect(regex).not.toBeNull();
+    expect(regex!.flags).toContain('m');
+    expect(regex!.flags).toContain('s');
+    expect('foo\nbar'.match(regex!)).toBeTruthy();
+  });
 });
 
 describe('matchesFileMask', () => {
@@ -536,6 +545,11 @@ describe('validateRegex', () => {
     const result = validateRegex('[a-', true);
     expect(result.isValid).toBe(false);
     expect(result.error).toBeDefined();
+  });
+
+  test('should validate with multiline flag when provided', () => {
+    const result = validateRegex('^foo.bar$', true, true);
+    expect(result.isValid).toBe(true);
   });
 });
 

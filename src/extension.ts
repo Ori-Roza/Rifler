@@ -106,22 +106,83 @@ async function sendFileContent(
     const lines = fileContent.split('\n');
 
     if (regex) {
-      for (let lineNo = 0; lineNo < lines.length; lineNo++) {
-        const line = lines[lineNo];
-        let match;
+      // Detect multiline: if query has newlines, always use multiline matching
+      const isMultiline = query.includes('\n');
+      
+      if (isMultiline) {
+        // For multiline patterns, search the entire content
         regex.lastIndex = 0;
-
-        while ((match = regex.exec(line)) !== null) {
-          matches.push({
-            line: lineNo,
-            start: match.index,
-            end: match.index + match[0].length
-          });
-          // Prevent infinite loop for zero-length matches
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(fileContent)) !== null) {
+          // Find which line this match starts on
+          const beforeMatch = fileContent.substring(0, match.index);
+          const lineNo = (beforeMatch.match(/\n/g) || []).length;
+          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+          const start = match.index - lineStart;
+          
+          // Find all lines this match spans
+          const matchText = match[0];
+          const matchLines = matchText.split('\n');
+          
+          // Add match for each line it spans
+          for (let i = 0; i < matchLines.length; i++) {
+            const currentLine = lineNo + i;
+            const lineText = lines[currentLine] || '';
+            
+            if (i === 0) {
+              // First line: from start position to end of match on this line
+              matches.push({
+                line: currentLine,
+                start: start,
+                end: Math.min(start + matchLines[i].length, lineText.length)
+              });
+            } else if (i === matchLines.length - 1) {
+              // Last line: from beginning to end of match
+              matches.push({
+                line: currentLine,
+                start: 0,
+                end: matchLines[i].length
+              });
+            } else {
+              // Middle lines: entire line is highlighted
+              matches.push({
+                line: currentLine,
+                start: 0,
+                end: lineText.length
+              });
+            }
+          }
+          
           if (match[0].length === 0) regex.lastIndex++;
+        }
+      } else {
+        // Single-line matching (original logic)
+        for (let lineNo = 0; lineNo < lines.length; lineNo++) {
+          const line = lines[lineNo];
+          let match;
+          regex.lastIndex = 0;
+
+          while ((match = regex.exec(line)) !== null) {
+            matches.push({
+              line: lineNo,
+              start: match.index,
+              end: match.index + match[0].length
+            });
+            // Prevent infinite loop for zero-length matches
+            if (match[0].length === 0) regex.lastIndex++;
+          }
         }
       }
     }
+
+    console.log('[Rifler] sendFileContent matches:', {
+      query,
+      hasNewline: query.includes('\n'),
+      multiline: options.multiline,
+      isMultiline: query.includes('\n'),
+      matchCount: matches.length,
+      sampleMatches: matches.slice(0, 5)
+    });
 
     panel.webview.postMessage({
       type: 'fileContent',
@@ -369,21 +430,81 @@ export async function activate(context: vscode.ExtensionContext) {
       const fileContent = e.document.getText();
       const regex = buildSearchRegex(panelActivePreview.query, panelActivePreview.options);
 
+      console.log('[Rifler] Building preview regex:', {
+        query: panelActivePreview.query,
+        queryLength: panelActivePreview.query.length,
+        hasNewline: panelActivePreview.query.includes('\n'),
+        multiline: panelActivePreview.options.multiline,
+        regex: regex?.toString()
+      });
+
       const matches: Array<{ line: number; start: number; end: number }> = [];
       const lines = fileContent.split('\n');
 
       if (regex) {
-        for (let lineNo = 0; lineNo < lines.length; lineNo++) {
-          const line = lines[lineNo];
+        // Detect multiline: if query has newlines, always use multiline matching
+        const isMultiline = panelActivePreview.query.includes('\n');
+        
+        if (isMultiline) {
+          // For multiline patterns, search the entire content
           regex.lastIndex = 0;
           let match: RegExpExecArray | null;
-          while ((match = regex.exec(line)) !== null) {
-            matches.push({
-              line: lineNo,
-              start: match.index,
-              end: match.index + match[0].length
-            });
+          while ((match = regex.exec(fileContent)) !== null) {
+            // Find which line this match starts on
+            const beforeMatch = fileContent.substring(0, match.index);
+            const lineNo = (beforeMatch.match(/\n/g) || []).length;
+            const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+            const start = match.index - lineStart;
+            
+            // Find all lines this match spans
+            const matchText = match[0];
+            const matchLines = matchText.split('\n');
+            
+            // Add match for each line it spans
+            for (let i = 0; i < matchLines.length; i++) {
+              const currentLine = lineNo + i;
+              const lineText = lines[currentLine] || '';
+              
+              if (i === 0) {
+                // First line: from start position to end of match on this line
+                matches.push({
+                  line: currentLine,
+                  start: start,
+                  end: Math.min(start + matchLines[i].length, lineText.length)
+                });
+              } else if (i === matchLines.length - 1) {
+                // Last line: from beginning to end of match
+                matches.push({
+                  line: currentLine,
+                  start: 0,
+                  end: matchLines[i].length
+                });
+              } else {
+                // Middle lines: entire line is highlighted
+                matches.push({
+                  line: currentLine,
+                  start: 0,
+                  end: lineText.length
+                });
+              }
+            }
+            
             if (match[0].length === 0) regex.lastIndex++;
+          }
+        } else {
+          // Single-line matching (original logic)
+          for (let lineNo = 0; lineNo < lines.length; lineNo++) {
+            const line = lines[lineNo];
+            regex.lastIndex = 0;
+            let match: RegExpExecArray | null;
+            while ((match = regex.exec(line)) !== null) {
+              matches.push({
+                line: lineNo,
+                start: match.index,
+                end: match.index + match[0].length
+              });
+              if (match[0].length === 0) regex.lastIndex++;
+            }
           }
         }
       }
@@ -397,6 +518,10 @@ export async function activate(context: vscode.ExtensionContext) {
         iconUri,
         matches
       });
+      
+      if (panelActivePreview.options.multiline && matches.length > 0) {
+        console.log('[Rifler] Multiline preview matches:', matches.slice(0, 10));
+      }
     })
   );
 

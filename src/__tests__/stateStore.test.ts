@@ -92,6 +92,20 @@ describe('StateStore Tests', () => {
       assert.strictEqual(history[0].options.matchCase, true);
     });
 
+    test('should record multiline option and query rows', () => {
+      const store = new StateStore(mockContext);
+      store.recordSearch({
+        query: 'foo\nbar',
+        scope: 'project',
+        options: { matchCase: false, wholeWord: false, useRegex: true, multiline: true, fileMask: '' },
+        queryRows: 3
+      });
+
+      const history = store.getSearchHistory();
+      assert.strictEqual(history[0].options.multiline, true);
+      assert.strictEqual(history[0].queryRows, 3);
+    });
+
     test('should clear history and persist the cleared list', () => {
       const store = new StateStore(mockContext);
       store.recordSearch({

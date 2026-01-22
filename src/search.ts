@@ -80,7 +80,9 @@ export async function performSearch(
     return [];
   }
 
-  const regexValidation = validateRegex(query, options.useRegex);
+  options.multiline = !!options.multiline;
+
+  const regexValidation = validateRegex(query, options.useRegex, !!options.multiline);
   if (!regexValidation.isValid) {
     console.error('Invalid regex:', regexValidation.error);
     return [];

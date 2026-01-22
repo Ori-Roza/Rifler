@@ -306,14 +306,16 @@ body.loaded {
 }
 
 .search-input-group {
+  --search-rows: 1;
+  --search-line-height: 18px;
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   background-color: var(--rifler-input-bg);
   border: 1px solid var(--rifler-input-border);
   border-radius: 6px;
-  padding: 4px 10px;
+  padding: 6px 10px;
   transition: all 0.15s;
   position: relative;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
@@ -335,13 +337,24 @@ body.loaded {
   flex: 1;
   padding: 4px 0;
   font-size: 13px;
+  line-height: var(--search-line-height);
   font-family: var(--rifler-font-mono);
   background-color: transparent;
   color: var(--rifler-input-fg);
   border: none;
   outline: none;
   min-width: 0;
+  resize: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: calc(var(--search-line-height) * var(--search-rows) + 6px);
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
+
+.search-input.multiline-2 { --search-rows: 2; }
+.search-input.multiline-3 { --search-rows: 3; }
+.search-input.multiline-4 { --search-rows: 4; }
 
 .search-input-group {
   position: relative;
@@ -393,6 +406,23 @@ body.loaded {
   gap: 2px;
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.multiline-btn {
+  width: 28px;
+}
+
+.multiline-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  opacity: 0.8;
+  filter: brightness(0) saturate(100%) invert(52%) sepia(7%) saturate(451%) hue-rotate(182deg) brightness(94%) contrast(86%);
+}
+
+.option-btn:hover .multiline-icon {
+  filter: brightness(0) saturate(100%) invert(100%);
+  opacity: 1;
 }
 
 .search-overflow {

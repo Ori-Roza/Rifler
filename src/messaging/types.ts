@@ -14,6 +14,7 @@ export interface MinimizeMessage {
     modulePath: string;
     filePath: string;
     options: SearchOptions;
+    queryRows?: number;
     showReplace: boolean;
     showFilters?: boolean;
     smartExcludesEnabled?: boolean;
@@ -27,6 +28,7 @@ export interface ValidateRegexMessage {
   type: 'validateRegex';
   pattern: string;
   useRegex: boolean;
+  multiline?: boolean;
 }
 
 export interface ValidateFileMaskMessage {
@@ -43,6 +45,7 @@ export interface RunSearchMessage {
   query: string;
   scope: SearchScope;
   options: SearchOptions;
+  queryRows?: number;
   directoryPath?: string;
   modulePath?: string;
   filePath?: string;

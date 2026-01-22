@@ -141,8 +141,8 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
   });
 
   handler.registerHandler('validateRegex', async (message) => {
-    const msg = message as { pattern: string; useRegex: boolean };
-    const result = validateRegex(msg.pattern, msg.useRegex);
+    const msg = message as { pattern: string; useRegex: boolean; multiline?: boolean };
+    const result = validateRegex(msg.pattern, msg.useRegex, !!msg.multiline);
     deps.postMessage({ type: 'validationResult', field: 'regex', isValid: result.isValid, error: result.error });
   });
 

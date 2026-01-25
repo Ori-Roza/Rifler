@@ -2520,12 +2520,12 @@ console.log('[Rifler] Webview script starting...');
           openActiveResult();
         }
         break;
-      case '__test_getPreviewScrollInfo':
-        const previewContent = document.getElementById('preview-content');
-        const activeLineEl = previewContent ? previewContent.querySelector('.pvLine.isActive') : null;
-        const previewScrollTop = previewContent ? previewContent.scrollTop : 0;
-        const previewScrollHeight = previewContent ? previewContent.scrollHeight : 0;
-        const previewClientHeight = previewContent ? previewContent.clientHeight : 0;
+      case '__test_getPreviewScrollInfo': {
+        const previewContentEl = document.getElementById('preview-content');
+        const activeLineEl = previewContentEl ? previewContentEl.querySelector('.pvLine.isActive') : null;
+        const previewScrollTop = previewContentEl ? previewContentEl.scrollTop : 0;
+        const previewScrollHeight = previewContentEl ? previewContentEl.scrollHeight : 0;
+        const previewClientHeight = previewContentEl ? previewContentEl.clientHeight : 0;
         
         vscode.postMessage({
           type: '__test_previewScrollInfo',
@@ -2539,6 +2539,7 @@ console.log('[Rifler] Webview script starting...');
              activeLineEl.offsetTop + activeLineEl.offsetHeight <= previewScrollTop + previewClientHeight) : false
         });
         break;
+      }
       case '__test_getGroupScrollInfo': {
         const containers = document.querySelectorAll('.matches-group-scroll-container');
         const groups = Array.from(containers).map(el => {

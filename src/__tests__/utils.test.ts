@@ -81,13 +81,17 @@ describe('buildSearchRegex', () => {
     expect(regex).not.toBeNull();
   });
 
-  test('should include multiline and dotall flags when multiline is enabled', () => {
+  test('should include multiline flag when multiline is enabled (but not dotall)', () => {
     const options = { ...defaultOptions, useRegex: true, multiline: true } as SearchOptions;
     const regex = buildSearchRegex('foo.bar', options);
     expect(regex).not.toBeNull();
     expect(regex!.flags).toContain('m');
-    expect(regex!.flags).toContain('s');
-    expect('foo\nbar'.match(regex!)).toBeTruthy();
+    // 's' flag (dotall) should NOT be included - users expect '.' to not match newlines by default
+    expect(regex!.flags).not.toContain('s');
+    // '.' should not match newline without 's' flag
+    expect('foo\nbar'.match(regex!)).toBeFalsy();
+    // But it should match when there's no newline
+    expect('foo_bar'.match(regex!)).toBeTruthy();
   });
 });
 

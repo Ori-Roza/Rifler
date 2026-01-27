@@ -162,9 +162,12 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
             type: 'setSearchQuery',
             query: selectedText
           });
-        } else if (!this._pendingInitOptions?.initialQuery) {
-          // Only restore state if we don't have a pending initialQuery (selection takes precedence)
-          this._restoreState();
+        } else {
+          // No selection: restore state and focus search input
+          if (!this._pendingInitOptions?.initialQuery) {
+            this._restoreState();
+          }
+          webviewView.webview.postMessage({ type: 'focusSearch' });
         }
         if (this._onVisibilityChanged) {
           this._onVisibilityChanged(true);
@@ -247,6 +250,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       'getModules',
       'getCurrentDirectory',
       'getWorkspaceInfo',
+      'requestSelectionRefresh',
       'getFileContent',
       'applyEdits',
       'validateRegex',

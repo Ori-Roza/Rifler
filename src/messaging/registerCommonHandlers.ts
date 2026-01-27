@@ -87,6 +87,25 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     deps.sendWorkspaceInfo();
   });
 
+  handler.registerHandler('requestSelectionRefresh', async () => {
+    const editor = vscode.window.activeTextEditor;
+    let selectedText: string | undefined;
+
+    if (editor && !editor.selection.isEmpty) {
+      const rawText = editor.document.getText(editor.selection);
+      const trimmedText = rawText.trim();
+      if (trimmedText.length >= 2) {
+        selectedText = trimmedText;
+      }
+    }
+
+    if (selectedText) {
+      deps.postMessage({ type: 'setSearchQuery', query: selectedText });
+    } else {
+      deps.postMessage({ type: 'focusSearch' });
+    }
+  });
+
   handler.registerHandler('validateDirectory', async (message) => {
     const msg = message as { directoryPath: string };
     console.log('[Rifler Backend] Validating directory:', msg.directoryPath);

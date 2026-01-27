@@ -384,6 +384,10 @@ console.log('[Rifler] Webview script starting...');
   vscode.postMessage({ type: 'getWorkspaceInfo' });
   console.log('[Rifler] Sending getProjectExclusions message');
   vscode.postMessage({ type: 'getProjectExclusions' });
+
+  window.addEventListener('focus', () => {
+    vscode.postMessage({ type: 'requestSelectionRefresh' });
+  });
   
   // Initialize results count display
   clearResultsCountDisplay();
@@ -2105,6 +2109,12 @@ console.log('[Rifler] Webview script starting...');
   document.addEventListener('keydown', (e) => {
     var activeEl = document.activeElement;
     var isInEditor = activeEl === fileEditor || activeEl === localSearchInput || activeEl === localReplaceInput || activeEl === queryInput;
+
+    if ((e.metaKey || e.ctrlKey) && e.altKey && !e.shiftKey && e.code === 'KeyF') {
+      e.preventDefault();
+      vscode.postMessage({ type: 'requestSelectionRefresh' });
+      return;
+    }
     
     if (e.altKey && !e.shiftKey && e.code === 'KeyR') {
       e.preventDefault();

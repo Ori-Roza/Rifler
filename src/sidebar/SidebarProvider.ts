@@ -154,8 +154,16 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       console.log('SidebarProvider: visibility changed, visible =', currentVisibility);
       this._lastVisibility = currentVisibility;
       if (currentVisibility) {
-        // Only restore state if we don't have a pending initialQuery (selection takes precedence)
-        if (!this._pendingInitOptions?.initialQuery) {
+        // If there's a current editor selection, use it as initial query
+        const selectedText = this._getSelectedText();
+        if (selectedText) {
+          this._pendingInitOptions = { initialQuery: selectedText };
+          webviewView.webview.postMessage({
+            type: 'setSearchQuery',
+            query: selectedText
+          });
+        } else if (!this._pendingInitOptions?.initialQuery) {
+          // Only restore state if we don't have a pending initialQuery (selection takes precedence)
           this._restoreState();
         }
         if (this._onVisibilityChanged) {
@@ -192,6 +200,21 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     if (webviewView.visible) {
       this._restoreState();
     }
+  }
+
+  private _getSelectedText(): string | undefined {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const selection = editor.selection;
+      if (!selection.isEmpty) {
+        const rawText = editor.document.getText(selection);
+        const trimmedText = rawText.trim();
+        if (trimmedText.length >= 2) {
+          return trimmedText;
+        }
+      }
+    }
+    return undefined;
   }
 
   private _updateViewTitle(): void {

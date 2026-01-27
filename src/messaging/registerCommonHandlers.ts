@@ -193,6 +193,13 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
 
   handler.registerHandler('executeCommand', async (message) => {
     const msg = message as { command: string; args?: unknown[] };
+    const allowedCommands = new Set<string>([
+      // Intentionally empty until a concrete webview use-case is defined.
+    ]);
+    if (!allowedCommands.has(msg.command)) {
+      console.warn('[Rifler] Blocked executeCommand from webview:', msg.command);
+      return;
+    }
     await vscode.commands.executeCommand(msg.command, ...(msg.args || []));
   });
 

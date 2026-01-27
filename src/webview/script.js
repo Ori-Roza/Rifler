@@ -780,6 +780,20 @@ console.log('[Rifler] Webview script starting...');
       editorContainer.style.removeProperty('--local-widget-offset');
     }
 
+    if (fileEditor && localMatches.length > 0 && localMatchIndex >= 0) {
+      var match = localMatches[localMatchIndex];
+      fileEditor.setSelectionRange(match.start, match.end);
+
+      var textBefore = fileEditor.value.substring(0, match.start);
+      var lines = textBefore.split('\n');
+      var lineHeight = 20;
+      var scrollTop = (lines.length - 5) * lineHeight;
+      fileEditor.scrollTop = Math.max(0, scrollTop);
+      if (editorBackdrop) {
+        editorBackdrop.scrollTop = fileEditor.scrollTop;
+      }
+    }
+
     localMatches = [];
     localMatchIndex = 0;
     updateHighlights();
@@ -884,7 +898,12 @@ console.log('[Rifler] Webview script starting...');
         e.preventDefault();
         navigateLocalMatch(1);
       } else if (e.key === 'Escape') {
-        closeLocalFindReplaceWidget();
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === 'function') {
+          e.stopImmediatePropagation();
+        }
+        closeLocalFindReplaceWidget({ refocusEditor: true });
       }
     });
   }
@@ -904,7 +923,12 @@ console.log('[Rifler] Webview script starting...');
         e.preventDefault();
         navigateLocalMatch(1);
       } else if (e.key === 'Escape') {
-        closeLocalFindReplaceWidget();
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === 'function') {
+          e.stopImmediatePropagation();
+        }
+        closeLocalFindReplaceWidget({ refocusEditor: true });
       }
     });
   }
@@ -926,7 +950,7 @@ console.log('[Rifler] Webview script starting...');
 
   function updateLocalMatches() {
     localMatches = [];
-    localMatchIndex = 0;
+    localMatchIndex = -1;
     
     var searchTerm = localSearchInput.value;
     if (!searchTerm || searchTerm.length < 1) {
@@ -1412,6 +1436,36 @@ console.log('[Rifler] Webview script starting...');
     });
     fileEditor.addEventListener('keydown', (e) => {
       // Preview editor shortcuts (only when the editor textarea is focused)
+      if (replaceWidget && replaceWidget.classList.contains('visible')) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            navigateLocalMatch(-1);
+          } else {
+            navigateLocalMatch(1);
+          }
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (typeof e.stopImmediatePropagation === 'function') {
+            e.stopImmediatePropagation();
+          }
+          closeLocalFindReplaceWidget({ refocusEditor: true });
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          navigateLocalMatch(-1);
+          return;
+        }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          navigateLocalMatch(1);
+          return;
+        }
+      }
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === 'KeyF') {
         // Find in file (within the preview editor)
         e.preventDefault();
@@ -2138,6 +2192,10 @@ console.log('[Rifler] Webview script starting...');
       e.preventDefault();
       openActiveResult();
     } else if (e.key === 'Escape') {
+      if (replaceWidget && replaceWidget.classList.contains('visible')) {
+        e.preventDefault();
+        return;
+      }
       if (isEditMode && !replaceWidget.classList.contains('visible')) {
         exitEditMode();
         queryInput.focus();

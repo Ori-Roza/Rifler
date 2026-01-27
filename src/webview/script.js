@@ -407,6 +407,9 @@ console.log('[Rifler] Webview script starting...');
 
       if (newState && replaceInput) {
         replaceInput.focus();
+      } else if (!newState && queryInput) {
+        queryInput.focus();
+        queryInput.select();
       }
       
       // Update highlights when replace mode changes

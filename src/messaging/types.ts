@@ -167,6 +167,10 @@ export interface DiagPingMessage {
   ts: number;
 }
 
+export interface RequestSelectionRefreshMessage {
+  type: 'requestSelectionRefresh';
+}
+
 /**
  * Union type of all possible messages from webview to extension
  */
@@ -176,6 +180,7 @@ export type IncomingMessage =
   | GetModulesMessage
   | GetCurrentDirectoryMessage
   | GetWorkspaceInfoMessage
+  | RequestSelectionRefreshMessage
   | GetFileContentMessage
   | ReplaceOneMessage
   | ReplaceAllMessage

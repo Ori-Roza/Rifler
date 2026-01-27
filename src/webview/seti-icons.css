@@ -357,7 +357,7 @@
 .seti-tex_2::before { content: "\E094"; color: #e37933; }
 .seti-tex_3_light::before { content: "\E094"; color: #bfc2c1; }
 .seti-tex_3::before { content: "\E094"; color: #d4d7d6; }
-.seti-todo::before { content: "\E096"; color: undefined; }
+.seti-todo::before { content: "\E096"; color: #d4d7d6; }
 .seti-tsconfig_light::before { content: "\E097"; color: #498ba7; }
 .seti-tsconfig::before { content: "\E097"; color: #519aba; }
 .seti-twig_light::before { content: "\E098"; color: #7fae42; }

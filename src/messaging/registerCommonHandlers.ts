@@ -87,6 +87,25 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     deps.sendWorkspaceInfo();
   });
 
+  handler.registerHandler('requestSelectionRefresh', async () => {
+    const editor = vscode.window.activeTextEditor;
+    let selectedText: string | undefined;
+
+    if (editor && !editor.selection.isEmpty) {
+      const rawText = editor.document.getText(editor.selection);
+      const trimmedText = rawText.trim();
+      if (trimmedText.length >= 2) {
+        selectedText = trimmedText;
+      }
+    }
+
+    if (selectedText) {
+      deps.postMessage({ type: 'setSearchQuery', query: selectedText });
+    } else {
+      deps.postMessage({ type: 'focusSearch' });
+    }
+  });
+
   handler.registerHandler('validateDirectory', async (message) => {
     const msg = message as { directoryPath: string };
     console.log('[Rifler Backend] Validating directory:', msg.directoryPath);
@@ -174,6 +193,13 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
 
   handler.registerHandler('executeCommand', async (message) => {
     const msg = message as { command: string; args?: unknown[] };
+    const allowedCommands = new Set<string>([
+      // Intentionally empty until a concrete webview use-case is defined.
+    ]);
+    if (!allowedCommands.has(msg.command)) {
+      console.warn('[Rifler] Blocked executeCommand from webview:', msg.command);
+      return;
+    }
     await vscode.commands.executeCommand(msg.command, ...(msg.args || []));
   });
 

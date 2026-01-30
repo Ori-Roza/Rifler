@@ -18,7 +18,11 @@ function getSelectedText(): string | undefined {
   if (editor) {
     const selection = editor.selection;
     if (!selection.isEmpty) {
-      return editor.document.getText(selection);
+      const rawText = editor.document.getText(selection);
+      const trimmedText = rawText.trim();
+      if (trimmedText.length >= 2) {
+        return trimmedText;
+      }
     }
   }
   return undefined;

@@ -2644,19 +2644,6 @@ console.log('[Rifler] Webview script starting...');
       case '__test_simulateKeyboard':
         if (message.key === 'Enter' && message.ctrlKey) {
           openActiveResult();
-        } else if (message.key === 'ArrowDown') {
-          // Simulate arrow down for result navigation
-          const currentActive = state.activeIndex;
-          if (state.results && state.results.length > 0) {
-            state.activeIndex = Math.min(currentActive + 1, state.results.length - 1);
-            renderResults();
-          }
-        } else if (message.key === 'ArrowUp') {
-          const currentActive = state.activeIndex;
-          if (state.results && state.results.length > 0) {
-            state.activeIndex = Math.max(currentActive - 1, 0);
-            renderResults();
-          }
         }
         break;
       case '__test_enterEditMode':
@@ -2760,7 +2747,7 @@ console.log('[Rifler] Webview script starting...');
         if (resultsList && virtualContent) {
           const virtualHeight = parseFloat(virtualContent.style.height) || virtualContent.scrollHeight || 0;
           // Force layout to ensure clientHeight is up-to-date
-          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+           
           resultsList.offsetHeight;
           const rectHeight = resultsList.getBoundingClientRect().height || 0;
           const computedHeight = parseFloat(getComputedStyle(resultsList).height) || 0;
@@ -2864,6 +2851,22 @@ console.log('[Rifler] Webview script starting...');
           activeElementId: activeElement ? activeElement.id : null,
           activeElementTag: activeElement ? activeElement.tagName : null
         });
+        break;
+      case '__test_simulateKeyboard_2':
+        if (message.key === 'ArrowDown') {
+          // Simulate arrow down for result navigation
+          const currentActive = state.activeIndex;
+          if (state.results && state.results.length > 0) {
+            state.activeIndex = Math.min(currentActive + 1, state.results.length - 1);
+            renderResults();
+          }
+        } else if (message.key === 'ArrowUp') {
+          const currentActive = state.activeIndex;
+          if (state.results && state.results.length > 0) {
+            state.activeIndex = Math.max(currentActive - 1, 0);
+            renderResults();
+          }
+        }
         break;
       case 'restorePreviewPanelState':
         if (typeof message.collapsed === 'boolean') {
@@ -4682,10 +4685,6 @@ console.log('[Rifler] Webview script starting...');
     return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  /**
-   * Security: Sanitize syntax-highlighted HTML to prevent XSS.
-   * Removes dangerous tags/attributes while preserving hljs styling.
-   */
   function sanitizeHighlightedHtml(highlightedHtml) {
     if (typeof highlightedHtml !== 'string') {
       return '';
@@ -4750,10 +4749,8 @@ console.log('[Rifler] Webview script starting...');
             if (rawText.length > 0 && !res.includes('class="hljs-')) {
               console.warn(`[Rifler] highlightMatchSafe: No hljs classes found in result for ${language}. Input: ${rawText.substring(0, 20)}`);
             }
-            // Security: Sanitize highlight.js output to prevent XSS
             return sanitizeHighlightedHtml(res);
           } else {
-            // Security: Sanitize highlight.js output to prevent XSS
             return sanitizeHighlightedHtml(hljs.highlightAuto(rawText).value);
           }
         } catch (e) {

@@ -421,7 +421,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     async function retryAssert(fn: () => void | Promise<void>, timeout = 15000, interval = 250) {
       const start = Date.now();
-      // eslint-disable-next-line no-constant-condition
+       
       while (true) {
         try {
           await fn();
@@ -620,7 +620,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     async function retryAssert(fn: () => void | Promise<void>, timeout = 8000, interval = 250) {
       const start = Date.now();
-      // eslint-disable-next-line no-constant-condition
+       
       while (true) {
         try {
           await fn();
@@ -666,7 +666,7 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
 
     async function retryAssert(fn: () => void | Promise<void>, timeout = 8000, interval = 250) {
       const start = Date.now();
-      // eslint-disable-next-line no-constant-condition
+       
       while (true) {
         try {
           await fn();

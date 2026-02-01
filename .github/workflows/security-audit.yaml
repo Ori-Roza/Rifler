@@ -1,0 +1,209 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run weekly security audit every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  dependency-audit:
+    name: NPM Dependency Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run npm audit
+        run: |
+          # Run audit and save output
+          npm audit --production --audit-level=moderate > audit-results.txt || true
+          
+          # Check if vulnerabilities found
+          if npm audit --production --audit-level=moderate; then
+            echo "✅ No vulnerabilities found"
+          else
+            echo "⚠️ Vulnerabilities detected"
+            cat audit-results.txt
+            exit 1
+          fi
+      
+      - name: Upload audit results
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-audit-results
+          path: audit-results.txt
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v3
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-3.0, AGPL-3.0
+
+  security-tests:
+    name: Security Test Suite
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run security tests
+        run: |
+          # Run only security-related tests
+          npm test -- src/security/__tests__
+      
+      - name: Check for path traversal vulnerabilities
+        run: |
+          echo "Checking for potential path traversal vulnerabilities..."
+          
+          # Search for dangerous path operations
+          if grep -r "path\.join.*\.\." src/ --exclude-dir=node_modules || \
+             grep -r "path\.resolve.*\.\." src/ --exclude-dir=node_modules; then
+            echo "⚠️ Found potential path traversal patterns"
+            echo "Review these carefully for security implications"
+            exit 1
+          else
+            echo "✅ No obvious path traversal patterns found"
+          fi
+      
+      - name: Check for command injection vulnerabilities
+        run: |
+          echo "Checking for command injection vulnerabilities..."
+          
+          # Search for dangerous command execution patterns
+          if grep -r "exec\(.*\$\|spawn\(.*shell.*true" src/ --exclude-dir=node_modules || \
+             grep -r "child_process.*shell.*true" src/ --exclude-dir=node_modules; then
+            echo "⚠️ Found potential command injection patterns"
+            exit 1
+          else
+            echo "✅ No command injection vulnerabilities found"
+          fi
+      
+      - name: Check for XSS vulnerabilities in webview
+        run: |
+          echo "Checking for XSS vulnerabilities in webview code..."
+          
+          # Search for dangerous innerHTML patterns
+          UNSAFE_INNERHTML=$(grep -n "innerHTML.*=" src/webview/ --exclude="*.test.*" || true)
+          
+          if [ -n "$UNSAFE_INNERHTML" ]; then
+            echo "⚠️ Found innerHTML usage in webview:"
+            echo "$UNSAFE_INNERHTML"
+            echo ""
+            echo "Ensure all innerHTML assignments use escapeHtml() or sanitizeHighlightedHtml()"
+            # Don't fail - just warn (can enable exit 1 after fixing all cases)
+          else
+            echo "✅ No innerHTML usage found"
+          fi
+
+  code-scanning:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript, typescript
+          queries: security-and-quality
+      
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+  security-scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      security-events: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+      
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      
+      - name: Upload Scorecard results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: results.sarif
+
+  summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, security-tests]
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🔒 Security Audit Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.dependency-audit.result }}" == "success" ]; then
+            echo "✅ **Dependency Audit**: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Dependency Audit**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.security-tests.result }}" == "success" ]; then
+            echo "✅ **Security Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Security Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Audit Date**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

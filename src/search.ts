@@ -202,8 +202,7 @@ async function resolveSearchRoots(
           vscode.window.showErrorMessage(
             'Invalid directory path: must be within workspace. Path traversal (..) is not allowed for security reasons.'
           );
-          // Re-throw to make the error visible in tests/debugging
-          throw error;
+          // Log error but don't throw - allow graceful degradation
         }
       } else {
         // No workspace folders (test mode or edge case) - allow path without validation

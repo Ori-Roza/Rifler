@@ -5,7 +5,7 @@ import { testHelpers } from '../../../extension';
 suite('View Switching E2E Tests - Bug Fix', () => {
   async function retryAssert(fn: () => void | Promise<void>, timeout = 10000, interval = 500) {
     const start = Date.now();
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       try {
         await fn();

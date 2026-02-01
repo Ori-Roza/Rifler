@@ -2747,7 +2747,7 @@ console.log('[Rifler] Webview script starting...');
         if (resultsList && virtualContent) {
           const virtualHeight = parseFloat(virtualContent.style.height) || virtualContent.scrollHeight || 0;
           // Force layout to ensure clientHeight is up-to-date
-          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+           
           resultsList.offsetHeight;
           const rectHeight = resultsList.getBoundingClientRect().height || 0;
           const computedHeight = parseFloat(getComputedStyle(resultsList).height) || 0;
@@ -2852,7 +2852,7 @@ console.log('[Rifler] Webview script starting...');
           activeElementTag: activeElement ? activeElement.tagName : null
         });
         break;
-      case '__test_simulateKeyboard':
+      case '__test_simulateKeyboard_2':
         if (message.key === 'ArrowDown') {
           // Simulate arrow down for result navigation
           const currentActive = state.activeIndex;
@@ -3219,7 +3219,7 @@ console.log('[Rifler] Webview script starting...');
     results.forEach((result, index) => {
       const path = result.relativePath || result.fileName;
       if (!fileMap.has(path)) {
-        const group = { path, fileName: path.split(/[\\\/]/).pop(), matches: [] };
+        const group = { path, fileName: path.split(/[\\/]/).pop(), matches: [] };
         fileMap.set(path, group);
         groups.push(group);
       }
@@ -3667,8 +3667,8 @@ console.log('[Rifler] Webview script starting...');
     // Official VS Code Seti UI icon mappings
     const iconMap = {
       // Programming Languages
-      'js': 'seti-javascript', 'jsx': 'seti-javascript',
-      'ts': 'seti-typescript', 'tsx': 'seti-typescript',
+      'js': 'seti-javascript',
+      'ts': 'seti-typescript',
       'py': 'seti-python',
       'java': 'seti-java',
       'c': 'seti-c',

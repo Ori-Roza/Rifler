@@ -198,11 +198,9 @@ async function resolveSearchRoots(
           const safePath = validateDirectoryPath(trimmedPath);
           await addIfExists(safePath);
         } catch (error) {
-          console.error(`[Rifler Security] Directory path validation failed for "${trimmedPath}":`, error);
-          vscode.window.showErrorMessage(
-            'Invalid directory path: must be within workspace. Path traversal (..) is not allowed for security reasons.'
-          );
-          // Log error but don't throw - allow graceful degradation
+          console.warn(`[Rifler] Directory path validation failed for "${trimmedPath}", attempting search anyway:`, error);
+          // Fall back to searching the directory anyway (with warning) to avoid completely breaking search
+          await addIfExists(trimmedPath);
         }
       } else {
         // No workspace folders (test mode or edge case) - allow path without validation

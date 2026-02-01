@@ -35,6 +35,24 @@
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-unused-vars": "off"
       }
+    },
+    {
+      "files": ["src/webview/script.js"],
+      "env": {
+        "browser": true
+      },
+      "globals": {
+        "hljs": "readonly",
+        "acquireVsCodeApi": "readonly",
+        "renderResults": "readonly",
+        "toggleReplaceBtn": "readonly",
+        "saveTimeout": "writable"
+      },
+      "rules": {
+        "@typescript-eslint/no-unused-vars": "warn",
+        "no-case-declarations": "off",
+        "no-empty": "warn"
+      }
     }
   ]
 }

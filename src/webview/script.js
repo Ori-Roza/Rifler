@@ -2644,6 +2644,19 @@ console.log('[Rifler] Webview script starting...');
       case '__test_simulateKeyboard':
         if (message.key === 'Enter' && message.ctrlKey) {
           openActiveResult();
+        } else if (message.key === 'ArrowDown') {
+          // Simulate arrow down for result navigation
+          const currentActive = state.activeIndex;
+          if (state.results && state.results.length > 0) {
+            state.activeIndex = Math.min(currentActive + 1, state.results.length - 1);
+            renderResults();
+          }
+        } else if (message.key === 'ArrowUp') {
+          const currentActive = state.activeIndex;
+          if (state.results && state.results.length > 0) {
+            state.activeIndex = Math.max(currentActive - 1, 0);
+            renderResults();
+          }
         }
         break;
       case '__test_enterEditMode':
@@ -2851,22 +2864,6 @@ console.log('[Rifler] Webview script starting...');
           activeElementId: activeElement ? activeElement.id : null,
           activeElementTag: activeElement ? activeElement.tagName : null
         });
-        break;
-      case '__test_simulateKeyboard':
-        if (message.key === 'ArrowDown') {
-          // Simulate arrow down for result navigation
-          const currentActive = state.activeIndex;
-          if (state.results && state.results.length > 0) {
-            state.activeIndex = Math.min(currentActive + 1, state.results.length - 1);
-            renderResults();
-          }
-        } else if (message.key === 'ArrowUp') {
-          const currentActive = state.activeIndex;
-          if (state.results && state.results.length > 0) {
-            state.activeIndex = Math.max(currentActive - 1, 0);
-            renderResults();
-          }
-        }
         break;
       case 'restorePreviewPanelState':
         if (typeof message.collapsed === 'boolean') {
@@ -3219,7 +3216,7 @@ console.log('[Rifler] Webview script starting...');
     results.forEach((result, index) => {
       const path = result.relativePath || result.fileName;
       if (!fileMap.has(path)) {
-        const group = { path, fileName: path.split(/[\\\/]/).pop(), matches: [] };
+        const group = { path, fileName: path.split(/[\\/]/).pop(), matches: [] };
         fileMap.set(path, group);
         groups.push(group);
       }
@@ -3667,8 +3664,8 @@ console.log('[Rifler] Webview script starting...');
     // Official VS Code Seti UI icon mappings
     const iconMap = {
       // Programming Languages
-      'js': 'seti-javascript', 'jsx': 'seti-javascript',
-      'ts': 'seti-typescript', 'tsx': 'seti-typescript',
+      'js': 'seti-javascript',
+      'ts': 'seti-typescript',
       'py': 'seti-python',
       'java': 'seti-java',
       'c': 'seti-c',

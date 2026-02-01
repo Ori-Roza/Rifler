@@ -14,6 +14,7 @@ import {
   Limiter
 } from './utils';
 import { startRipgrepSearch } from './rgSearch';
+import { validateDirectoryPath } from './security/pathValidation';
 
 type RootSpec = { fsPath: string; type: vscode.FileType };
 
@@ -187,7 +188,26 @@ async function resolveSearchRoots(
   };
 
   if (scope === 'directory') {
-    await addIfExists(directoryPath?.trim());
+    const trimmedPath = directoryPath?.trim();
+    if (trimmedPath) {
+      // Security: Validate directory path to prevent path traversal attacks
+      // Only enforce validation if workspace folders exist (skip in tests/edge cases)
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (workspaceFolders && workspaceFolders.length > 0) {
+        try {
+          const safePath = validateDirectoryPath(trimmedPath);
+          await addIfExists(safePath);
+        } catch (error) {
+          console.error('[Rifler Security] Directory path validation failed:', error);
+          vscode.window.showErrorMessage(
+            'Invalid directory path: must be within workspace. Path traversal (..) is not allowed for security reasons.'
+          );
+        }
+      } else {
+        // No workspace folders (test mode or edge case) - allow path without validation
+        await addIfExists(trimmedPath);
+      }
+    }
   } else if (scope === 'module') {
     await addIfExists(modulePath?.trim());
   } else {

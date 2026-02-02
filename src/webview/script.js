@@ -4685,6 +4685,42 @@ console.log('[Rifler] Webview script starting...');
     return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  function sanitizeHighlightedHtml(highlightedHtml) {
+    if (typeof highlightedHtml !== 'string') {
+      return '';
+    }
+    
+    let sanitized = highlightedHtml;
+    
+    // Remove script tags and their content
+    sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    
+    // Remove dangerous tags (keeping their content)
+    sanitized = sanitized.replace(/<(iframe|object|embed|link|meta|style)[^>]*>/gi, '');
+    sanitized = sanitized.replace(/<\/(iframe|object|embed|link|meta|style)>/gi, '');
+    
+    // Remove event handler attributes
+    sanitized = sanitized.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+    sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
+    
+    // Sanitize span tags to only keep class attributes with hljs- prefix
+    sanitized = sanitized.replace(/<span([^>]*)>/gi, function(match, attrs) {
+      const classMatch = attrs.match(/class\s*=\s*["']([^"']*)["']/i);
+      if (classMatch) {
+        const classes = classMatch[1].split(' ').filter(function(c) { return c.startsWith('hljs-'); });
+        if (classes.length > 0) {
+          return '<span class="' + escapeHtml(classes.join(' ')) + '">';
+        }
+      }
+      return '<span>';
+    });
+    
+    // Remove any remaining non-span tags (except closing tags)
+    sanitized = sanitized.replace(/<(?!\/?(span\b)[^>]*>)[^>]+>/gi, '');
+    
+    return sanitized;
+  }
+
   function highlightMatch(html, start, end) {
     if (start < 0 || end <= start || start >= html.length) return html;
     end = Math.min(end, html.length);
@@ -4713,9 +4749,9 @@ console.log('[Rifler] Webview script starting...');
             if (rawText.length > 0 && !res.includes('class="hljs-')) {
               console.warn(`[Rifler] highlightMatchSafe: No hljs classes found in result for ${language}. Input: ${rawText.substring(0, 20)}`);
             }
-            return res;
+            return sanitizeHighlightedHtml(res);
           } else {
-            return hljs.highlightAuto(rawText).value;
+            return sanitizeHighlightedHtml(hljs.highlightAuto(rawText).value);
           }
         } catch (e) {
           console.error('[Rifler] highlightMatchSafe error:', e);
@@ -4739,11 +4775,11 @@ console.log('[Rifler] Webview script starting...');
       if (typeof hljs !== 'undefined') {
         try {
           if (language && language !== 'file' && hljs.getLanguage(language)) {
-            result += hljs.highlight(before, { language }).value;
-            result += '<span class="match">' + hljs.highlight(match, { language }).value + '</span>';
+            result += sanitizeHighlightedHtml(hljs.highlight(before, { language }).value);
+            result += '<span class="match">' + sanitizeHighlightedHtml(hljs.highlight(match, { language }).value) + '</span>';
           } else {
-            result += hljs.highlightAuto(before).value;
-            result += '<span class="match">' + hljs.highlightAuto(match).value + '</span>';
+            result += sanitizeHighlightedHtml(hljs.highlightAuto(before).value);
+            result += '<span class="match">' + sanitizeHighlightedHtml(hljs.highlightAuto(match).value) + '</span>';
           }
         } catch (e) {
           result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
@@ -4758,9 +4794,9 @@ console.log('[Rifler] Webview script starting...');
     if (typeof hljs !== 'undefined') {
       try {
         if (language && language !== 'file' && hljs.getLanguage(language)) {
-          result += hljs.highlight(remaining, { language }).value;
+          result += sanitizeHighlightedHtml(hljs.highlight(remaining, { language }).value);
         } else {
-          result += hljs.highlightAuto(remaining).value;
+          result += sanitizeHighlightedHtml(hljs.highlightAuto(remaining).value);
         }
       } catch (e) {
         result += escapeHtml(remaining);

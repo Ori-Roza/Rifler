@@ -1,10 +1,26 @@
 import * as vscode from 'vscode';
 import { SearchScope, SearchOptions } from './utils';
 import { performSearch } from './search';
+import { validateUriString, isUriSafe } from './security/pathValidation';
 
 export async function replaceOne(uriString: string, line: number, character: number, length: number, replaceText: string): Promise<void> {
   try {
     const uri = vscode.Uri.parse(uriString);
+    
+    // Security: Validate URI is within workspace before replacing
+    // Only enforce validation if workspace folders exist (skip in tests/edge cases)
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (workspaceFolders && workspaceFolders.length > 0) {
+      if (!validateUriString(uriString)) {
+        throw new Error('Security: URI must be a file:// URI within workspace');
+      }
+      
+      // Security: Double-check after parsing
+      if (!isUriSafe(uri)) {
+        throw new Error('Security: Attempted to replace file outside workspace');
+      }
+    }
+    
     const edit = new vscode.WorkspaceEdit();
     const range = new vscode.Range(line, character, line, character + length);
     edit.replace(uri, range, replaceText);
@@ -35,6 +51,17 @@ export async function replaceAll(
     if (results.length === 0) {
       vscode.window.showInformationMessage('No occurrences found to replace.');
       return;
+    }
+
+    // Security: Validate all URIs before batch operation
+    // Only enforce validation if workspace folders exist (skip in tests/edge cases)
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (workspaceFolders && workspaceFolders.length > 0) {
+      for (const result of results) {
+        if (!validateUriString(result.uri)) {
+          throw new Error('Security: All URIs must be within workspace');
+        }
+      }
     }
 
     const edit = new vscode.WorkspaceEdit();

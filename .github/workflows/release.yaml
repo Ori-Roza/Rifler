@@ -68,7 +68,7 @@ jobs:
           echo "Extension packaged: $VSIX_FILE"
 
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: rifler-vsix
           path: '*.vsix'

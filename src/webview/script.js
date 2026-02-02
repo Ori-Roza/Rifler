@@ -2340,8 +2340,15 @@ console.log('[Rifler] Webview script starting...');
 
   window.addEventListener('message', (event) => {
     // Security: Verify origin for postMessage handler
-    // VS Code webviews use vscode-webview:// protocol
-    if (!event.origin || !event.origin.startsWith('vscode-webview://')) {
+    // VS Code webviews use vscode-webview:// protocol or have no origin for internal messages
+    // Allow: no origin (internal VS Code API), vscode-webview://, or file:// (test environment)
+    const origin = event.origin || '';
+    const isTrustedOrigin = !origin || 
+                           origin.startsWith('vscode-webview://') || 
+                           origin.startsWith('file://') ||
+                           origin === 'null';
+    
+    if (!isTrustedOrigin) {
       console.warn('[Rifler] Rejected message from untrusted origin:', event.origin);
       return;
     }

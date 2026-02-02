@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 const { spawn } = require('child_process');
 const fs = require('fs');
-const path = require('path');
 
 const root = process.argv[2];
 const query = process.argv[3] || 'test';

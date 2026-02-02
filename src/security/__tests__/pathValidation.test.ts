@@ -5,7 +5,6 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'path';
 import {
   isWithinWorkspace,
   isUriSafe,
@@ -165,7 +164,6 @@ describe('Path Validation Security', () => {
 
     test('Should prevent accessing files via symlink traversal', () => {
       // If symlink points outside workspace, resolved path should fail validation
-      const symlinkPath = '/Users/test/project/malicious-symlink';
       // In real scenario, path.resolve would follow symlink to /etc/passwd
       // For this test, we simulate the resolved path
       const resolvedPath = '/etc/passwd';

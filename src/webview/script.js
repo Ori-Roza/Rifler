@@ -149,12 +149,6 @@ console.log('[Rifler] Webview script starting...');
   const collapseAllBtn = document.getElementById('collapse-all-btn');
   const smartExcludeToggle = document.getElementById('smart-exclude-toggle');
   
-  // Create a fallback for resultsCount if needed (backward compatibility)
-  let resultsCount = document.getElementById('results-count');
-  if (!resultsCount) {
-    resultsCount = resultsCountText; // Use the new element as a fallback
-  }
-
   // Keep backward compatibility - some may not exist in new design
   const previewActions = document.getElementById('preview-actions');
   const replaceInFileBtn = document.getElementById('replace-in-file-btn');
@@ -170,7 +164,6 @@ console.log('[Rifler] Webview script starting...');
 
   let VIRTUAL_ROW_HEIGHT = 40;
   const VIRTUAL_OVERSCAN = 8;
-  let measuredRowHeight = 0;
   const virtualContent = document.createElement('div');
   virtualContent.id = 'results-virtual-content';
   virtualContent.style.position = 'relative';
@@ -295,10 +288,8 @@ console.log('[Rifler] Webview script starting...');
   updateLayoutClass();
 
   // Set up ResizeObserver to detect width changes
-  const resizeObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      updateLayoutClass();
-    }
+  const resizeObserver = new ResizeObserver(() => {
+    updateLayoutClass();
   });
 
   // Observe body element for resize
@@ -1129,6 +1120,7 @@ console.log('[Rifler] Webview script starting...');
   let rafActiveScheduled = false;
   let rafBackdropScheduled = false;
   let pendingActiveIdx = 0;
+  let rafActiveScheduled = false;
   
   function scheduleActiveLineUpdate(idx) {
     pendingActiveIdx = idx;
@@ -1773,11 +1765,10 @@ console.log('[Rifler] Webview script starting...');
 
   function updateSearchButtonState() {
     const queryValidation = document.getElementById('query-validation-message');
-    const hasRegexError = queryValidation && queryValidation.classList.contains('error');
     const searchBtn = document.getElementById('search-btn') || toggleReplaceBtn.previousElementSibling;
     
     if (searchBtn) {
-      searchBtn.disabled = hasRegexError;
+      searchBtn.disabled = queryValidation && queryValidation.classList.contains('error');
     }
   }
 
@@ -2274,10 +2265,10 @@ console.log('[Rifler] Webview script starting...');
     const fileName = uri.split('/').pop() || 'file';
     const message = reason === 'vsCodeDirtyOrDiverged'
       ? `This file changed in VS Code while editing in Rifler`
-      : `Conflict: cannot apply edit to ${fileName}`;
+      : `Conflict: cannot apply edit to ${escapeHtml(fileName)}`;
     
     banner.innerHTML = `
-      <span>${message}</span>
+      <span>${escapeHtml(message)}</span>
       <div style="display: flex; gap: 8px;">
         <button class="conflict-action-btn" data-action="overwrite" style="
           background: #dc3545;
@@ -2348,6 +2339,13 @@ console.log('[Rifler] Webview script starting...');
   }
 
   window.addEventListener('message', (event) => {
+    // Security: Verify origin for postMessage handler
+    // VS Code webviews use vscode-webview:// protocol
+    if (!event.origin || !event.origin.startsWith('vscode-webview://')) {
+      console.warn('[Rifler] Rejected message from untrusted origin:', event.origin);
+      return;
+    }
+    
     const message = event.data;
     console.log('Webview received message:', message.type, message);
     switch (message.type) {
@@ -2861,9 +2859,8 @@ console.log('[Rifler] Webview script starting...');
             renderResults();
           }
         } else if (message.key === 'ArrowUp') {
-          const currentActive = state.activeIndex;
           if (state.results && state.results.length > 0) {
-            state.activeIndex = Math.max(currentActive - 1, 0);
+            state.activeIndex = Math.max(state.activeIndex - 1, 0);
             renderResults();
           }
         }
@@ -3614,7 +3611,7 @@ console.log('[Rifler] Webview script starting...');
 
     item.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      showContextMenu(e, itemData.originalIndex);
+      showContextMenu(e, result.originalIndex);
     });
 
     return item;
@@ -4692,24 +4689,34 @@ console.log('[Rifler] Webview script starting...');
     
     let sanitized = highlightedHtml;
     
-    // Remove script tags and their content
-    sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    // Remove script tags and their content - apply repeatedly to prevent incomplete sanitization
+    let previous;
+    do {
+      previous = sanitized;
+      sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    } while (sanitized !== previous);
     
-    // Remove dangerous tags (keeping their content)
-    sanitized = sanitized.replace(/<(iframe|object|embed|link|meta|style)[^>]*>/gi, '');
-    sanitized = sanitized.replace(/<\/(iframe|object|embed|link|meta|style)>/gi, '');
+    // Remove dangerous tags (keeping their content) - apply repeatedly
+    do {
+      previous = sanitized;
+      sanitized = sanitized.replace(/<(iframe|object|embed|link|meta|style)[^>]*>/gi, '');
+      sanitized = sanitized.replace(/<\/(iframe|object|embed|link|meta|style)>/gi, '');
+    } while (sanitized !== previous);
     
-    // Remove event handler attributes
-    sanitized = sanitized.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
-    sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
+    // Remove event handler attributes - apply repeatedly
+    do {
+      previous = sanitized;
+      sanitized = sanitized.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+      sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
+    } while (sanitized !== previous);
     
     // Sanitize span tags to only keep class attributes with hljs- prefix
-    sanitized = sanitized.replace(/<span([^>]*)>/gi, function(match, attrs) {
+    sanitized = sanitized.replace(/<span([^>]*)>/gi, function(_match, attrs) {
       const classMatch = attrs.match(/class\s*=\s*["']([^"']*)["']/i);
       if (classMatch) {
         const classes = classMatch[1].split(' ').filter(function(c) { return c.startsWith('hljs-'); });
         if (classes.length > 0) {
-          return '<span class="' + escapeHtml(classes.join(' ')) + '">';
+          return '<span class="' + escapeHtml(classes.join(' ')) + '"';
         }
       }
       return '<span>';

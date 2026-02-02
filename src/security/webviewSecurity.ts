@@ -47,16 +47,26 @@ export function sanitizeHighlightedHtml(highlightedHtml: string): string {
   // This removes any tags except <span> and removes dangerous attributes
   let sanitized = highlightedHtml;
   
-  // Remove all script tags and their content
-  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  // Remove all script tags and their content - apply repeatedly to prevent incomplete sanitization
+  let previous;
+  do {
+    previous = sanitized;
+    sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  } while (sanitized !== previous);
   
-  // Remove dangerous tags (keeping their content)
-  sanitized = sanitized.replace(/<(iframe|object|embed|link|meta|style)[^>]*>/gi, '');
-  sanitized = sanitized.replace(/<\/(iframe|object|embed|link|meta|style)>/gi, '');
+  // Remove dangerous tags (keeping their content) - apply repeatedly
+  do {
+    previous = sanitized;
+    sanitized = sanitized.replace(/<(iframe|object|embed|link|meta|style)[^>]*>/gi, '');
+    sanitized = sanitized.replace(/<\/(iframe|object|embed|link|meta|style)>/gi, '');
+  } while (sanitized !== previous);
   
-  // Remove event handler attributes
-  sanitized = sanitized.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
-  sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
+  // Remove event handler attributes - apply repeatedly
+  do {
+    previous = sanitized;
+    sanitized = sanitized.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+    sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
+  } while (sanitized !== previous);
   
   // Remove dangerous attributes from span tags
   sanitized = sanitized.replace(/<span([^>]*)>/gi, (match, attrs) => {

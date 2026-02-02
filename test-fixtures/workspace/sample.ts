@@ -13,6 +13,5 @@ export class updatedClass {
 
 // Another function to search for
 function anotherFunction() {
-  const updated = 'search updated';
-  return updated;
+  return 'search updated';
 }

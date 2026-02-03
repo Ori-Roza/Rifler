@@ -90,14 +90,14 @@ jobs:
         run: |
           echo "Checking for potential path traversal vulnerabilities..."
           
-          # Search for dangerous path operations
-           if grep -r "path\.join.*\.\." src/ --exclude-dir=node_modules --exclude-dir=__tests__ --exclude-dir=e2e --exclude="*.test.*" || \
-             grep -r "path\.resolve.*\.\." src/ --exclude-dir=node_modules --exclude-dir=__tests__ --exclude-dir=e2e --exclude="*.test.*"; then
-            echo "⚠️ Found potential path traversal patterns"
+          # Search for dangerous path operations in production code only (exclude test files)
+          if grep -r "path\.join.*\.\." src/ --exclude-dir=node_modules --exclude="*.test.ts" --exclude="*.test.js" | grep -v "__tests__" || \
+             grep -r "path\.resolve.*\.\." src/ --exclude-dir=node_modules --exclude="*.test.ts" --exclude="*.test.js" | grep -v "__tests__"; then
+            echo "⚠️ Found potential path traversal patterns in production code"
             echo "Review these carefully for security implications"
             exit 1
           else
-            echo "✅ No obvious path traversal patterns found"
+            echo "✅ No obvious path traversal patterns found in production code"
           fi
       
       - name: Check for command injection vulnerabilities

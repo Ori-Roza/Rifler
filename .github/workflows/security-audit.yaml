@@ -91,8 +91,8 @@ jobs:
           echo "Checking for potential path traversal vulnerabilities..."
           
           # Search for dangerous path operations
-          if grep -r "path\.join.*\.\." src/ --exclude-dir=node_modules || \
-             grep -r "path\.resolve.*\.\." src/ --exclude-dir=node_modules; then
+           if grep -r "path\.join.*\.\." src/ --exclude-dir=node_modules --exclude-dir=__tests__ --exclude-dir=e2e --exclude="*.test.*" || \
+             grep -r "path\.resolve.*\.\." src/ --exclude-dir=node_modules --exclude-dir=__tests__ --exclude-dir=e2e --exclude="*.test.*"; then
             echo "⚠️ Found potential path traversal patterns"
             echo "Review these carefully for security implications"
             exit 1

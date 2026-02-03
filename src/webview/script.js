@@ -152,7 +152,6 @@ console.log('[Rifler] Webview script starting...');
   // Keep backward compatibility - some may not exist in new design
   const previewActions = document.getElementById('preview-actions');
   const replaceInFileBtn = document.getElementById('replace-in-file-btn');
-  const openInEditorBtn = document.getElementById('open-in-editor-btn');
   const fileEditor = document.getElementById('file-editor');
   const editorContainer = document.getElementById('editor-container');
   const editorBackdrop = document.getElementById('editor-backdrop');
@@ -163,7 +162,7 @@ console.log('[Rifler] Webview script starting...');
   const mainContent = document.querySelector('.main-content');
 
   let VIRTUAL_ROW_HEIGHT = 40;
-  const VIRTUAL_OVERSCAN = 8;
+  let measuredRowHeight = 0;
   const virtualContent = document.createElement('div');
   virtualContent.id = 'results-virtual-content';
   virtualContent.style.position = 'relative';
@@ -315,7 +314,7 @@ console.log('[Rifler] Webview script starting...');
     if (useRegexToggle) useRegexToggle.classList.toggle('active', state.options.useRegex);
   }
 
-  function applyQueryRows(rows, { skipSearch, preventShrink } = { skipSearch: false, preventShrink: false }) {
+  function applyQueryRows(rows, { skipSearch } = { skipSearch: false }) {
     const normalized = Math.min(4, Math.max(1, rows || 1));
     state.queryRows = normalized;
     if (queryInput && 'rows' in queryInput) {
@@ -326,10 +325,10 @@ console.log('[Rifler] Webview script starting...');
     if (searchInputGroup) {
       searchInputGroup.style.setProperty('--search-rows', String(normalized));
     }
-    recomputeMultilineOption({ skipSearch, preventShrink });
+    recomputeMultilineOption({ skipSearch });
   }
 
-  function recomputeMultilineOption({ skipSearch, preventShrink } = { skipSearch: false, preventShrink: false }) {
+  function recomputeMultilineOption({ skipSearch } = { skipSearch: false }) {
     const text = queryInput ? String(queryInput.value || '') : '';
     const hasNewline = text.includes('\n');
     const lineCount = text.split('\n').length;
@@ -340,7 +339,7 @@ console.log('[Rifler] Webview script starting...');
     // Auto-adjust rows based on actual line count
     const targetRows = Math.max(1, Math.min(3, lineCount));
     if (state.queryRows !== targetRows) {
-      applyQueryRows(targetRows, { skipSearch: true, preventShrink: true });
+      applyQueryRows(targetRows, { skipSearch: true });
       // Don't return early - we need to potentially trigger search below
     }
     
@@ -975,8 +974,9 @@ console.log('[Rifler] Webview script starting...');
         });
         if (match[0].length === 0) break;
       }
-    } catch (e) {
+    } catch {
       // Invalid regex
+      void 0;
     }
     
     if (localMatches.length > 0) {
@@ -1090,7 +1090,9 @@ console.log('[Rifler] Webview script starting...');
       }
       
       localMatchCount.textContent = 'Replaced ' + count;
-    } catch (e) {
+    } catch {
+      // Ignore highlight errors
+      void 0;
     }
   }
 
@@ -1111,71 +1113,6 @@ console.log('[Rifler] Webview script starting...');
   // Prevent scroll ping-pong between editor and preview
   let isProgrammaticScroll = false;
   
-  // Cache line elements to avoid querying on every arrow press
-  let lineEls = [];
-  let activeLineEl = null;
-  let activeLineIdx = 0;
-  
-  // RAF schedulers for active line and backdrop updates
-  let rafActiveScheduled = false;
-  let rafBackdropScheduled = false;
-  let pendingActiveIdx = 0;
-  let rafActiveScheduled = false;
-  
-  function scheduleActiveLineUpdate(idx) {
-    pendingActiveIdx = idx;
-    if (rafActiveScheduled) return;
-    rafActiveScheduled = true;
-    requestAnimationFrame(() => {
-      rafActiveScheduled = false;
-      applyActiveLineClass(pendingActiveIdx);
-      ensureLineVisible(pendingActiveIdx);
-    });
-  }
-  
-  function scheduleBackdropUpdateRAF() {
-    if (rafBackdropScheduled) return;
-    rafBackdropScheduled = true;
-    requestAnimationFrame(() => {
-      rafBackdropScheduled = false;
-      scheduleBackdropSync();
-    });
-  }
-  
-  function applyActiveLineClass(idx) {
-    // Touch only 2 line elements: remove from previous, add to next
-    if (activeLineEl) {
-      activeLineEl.classList.remove('isActive');
-    }
-    
-    activeLineEl = lineEls[idx] || null;
-    activeLineIdx = idx;
-    
-    if (activeLineEl) {
-      activeLineEl.classList.add('isActive');
-    }
-  }
-  
-  function ensureLineVisible(idx) {
-    if (!previewContent || idx < 0 || idx >= lineEls.length) return;
-    const lineEl = lineEls[idx];
-    if (lineEl) {
-      // Only assign scrollTop if element is outside viewport
-      const rect = lineEl.getBoundingClientRect();
-      const containerRect = previewContent.getBoundingClientRect();
-      
-      if (rect.top < containerRect.top) {
-        previewContent.scrollTop -= (containerRect.top - rect.top);
-      } else if (rect.bottom > containerRect.bottom) {
-        previewContent.scrollTop += (rect.bottom - containerRect.bottom);
-      }
-    }
-  }
-  
-  function rebuildLineElementCache() {
-    lineEls = Array.from(document.querySelectorAll('.pvLine'));
-    activeLineEl = lineEls[activeLineIdx] || null;
-  }
 
   if (previewContent) {
     previewContent.addEventListener('click', (e) => {
@@ -1601,7 +1538,9 @@ console.log('[Rifler] Webview script starting...');
         }
         
         highlighted = temp.innerHTML;
-      } catch (e) {
+      } catch {
+        // Ignore highlight errors
+        void 0;
       }
     }
     
@@ -1761,15 +1700,6 @@ console.log('[Rifler] Webview script starting...');
       type: 'validateDirectory',
       directoryPath: directoryPath
     });
-  }
-
-  function updateSearchButtonState() {
-    const queryValidation = document.getElementById('query-validation-message');
-    const searchBtn = document.getElementById('search-btn') || toggleReplaceBtn.previousElementSibling;
-    
-    if (searchBtn) {
-      searchBtn.disabled = queryValidation && queryValidation.classList.contains('error');
-    }
   }
 
   function validateRegexPattern() {
@@ -1992,10 +1922,6 @@ console.log('[Rifler] Webview script starting...');
     updatePreviewToggleButton();
   }
 
-  function isPreviewCollapsed() {
-    return previewHeight <= PREVIEW_MIN_HEIGHT + 0.5;
-  }
-
   function updatePreviewToggleButton() {
     // Preview toggle button not used in current UI design
     // This function is kept for backward compatibility but does nothing
@@ -2112,7 +2038,10 @@ console.log('[Rifler] Webview script starting...');
       if (!isResizing) return;
       try {
         dragHandle.releasePointerCapture(e.pointerId);
-      } catch (err) {}
+      } catch {
+        // Ignore release errors
+        void 0;
+      }
       endResize(true);
     });
 
@@ -2120,7 +2049,10 @@ console.log('[Rifler] Webview script starting...');
       if (!isResizing) return;
       try {
         dragHandle.releasePointerCapture(e.pointerId);
-      } catch (err) {}
+      } catch {
+        // Ignore release errors
+        void 0;
+      }
       endResize(false);
     });
   }
@@ -2875,7 +2807,6 @@ console.log('[Rifler] Webview script starting...');
       case 'restorePreviewPanelState':
         if (typeof message.collapsed === 'boolean') {
           state.previewPanelCollapsed = message.collapsed;
-          const previewPanel = document.getElementById('preview-panel-container');
           const previewToggleBtn = document.getElementById('preview-toggle-btn');
           
           if (state.previewPanelCollapsed) {
@@ -3148,7 +3079,7 @@ console.log('[Rifler] Webview script starting...');
       if (state.options.useRegex) {
         try {
           new RegExp(query);
-        } catch (e) {
+        } catch {
           showPlaceholder('Invalid regex pattern');
           clearResultsCountDisplay();
           return;
@@ -3382,7 +3313,7 @@ console.log('[Rifler] Webview script starting...');
 
     const fragment = document.createDocumentFragment();
     for (let i = start; i < end; i++) {
-      fragment.appendChild(renderResultRow(state.renderItems[i], i));
+      fragment.appendChild(renderResultRow(state.renderItems[i]));
     }
 
     // Preserve grouped scroll positions before virtual DOM swap
@@ -3412,7 +3343,7 @@ console.log('[Rifler] Webview script starting...');
     }
   }
 
-  function renderResultRow(itemData, index) {
+  function renderResultRow(itemData) {
     const item = document.createElement('div');
     item.style.position = 'absolute';
     item.style.top = (itemData.top || 0) + 'px';
@@ -3519,7 +3450,7 @@ console.log('[Rifler] Webview script starting...');
           '</div>' +
           '<div class="result-preview hljs">' + previewHtml + '</div>';
 
-        matchEl.addEventListener('click', (e) => {
+        matchEl.addEventListener('click', () => {
           // Single click selects/loads preview (no show/hide toggle)
           if (match.originalIndex === state.activeIndex) {
             const active = state.results?.[state.activeIndex];
@@ -3533,7 +3464,7 @@ console.log('[Rifler] Webview script starting...');
           setActiveIndex(match.originalIndex);
         });
 
-        matchEl.addEventListener('dblclick', (e) => {
+        matchEl.addEventListener('dblclick', () => {
           // Double click opens file in editor
           openActiveResult();
         });
@@ -3599,7 +3530,7 @@ console.log('[Rifler] Webview script starting...');
       '</div>' +
       '<div class="result-preview hljs">' + previewHtml + '</div>';
 
-    item.addEventListener('click', (e) => {
+    item.addEventListener('click', () => {
       // Single click selects/loads preview (no show/hide toggle)
       if (itemData.originalIndex === state.activeIndex) {
         const active = state.results?.[state.activeIndex];
@@ -3611,59 +3542,17 @@ console.log('[Rifler] Webview script starting...');
       setActiveIndex(itemData.originalIndex);
     });
 
-    item.addEventListener('dblclick', (e) => {
+    item.addEventListener('dblclick', () => {
       // Double click opens file in editor
       openActiveResult();
     });
 
     item.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      showContextMenu(e, result.originalIndex);
+      showContextMenu(e, itemData.originalIndex);
     });
 
     return item;
-  }
-
-  function getLanguageIdFromFilename(fileName) {
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    const langMap = {
-      'js': 'javascript',
-      'jsx': 'javascriptreact',
-      'ts': 'typescript',
-      'tsx': 'typescriptreact',
-      'py': 'python',
-      'java': 'java',
-      'c': 'c',
-      'cpp': 'cpp',
-      'h': 'c',
-      'hpp': 'cpp',
-      'cs': 'csharp',
-      'php': 'php',
-      'rb': 'ruby',
-      'go': 'go',
-      'rs': 'rust',
-      'swift': 'swift',
-      'kt': 'kotlin',
-      'kts': 'kotlin',
-      'scala': 'scala',
-      'html': 'html',
-      'htm': 'html',
-      'xml': 'xml',
-      'css': 'css',
-      'scss': 'scss',
-      'less': 'less',
-      'json': 'json',
-      'yaml': 'yaml',
-      'yml': 'yaml',
-      'md': 'markdown',
-      'sh': 'shellscript',
-      'bash': 'shellscript',
-      'zsh': 'shellscript',
-      'sql': 'sql',
-      'vue': 'vue',
-      'svelte': 'svelte'
-    };
-    return langMap[ext] || 'file';
   }
 
   function getFileIconName(fileName) {
@@ -4178,9 +4067,9 @@ console.log('[Rifler] Webview script starting...');
           }
           // console.log('[Rifler] Highlighted segment:', highlighted.substring(0, 20));
           return highlighted;
-        } catch (e) {
-          console.error('[Rifler] Highlight error:', e, 'Language:', language);
-          return escapeHtml(text);
+        } catch {
+          // Ignore highlight errors
+          void 0;
         }
       }
       return escapeHtml(text);
@@ -4269,9 +4158,6 @@ console.log('[Rifler] Webview script starting...');
     previewContent.style.visibility = 'visible';
     previewContent.style.opacity = '1';
     previewContent.style.zIndex = '1';
-    
-    // Rebuild line element cache for lightweight arrow navigation
-    rebuildLineElementCache();
     
     // Update cache markers to prevent duplicate renders
     previewContent.dataset.lastRenderedCacheKey = cacheKey;
@@ -4587,7 +4473,7 @@ console.log('[Rifler] Webview script starting...');
 
     // Normal case: move within visible items
     if (nextIdx >= 0 && nextIdx < navigableItems.length) {
-      setActiveResult(navigableItems[nextIdx], { reason: 'keyboard' });
+      setActiveResult(navigableItems[nextIdx]);
       return;
     }
 
@@ -4635,7 +4521,7 @@ console.log('[Rifler] Webview script starting...');
    * IDEMPOTENT: safe to call multiple times with same or different items
    * Handles virtualization by re-rendering to ensure target item is in DOM
    */
-  function setActiveResult(itemEl, meta) {
+  function setActiveResult(itemEl) {
     const item = itemEl?.closest('.result-item');
     if (!item) return;
 
@@ -4735,12 +4621,6 @@ console.log('[Rifler] Webview script starting...');
     return sanitized;
   }
 
-  function highlightMatch(html, start, end) {
-    if (start < 0 || end <= start || start >= html.length) return html;
-    end = Math.min(end, html.length);
-    return html.substring(0, start) + '<span class="match">' + html.substring(start, end) + '</span>' + html.substring(end);
-  }
-
   function highlightMatchSafe(rawText, ranges, language = null) {
     // Normalize ranges to an array
     let matchRanges = [];
@@ -4795,7 +4675,7 @@ console.log('[Rifler] Webview script starting...');
             result += sanitizeHighlightedHtml(hljs.highlightAuto(before).value);
             result += '<span class="match">' + sanitizeHighlightedHtml(hljs.highlightAuto(match).value) + '</span>';
           }
-        } catch (e) {
+        } catch {
           result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
         }
       } else {
@@ -4812,7 +4692,7 @@ console.log('[Rifler] Webview script starting...');
         } else {
           result += sanitizeHighlightedHtml(hljs.highlightAuto(remaining).value);
         }
-      } catch (e) {
+      } catch {
         result += escapeHtml(remaining);
       }
     } else {

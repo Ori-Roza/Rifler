@@ -6,7 +6,7 @@
 
   Fast file search extension for VS Code. Rifle through your codebase with dynamic search, regex support, file masking, and full file preview with inline editing.
   
-  ⭐ **Rated 5.0 on VS Code Marketplace** | ⬇️ **80+ installs and growing**
+  ⭐ **Rated 5.0 on VS Code Marketplace** | ⬇️ **100+ installs and growing**
 
   [![CI](https://github.com/ori-roza/rifler/actions/workflows/pr-checks.yaml/badge.svg)](https://github.com/ori-roza/rifler/actions/workflows/pr-checks.yaml)
   [![Tests](https://img.shields.io/badge/tests-276%20passing-brightgreen)](https://github.com/ori-roza/rifler)

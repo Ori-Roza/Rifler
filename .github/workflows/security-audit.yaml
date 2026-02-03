@@ -44,7 +44,7 @@ jobs:
       
       - name: Upload audit results
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: npm-audit-results
           path: audit-results.txt

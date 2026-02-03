@@ -1,8 +1,6 @@
 import * as assert from 'assert';
 import { after, before } from 'mocha';
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
 import { testHelpers } from '../../../extension';
 
 suite('Rifler Usability Coverage E2E Tests', () => {
@@ -350,7 +348,7 @@ suite('Rifler Usability Coverage E2E Tests', () => {
         setTimeout(() => resolve(null), 2000);
       });
 
-      const validation = await validationPromise;
+      await validationPromise;
       // Should show error for invalid regex (if validation is implemented)
 
       // Now set valid regex

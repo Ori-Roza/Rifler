@@ -7,7 +7,7 @@
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.108.0"
   },
   "categories": [
     "Other"
@@ -226,7 +226,7 @@
     "compile": "tsc -p ./",
     "copy-webview": "mkdir -p out/webview && cp src/webview/index.html src/webview/script.js src/webview/styles.css src/webview/seti-icons.css src/webview/seti.woff assets/fonts/*.woff2 out/webview/ && cp node_modules/@vscode/codicons/dist/codicon.css node_modules/@vscode/codicons/dist/codicon.ttf out/webview/",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -249,14 +249,14 @@
     "@types/vscode": "^1.108.1",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^8.54.0",
-    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.1",
     "eslint": "^9.39.2",
     "glob": "^13.0.0",
     "globals": "^17.3.0",
     "jest": "^30.2.0",
-    "mocha": "^11.7.5",
+    "mocha": "^11.3.0",
     "react": "^19.2.3",
     "standard-version": "^9.5.0",
     "ts-jest": "^29.1.1",
@@ -269,6 +269,6 @@
     "highlight.js": "^11.11.1"
   },
   "overrides": {
-    "undici": "5.28.4"
+    "undici": "^7.19.0"
   }
 }

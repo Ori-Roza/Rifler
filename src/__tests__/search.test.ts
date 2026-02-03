@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { performSearch } from '../search';
-import { SearchOptions, SearchScope } from '../utils';
+import { SearchOptions } from '../utils';
 
 // Mock vscode
 jest.mock('vscode');
@@ -217,7 +217,7 @@ describe('Search', () => {
         mockWorkspaceFs.stat.mockResolvedValue({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });
         mockWorkspaceFs.readFile.mockResolvedValue(new TextEncoder().encode('const test = 1;'));
 
-        const results = await performSearch('test', 'project', defaultOptions);
+        await performSearch('test', 'project', defaultOptions);
 
         // Only app.ts should be searched, not image.png
         expect(mockWorkspaceFs.readFile).toHaveBeenCalledTimes(1);

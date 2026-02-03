@@ -322,9 +322,10 @@ function isSafeRegex(pattern: string): boolean {
     return false;
   }
   const dangerousSequences = [
-    /(\([^)]*([*+]{1,})[^)]*\))+[+*]/,
-    /([^\\]|^)\d+\s*[*+]{1,}/,
-    /\[[^\]]*\][*+]{1,}\s*[?+*]{1,}/
+    // Check for nested quantifiers without catastrophic backtracking
+    /(\([^)]*[*+][^)]*\))[+*]/,
+    /([^\\]|^)\d+\s*[*+]/,
+    /\[[^\]]*\][*+]\s*[?+*]/
   ];
   for (const seq of dangerousSequences) {
     if (seq.test(pattern)) return false;

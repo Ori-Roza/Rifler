@@ -1365,7 +1365,6 @@ class AutomationTestClass {
     }
 
     let validationMessage: any = null;
-    const searchResults: any[] | null = null;
 
     const validationPromise = new Promise<void>((resolve) => {
       const disposable = currentPanel.webview.onDidReceiveMessage((message: any) => {

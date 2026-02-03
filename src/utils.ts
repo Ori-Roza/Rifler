@@ -230,7 +230,7 @@ async function findModulesInDirectory(
         }
       }
     }
-  } catch (error) {
+  } catch {
     // Directory might not be accessible, skip it
   }
 }

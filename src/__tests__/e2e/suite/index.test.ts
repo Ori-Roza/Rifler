@@ -120,7 +120,7 @@ suite('Extension Test Suite', () => {
 
     test('Should toggle sidebar visibility', async () => {
       // Execute the sidebar view command
-      const sidebarView = await vscode.commands.executeCommand('workbench.view.extension.rifler-sidebar');
+      await vscode.commands.executeCommand('workbench.view.extension.rifler-sidebar');
       await new Promise(resolve => setTimeout(resolve, 1000));
       assert.ok(true);
     });

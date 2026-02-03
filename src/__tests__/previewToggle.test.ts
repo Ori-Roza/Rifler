@@ -13,7 +13,6 @@ describe('Preview Toggle Feature', () => {
   const MIN_PANEL_HEIGHT = 80;
   const PREVIEW_MIN_HEIGHT = 80;
   const DEFAULT_PREVIEW_HEIGHT = 240;
-  const RESIZER_HEIGHT = 22;
 
   let mockState: {
     previewHeight: number;
@@ -98,18 +97,15 @@ describe('Preview Toggle Feature', () => {
 
     test('should not update last expanded height when dragging to minimum', () => {
       const oldLastExpanded = 250;
-      const newHeight = PREVIEW_MIN_HEIGHT;
-      const lastExpanded = oldLastExpanded;
-      assert.strictEqual(lastExpanded, 250); // unchanged
+      // When dragging to minimum height, lastExpanded should remain unchanged
+      assert.strictEqual(oldLastExpanded, 250); // unchanged
     });
 
     test('should not overwrite last expanded height when collapsing via button', () => {
       const oldLastExpanded = 220;
-      const newHeight = PREVIEW_MIN_HEIGHT;
-      const lastExpanded = oldLastExpanded;
       // When collapsing via button, we don't update lastExpanded
       // (it remains the old value)
-      assert.strictEqual(lastExpanded, 220);
+      assert.strictEqual(oldLastExpanded, 220);
     });
 
     test('should persist last expanded height to state', () => {
@@ -339,10 +335,7 @@ describe('Preview Toggle Feature', () => {
       mockState.lastExpandedHeight = 200;
 
       // Simulate drag to minimum
-      const newHeight = PREVIEW_MIN_HEIGHT;
-      if (newHeight > PREVIEW_MIN_HEIGHT) {
-        mockState.lastExpandedHeight = newHeight;
-      }
+      // newHeight is PREVIEW_MIN_HEIGHT, so lastExpandedHeight should remain unchanged
 
       assert.strictEqual(mockState.lastExpandedHeight, 200); // Unchanged
     });
@@ -350,7 +343,6 @@ describe('Preview Toggle Feature', () => {
 
   describe('Window Resize Behavior', () => {
     test('should clamp preview height on container resize', () => {
-      const oldContainerHeight = 600;
       const newContainerHeight = 400;
       mockState.previewHeight = 300; // Was valid in old container
       const maxPreview = Math.max(PREVIEW_MIN_HEIGHT, newContainerHeight - MIN_PANEL_HEIGHT);

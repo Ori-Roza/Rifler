@@ -80,23 +80,29 @@ async function searchInDirectory(dirPath, regex, results, maxResults, limiter) {
 
 async function searchInFile(filePath, regex, results, maxResults) {
   try {
-    const stats = await fs.promises.stat(filePath);
-    if (stats.size > 1024 * 1024) return; // Skip files > 1MB
+    // Open file first to avoid race condition between stat and read
+    const fileHandle = await fs.promises.open(filePath, 'r');
+    try {
+      const stats = await fileHandle.stat();
+      if (stats.size > 1024 * 1024) return; // Skip files > 1MB
 
-    const content = await fs.promises.readFile(filePath, 'utf-8');
-    const lines = content.split('\n');
+      const content = await fileHandle.readFile('utf-8');
+      const lines = content.split('\n');
 
-    for (let lineIndex = 0; lineIndex < lines.length && results.length < maxResults; lineIndex++) {
-      const line = lines[lineIndex];
-      regex.lastIndex = 0;
-      
-      if (regex.test(line)) {
-        results.push({
-          file: filePath,
-          line: lineIndex,
-          content: line.trim()
-        });
+      for (let lineIndex = 0; lineIndex < lines.length && results.length < maxResults; lineIndex++) {
+        const line = lines[lineIndex];
+        regex.lastIndex = 0;
+        
+        if (regex.test(line)) {
+          results.push({
+            file: filePath,
+            line: lineIndex,
+            content: line.trim()
+          });
+        }
       }
+    } finally {
+      await fileHandle.close();
     }
   } catch {
     // Skip files that can't be read

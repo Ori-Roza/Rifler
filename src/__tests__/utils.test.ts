@@ -698,3 +698,64 @@ describe('isValidRegexPattern', () => {
     expect(isValidRegexPattern('\\bword\\b')).toBe(true);
   });
 });
+
+describe('buildSearchRegex with angle brackets', () => {
+  test('should handle Array<string> pattern in regex mode', () => {
+    const options: SearchOptions = {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: true,
+      fileMask: ''
+    };
+    const regex = buildSearchRegex('Array<string>', options);
+    expect(regex).not.toBeNull();
+    expect(regex!.test('Array<string>')).toBe(true);
+    regex!.lastIndex = 0;
+    expect(regex!.test('array<string>')).toBe(true); // case insensitive
+  });
+
+  test('should handle Array<(.*)> pattern with capture group', () => {
+    const options: SearchOptions = {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: true,
+      fileMask: ''
+    };
+    const regex = buildSearchRegex('Array<(.*)>', options);
+    expect(regex).not.toBeNull();
+    expect(regex!.test('Array<string>')).toBe(true);
+    regex!.lastIndex = 0;
+    expect(regex!.test('Array<number>')).toBe(true);
+    regex!.lastIndex = 0;
+    expect(regex!.test('Array<boolean>')).toBe(true);
+    regex!.lastIndex = 0;
+    expect(regex!.test('ArrayOfStuff')).toBe(false);
+  });
+
+  test('should match greedy capture groups correctly', () => {
+    const options: SearchOptions = {
+      matchCase: true,
+      wholeWord: false,
+      useRegex: true,
+      fileMask: ''
+    };
+    const regex = buildSearchRegex('Array<(.*)>', options);
+    const testString = 'Array<string>';
+    const match = regex!.exec(testString);
+    expect(match).not.toBeNull();
+    expect(match![0]).toBe('Array<string>');
+    expect(match![1]).toBe('string');
+  });
+
+  test('should not match patterns without angle brackets', () => {
+    const options: SearchOptions = {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: true,
+      fileMask: ''
+    };
+    const regex = buildSearchRegex('Array<(.*)>', options);
+    expect(regex!.test('List<string>')).toBe(false);
+    expect(regex!.test('Arraystring')).toBe(false);
+  });
+});

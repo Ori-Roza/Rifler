@@ -343,19 +343,22 @@ describe('collectFiles', () => {
     const files = await collectFiles('/test/dir');
 
     expect(files.length).toBe(2);
-    expect(files).toContain('/test/dir/file1.ts');
-    expect(files).toContain('/test/dir/file2.ts');
+    // Normalize for cross-platform comparison
+    const normalized = files.map(f => f.replace(/\\/g, '/'));
+    expect(normalized).toContain('/test/dir/file1.ts');
+    expect(normalized).toContain('/test/dir/file2.ts');
   });
 
   test('should recursively search subdirectories', async () => {
     mockWorkspaceFs.readDirectory.mockImplementation((uri: vscode.Uri) => {
-      if (uri.fsPath === '/test/dir') {
+      const normalized = uri.fsPath.replace(/\\/g, '/');
+      if (normalized === '/test/dir') {
         return Promise.resolve([
           ['subdir', vscode.FileType.Directory],
           ['file1.ts', vscode.FileType.File]
         ]);
       }
-      if (uri.fsPath === '/test/dir/subdir') {
+      if (normalized === '/test/dir/subdir') {
         return Promise.resolve([
           ['file2.ts', vscode.FileType.File]
         ]);
@@ -366,19 +369,21 @@ describe('collectFiles', () => {
     const files = await collectFiles('/test/dir');
 
     expect(files.length).toBe(2);
-    expect(files).toContain('/test/dir/file1.ts');
-    expect(files).toContain('/test/dir/subdir/file2.ts');
+    const normalizedFiles = files.map(f => f.replace(/\\/g, '/'));
+    expect(normalizedFiles).toContain('/test/dir/file1.ts');
+    expect(normalizedFiles).toContain('/test/dir/subdir/file2.ts');
   });
 
   test('should exclude node_modules directory', async () => {
     mockWorkspaceFs.readDirectory.mockImplementation((uri: vscode.Uri) => {
-      if (uri.fsPath === '/test/dir') {
+      const normalized = uri.fsPath.replace(/\\/g, '/');
+      if (normalized === '/test/dir') {
         return Promise.resolve([
           ['node_modules', vscode.FileType.Directory],
           ['src', vscode.FileType.Directory]
         ]);
       }
-      if (uri.fsPath === '/test/dir/src') {
+      if (normalized === '/test/dir/src') {
         return Promise.resolve([
           ['file.ts', vscode.FileType.File]
         ]);
@@ -389,7 +394,8 @@ describe('collectFiles', () => {
     const files = await collectFiles('/test/dir');
 
     expect(files.length).toBe(1);
-    expect(files).toContain('/test/dir/src/file.ts');
+    const normalizedFiles = files.map(f => f.replace(/\\/g, '/'));
+    expect(normalizedFiles).toContain('/test/dir/src/file.ts');
   });
 
   test('should exclude binary files', async () => {
@@ -402,7 +408,8 @@ describe('collectFiles', () => {
     const files = await collectFiles('/test/dir');
 
     expect(files.length).toBe(1);
-    expect(files).toContain('/test/dir/file.ts');
+    const normalizedFiles = files.map(f => f.replace(/\\/g, '/'));
+    expect(normalizedFiles).toContain('/test/dir/file.ts');
   });
 
   test('should respect file mask', async () => {
@@ -415,7 +422,8 @@ describe('collectFiles', () => {
     const files = await collectFiles('/test/dir', '*.ts');
 
     expect(files.length).toBe(1);
-    expect(files).toContain('/test/dir/file.ts');
+    const normalizedFiles = files.map(f => f.replace(/\\/g, '/'));
+    expect(normalizedFiles).toContain('/test/dir/file.ts');
   });
 
   test('should respect maxFiles limit', async () => {

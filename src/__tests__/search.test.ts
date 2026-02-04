@@ -231,7 +231,9 @@ describe('Search', () => {
           ['large.ts', vscode.FileType.File]
         ]);
         mockWorkspaceFs.stat.mockImplementation((uri) => {
-          if (uri.fsPath === '/workspace/large.ts') {
+          // Normalize path for cross-platform comparison
+          const normalizedPath = uri.fsPath.replace(/\\/g, '/');
+          if (normalizedPath === '/workspace/large.ts' || normalizedPath.endsWith('\\workspace\\large.ts')) {
             return Promise.resolve({ type: vscode.FileType.File, size: 2 * 1024 * 1024, ctime: 0, mtime: 0 }); // 2MB
           }
           return Promise.resolve({ type: vscode.FileType.File, size: 100, ctime: 0, mtime: 0 });

@@ -285,7 +285,12 @@ async function fallbackSearchInFile(
     let content: string;
     const fileUri = vscode.Uri.file(filePath);
     const fileUriString = fileUri.toString();
-    const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === fileUriString);
+    // Normalize for cross-platform comparison (case-insensitive on Windows)
+    const normalizedFileUriString = fileUriString.toLowerCase().replace(/\\/g, '/');
+    const openDoc = vscode.workspace.textDocuments.find(doc => {
+      const docUriString = doc.uri.toString().toLowerCase().replace(/\\/g, '/');
+      return docUriString === normalizedFileUriString;
+    });
 
     if (openDoc) {
       content = openDoc.getText();

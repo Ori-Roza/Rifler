@@ -50,6 +50,13 @@ export const workspace = {
 
 export const env = {
   appRoot: '/tmp/vscode-app-root',
+  appName: 'Visual Studio Code',
+  language: 'en',
+  machineId: 'test-machine-id',
+  sessionId: 'test-session-id',
+  remoteName: undefined,
+  shell: '/bin/bash',
+  uiKind: 1,
 };
 
 export const window = {

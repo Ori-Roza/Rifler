@@ -32,10 +32,11 @@ jobs:
         run: npm run lint
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [20.x]
     
     steps:
@@ -54,10 +55,11 @@ jobs:
         run: npm test
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [20.x]
     
     steps:
@@ -76,10 +78,11 @@ jobs:
         run: npm run compile
 
   e2e-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [20.x]
     
     steps:
@@ -100,8 +103,14 @@ jobs:
       - name: Copy webview assets
         run: npm run copy-webview
       
-      - name: Run E2E tests
+      - name: Run E2E tests (Linux)
+        if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:e2e
         env:
-          # Prevent VS Code from showing dialogs during tests
+          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+      
+      - name: Run E2E tests (Windows)
+        if: runner.os == 'Windows'
+        run: npm run test:e2e
+        env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true

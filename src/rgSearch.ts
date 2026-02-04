@@ -248,16 +248,18 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
 
   args.push('-e', searchQuery, '--', ...roots);
 
-  // Debug logging
-  if (options.multiline || query.includes('\n')) {
-    console.log('[Rifler] Multiline search:', {
+  // Debug logging for regex patterns - especially important for patterns with special chars like <, >
+  if (options.useRegex) {
+    console.log('[Rifler] Regex search:', {
       originalQuery: query,
       searchQuery,
-      useRegex,
-      hasNewline: query.includes('\n'),
-      multilineEnabled: options.multiline
+      useRegex: options.useRegex,
+      matchCase: options.matchCase,
+      wholeWord: options.wholeWord,
+      multilineEnabled: options.multiline,
+      patternSentToRipgrep: searchQuery
     });
-    console.log('[Rifler] ripgrep args:', args.slice(0, 10));
+    console.log('[Rifler] ripgrep command would be: rg', args.join(' '));
   }
 
   let child: ChildProcessWithoutNullStreams | undefined;

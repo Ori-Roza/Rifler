@@ -269,6 +269,6 @@
     "highlight.js": "^11.11.1"
   },
   "overrides": {
-    "undici": "^7.19.0"
+    "undici": "5.28.4"
   }
 }

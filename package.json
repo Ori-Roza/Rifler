@@ -224,7 +224,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile && npm run copy-webview",
     "compile": "tsc -p ./",
-    "copy-webview": "node scripts/copy-webview.js",
+    "copy-webview": "cpx \"src/webview/{index.html,script.js,styles.css,seti-icons.css,seti.woff}\" out/webview && cpx \"assets/fonts/*.woff2\" out/webview && cpx \"node_modules/@vscode/codicons/dist/{codicon.css,codicon.ttf}\" out/webview",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src",
     "test": "jest",
@@ -252,6 +252,7 @@
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.1",
+    "cpx2": "^8.0.0",
     "eslint": "^9.39.2",
     "glob": "^13.0.0",
     "globals": "^17.3.0",

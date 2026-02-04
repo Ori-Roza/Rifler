@@ -129,13 +129,7 @@ export async function performSearch(
 
   try {
     const rawResults = await promise;
-    console.log('[Rifler DEBUG] rawResults count:', rawResults.length);
-    if (rawResults.length > 0) {
-      console.log('[Rifler DEBUG] first result uri:', rawResults[0].uri);
-    }
-    console.log('[Rifler DEBUG] rootSpecs:', rootSpecs.map(r => ({ fsPath: r.fsPath, type: r.type })));
     const results = filterResultsToRoots(rawResults, rootSpecs);
-    console.log('[Rifler DEBUG] filtered results count:', results.length);
     if (activeSearchCancel === cancel) {
       activeSearchCancel = undefined;
     }

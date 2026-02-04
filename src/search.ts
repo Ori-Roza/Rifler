@@ -38,18 +38,21 @@ function filterResultsToRoots(results: SearchResult[], roots: RootSpec[]): Searc
       let rest = trimmed.slice('file://'.length);
       // Collapse leading slashes to a single slash for POSIX paths.
       rest = rest.replace(/^\/+/, '/');
+      // Decode FIRST, then check for Windows drive letter
+      try {
+        rest = decodeURIComponent(rest);
+      } catch {
+        // If decoding fails, continue with the original
+      }
       // Handle Windows drive letter form: /C:/...
-      if (/^\/[A-Za-z]:\//.test(rest)) {
+      if (/^\/[A-Za-z]:[\\/]/.test(rest)) {
         rest = rest.slice(1);
       }
-      try {
-        return decodeURIComponent(rest);
-      } catch {
-        return rest;
-      }
+      // Normalize path separators for the current platform
+      return path.normalize(rest);
     }
 
-    return trimmed;
+    return path.normalize(trimmed);
   };
 
   return results.filter((r) => {
@@ -282,7 +285,12 @@ async function fallbackSearchInFile(
     let content: string;
     const fileUri = vscode.Uri.file(filePath);
     const fileUriString = fileUri.toString();
-    const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === fileUriString);
+    // Normalize for cross-platform comparison (case-insensitive on Windows)
+    const normalizedFileUriString = fileUriString.toLowerCase().replace(/\\/g, '/');
+    const openDoc = vscode.workspace.textDocuments.find(doc => {
+      const docUriString = doc.uri.toString().toLowerCase().replace(/\\/g, '/');
+      return docUriString === normalizedFileUriString;
+    });
 
     if (openDoc) {
       content = openDoc.getText();

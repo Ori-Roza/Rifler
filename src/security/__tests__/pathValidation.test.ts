@@ -102,7 +102,9 @@ describe('Path Validation Security', () => {
     test('Should accept valid path within workspace', () => {
       const validPath = '/Users/test/project/src';
       const result = validateDirectoryPath(validPath);
-      expect(result).toContain('project/src');
+      // Normalize for cross-platform comparison (Windows uses backslashes)
+      const normalized = result.replace(/\\/g, '/');
+      expect(normalized).toContain('project/src');
     });
 
     test('Should throw on path traversal with ..', () => {

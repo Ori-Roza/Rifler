@@ -329,7 +329,7 @@ export function searchInContent(
     if (lineMatches.length > 0) {
       const firstMatch = lineMatches[0];
       results.push({
-        uri: `file://${filePath}`,
+        uri: vscode.Uri.file(filePath).toString(),
         fileName,
         relativePath: finalRelativePath,
         line: lineIndex,

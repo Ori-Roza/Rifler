@@ -26,7 +26,9 @@ describe('getRipgrepCommandCandidates', () => {
     const candidates = getRipgrepCommandCandidates();
 
     // our vscode jest mock sets env.appRoot to /tmp/vscode-app-root
-    expect(candidates.some((c) => c.includes('/tmp/vscode-app-root'))).toBe(true);
+    // Normalize paths for cross-platform comparison (Windows uses backslashes)
+    const normalized = candidates.map(c => c.replace(/\\/g, '/'));
+    expect(normalized.some((c) => c.includes('/tmp/vscode-app-root'))).toBe(true);
     expect(candidates).toContain('rg');
   });
 });

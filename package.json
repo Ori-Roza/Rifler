@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "1.1.9",
+  "version": "1.2.0",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
@@ -224,7 +224,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile && npm run copy-webview",
     "compile": "tsc -p ./",
-    "copy-webview": "mkdir -p out/webview && cp src/webview/index.html src/webview/script.js src/webview/styles.css src/webview/seti-icons.css src/webview/seti.woff assets/fonts/*.woff2 out/webview/ && cp node_modules/@vscode/codicons/dist/codicon.css node_modules/@vscode/codicons/dist/codicon.ttf out/webview/",
+    "copy-webview": "cpx \"src/webview/{index.html,script.js,styles.css,seti-icons.css,seti.woff}\" out/webview && cpx \"assets/fonts/*.woff2\" out/webview && cpx \"node_modules/@vscode/codicons/dist/{codicon.css,codicon.ttf}\" out/webview",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src",
     "test": "jest",
@@ -252,6 +252,7 @@
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.1",
+    "cpx2": "^8.0.0",
     "eslint": "^9.39.2",
     "glob": "^13.0.0",
     "globals": "^17.3.0",

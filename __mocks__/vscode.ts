@@ -1,6 +1,6 @@
 export const Uri = {
   parse: jest.fn((path) => ({ fsPath: path, toString: () => path })),
-  file: jest.fn((path) => ({ fsPath: path, toString: () => path })),
+  file: jest.fn((path) => ({ fsPath: path, toString: () => `file://${path}` })),
   joinPath: jest.fn((base, ...pathSegments) => ({
     fsPath: `${base.fsPath}/${pathSegments.join('/')}`,
     toString: () => `${base.fsPath}/${pathSegments.join('/')}`
@@ -50,6 +50,13 @@ export const workspace = {
 
 export const env = {
   appRoot: '/tmp/vscode-app-root',
+  appName: 'Visual Studio Code',
+  language: 'en',
+  machineId: 'test-machine-id',
+  sessionId: 'test-session-id',
+  remoteName: undefined,
+  shell: '/bin/bash',
+  uiKind: 1,
 };
 
 export const window = {

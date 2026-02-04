@@ -38,18 +38,21 @@ function filterResultsToRoots(results: SearchResult[], roots: RootSpec[]): Searc
       let rest = trimmed.slice('file://'.length);
       // Collapse leading slashes to a single slash for POSIX paths.
       rest = rest.replace(/^\/+/, '/');
+      // Decode FIRST, then check for Windows drive letter
+      try {
+        rest = decodeURIComponent(rest);
+      } catch {
+        // If decoding fails, continue with the original
+      }
       // Handle Windows drive letter form: /C:/...
-      if (/^\/[A-Za-z]:\//.test(rest)) {
+      if (/^\/[A-Za-z]:[\\/]/.test(rest)) {
         rest = rest.slice(1);
       }
-      try {
-        return decodeURIComponent(rest);
-      } catch {
-        return rest;
-      }
+      // Normalize path separators for the current platform
+      return path.normalize(rest);
     }
 
-    return trimmed;
+    return path.normalize(trimmed);
   };
 
   return results.filter((r) => {
@@ -126,7 +129,13 @@ export async function performSearch(
 
   try {
     const rawResults = await promise;
+    console.log('[Rifler DEBUG] rawResults count:', rawResults.length);
+    if (rawResults.length > 0) {
+      console.log('[Rifler DEBUG] first result uri:', rawResults[0].uri);
+    }
+    console.log('[Rifler DEBUG] rootSpecs:', rootSpecs.map(r => ({ fsPath: r.fsPath, type: r.type })));
     const results = filterResultsToRoots(rawResults, rootSpecs);
+    console.log('[Rifler DEBUG] filtered results count:', results.length);
     if (activeSearchCancel === cancel) {
       activeSearchCancel = undefined;
     }

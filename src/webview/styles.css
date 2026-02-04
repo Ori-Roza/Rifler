@@ -632,6 +632,18 @@ body.loaded {
   min-width: 0;
 }
 
+/* Fix for select elements on Windows - they need explicit background */
+select.path-input {
+  background: var(--rifler-input-bg);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+select.path-input option {
+  background: var(--rifler-input-bg);
+  color: var(--rifler-input-fg);
+}
+
 .smart-exclude-toggle {
   display: inline-flex;
   align-items: center;
@@ -717,12 +729,18 @@ body.loaded {
 
 .scope-dropdown {
   flex: 1;
-  background: transparent;
+  background: var(--rifler-input-bg);
   border: none;
   color: var(--rifler-input-fg);
   font-size: 11px;
   cursor: pointer;
-  padding: 2px 0;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.scope-dropdown option {
+  background: var(--rifler-input-bg);
+  color: var(--rifler-input-fg);
 }
 
 .scope-dropdown:focus {

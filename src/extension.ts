@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import {
   SearchOptions,
   findWorkspaceModules,
@@ -36,9 +37,7 @@ function sendCurrentDirectory(panel: vscode.WebviewPanel): void {
 
   if (activeEditor && activeEditor.document.uri.scheme === 'file') {
     const filePath = activeEditor.document.uri.fsPath;
-    const pathParts = filePath.split('/');
-    pathParts.pop();
-    directory = pathParts.join('/');
+    directory = path.dirname(filePath);
   } else {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length > 0) {

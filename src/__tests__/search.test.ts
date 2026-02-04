@@ -294,7 +294,7 @@ describe('Search', () => {
         (vscode.workspace as any).textDocuments = [{
           uri: { 
             fsPath: testFilePath,
-            toString: () => testFilePath 
+            toString: () => `file://${testFilePath}` 
           },
           getText: () => openDocContent
         }];

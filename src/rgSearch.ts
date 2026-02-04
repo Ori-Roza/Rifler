@@ -77,8 +77,12 @@ async function spawnWithFallback(
   const attempts = commands.filter(fileSeemsPresent);
   const errors: Array<{ command: string; error: unknown }> = [];
 
+  console.log('[Rifler DEBUG] ripgrep candidates:', JSON.stringify(commands));
+  console.log('[Rifler DEBUG] ripgrep attempts after filter:', JSON.stringify(attempts));
+
   for (const command of attempts) {
     try {
+      console.log('[Rifler DEBUG] Trying ripgrep at:', command);
       const child = spawn(command, args, { windowsHide: true });
       await new Promise<void>((resolve, reject) => {
         const onError = (err: NodeJS.ErrnoException): void => {
@@ -98,6 +102,7 @@ async function spawnWithFallback(
         child.once('spawn', onSpawn);
       });
 
+      console.log('[Rifler DEBUG] Successfully spawned ripgrep at:', command);
       return { child, command };
     } catch (error) {
       errors.push({ command, error });
@@ -248,6 +253,11 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
 
   args.push('-e', searchQuery, '--', ...roots);
 
+  // Debug logging for all searches on Windows
+  console.log('[Rifler DEBUG] ripgrep args:', JSON.stringify(args));
+  console.log('[Rifler DEBUG] ripgrep roots:', JSON.stringify(roots));
+  console.log('[Rifler DEBUG] ripgrep query:', searchQuery);
+
   // Debug logging for regex patterns - especially important for patterns with special chars like <, >
   if (options.useRegex) {
     console.log('[Rifler] Regex search:', {
@@ -330,16 +340,19 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
 
       child.on('error', (err) => {
         if (done) return;
+        console.error('[Rifler DEBUG] ripgrep error:', err);
         cleanup();
         reject(err);
       });
 
-      child.stderr.on('data', () => {
-        // Ignore stderr noise from ripgrep (e.g., broken pipes on cancel)
+      child.stderr.on('data', (data) => {
+        // Log stderr for debugging
+        console.log('[Rifler DEBUG] ripgrep stderr:', data.toString());
       });
 
       child.on('close', (code, signal) => {
         if (done) return;
+        console.log('[Rifler DEBUG] ripgrep closed with code:', code, 'signal:', signal, 'results:', results.length);
         cleanup();
         if (signal) {
           resolve(results);

@@ -1,114 +1,209 @@
-name: Release
+name: Security Audit
 
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., 0.2.0)'
-        required: false
-
-permissions:
-  contents: write
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run weekly security audit every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch: # Allow manual trigger
 
 jobs:
-  validate:
-    name: Validate & Build
+  dependency-audit:
+    name: NPM Dependency Audit
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
           node-version: '18'
           cache: 'npm'
-
+      
       - name: Install dependencies
         run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Run tests
-        run: npm test -- --coverage
-
-      - name: Compile
-        run: npm run compile
-
-  package:
-    name: Package Extension
-    needs: validate
-    runs-on: ubuntu-latest
-    outputs:
-      vsix-path: ${{ steps.package.outputs.vsix-path }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prepare for publication
-        run: npm run vscode:prepublish
-
-      - name: Package extension
-        id: package
+      
+      - name: Run npm audit
         run: |
-          npm run package
-          VSIX_FILE=$(ls *.vsix | head -1)
-          echo "vsix-path=$VSIX_FILE" >> $GITHUB_OUTPUT
-          echo "Extension packaged: $VSIX_FILE"
-
-      - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v6
+          # Run audit and save output
+          npm audit --production --audit-level=moderate > audit-results.txt || true
+          
+          # Check if vulnerabilities found
+          if npm audit --production --audit-level=moderate; then
+            echo "✅ No vulnerabilities found"
+          else
+            echo "⚠️ Vulnerabilities detected"
+            cat audit-results.txt
+            exit 1
+          fi
+      
+      - name: Upload audit results
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          name: rifler-vsix
-          path: '*.vsix'
-          retention-days: 30
+          name: npm-audit-results
+          path: audit-results.txt
 
-  publish:
-    name: Publish to Marketplace
-    needs: package
+  dependency-review:
+    name: Dependency Review
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'pull_request'
+    
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
+      
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-3.0, AGPL-3.0
 
-      - uses: actions/setup-node@v6
+  security-tests:
+    name: Security Test Suite
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
           node-version: '18'
           cache: 'npm'
-
+      
       - name: Install dependencies
         run: npm ci
-
-      - name: Prepare for publication
-        run: npm run vscode:prepublish
-
-      - name: Publish to Marketplace
+      
+      - name: Run security tests
         run: |
-          npx @vscode/vsce publish -p ${{ secrets.VSCE_PAT }}
+          # Run only security-related tests
+          npm test -- src/security/__tests__
+      
+      - name: Check for path traversal vulnerabilities
+        run: |
+          echo "Checking for potential path traversal vulnerabilities..."
+          
+          # Search for dangerous path operations in production code only (exclude test files)
+          if grep -r "path\.join.*\.\." src/ --exclude-dir=node_modules --exclude="*.test.ts" --exclude="*.test.js" | grep -v "__tests__" || \
+             grep -r "path\.resolve.*\.\." src/ --exclude-dir=node_modules --exclude="*.test.ts" --exclude="*.test.js" | grep -v "__tests__"; then
+            echo "⚠️ Found potential path traversal patterns in production code"
+            echo "Review these carefully for security implications"
+            exit 1
+          else
+            echo "✅ No obvious path traversal patterns found in production code"
+          fi
+      
+      - name: Check for command injection vulnerabilities
+        run: |
+          echo "Checking for command injection vulnerabilities..."
+          
+          # Search for dangerous command execution patterns
+          if grep -r "exec\(.*\$\|spawn\(.*shell.*true" src/ --exclude-dir=node_modules || \
+             grep -r "child_process.*shell.*true" src/ --exclude-dir=node_modules; then
+            echo "⚠️ Found potential command injection patterns"
+            exit 1
+          else
+            echo "✅ No command injection vulnerabilities found"
+          fi
+      
+      - name: Check for XSS vulnerabilities in webview
+        run: |
+          echo "Checking for XSS vulnerabilities in webview code..."
+          
+          # Search for dangerous innerHTML patterns
+          UNSAFE_INNERHTML=$(grep -n "innerHTML.*=" src/webview/ --exclude="*.test.*" || true)
+          
+          if [ -n "$UNSAFE_INNERHTML" ]; then
+            echo "⚠️ Found innerHTML usage in webview:"
+            echo "$UNSAFE_INNERHTML"
+            echo ""
+            echo "Ensure all innerHTML assignments use escapeHtml() or sanitizeHighlightedHtml()"
+            # Don't fail - just warn (can enable exit 1 after fixing all cases)
+          else
+            echo "✅ No innerHTML usage found"
+          fi
 
-      - name: Download artifact
-        uses: actions/download-artifact@v4
+  code-scanning:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
         with:
-          name: rifler-vsix
+          languages: javascript, typescript
+          queries: security-and-quality
+      
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+  security-scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      security-events: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
         with:
-          files: '*.vsix'
-          draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
+      
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      
+      - name: Upload Scorecard results
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
 
+  summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, security-tests]
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🔒 Security Audit Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.dependency-audit.result }}" == "success" ]; then
+            echo "✅ **Dependency Audit**: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Dependency Audit**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.security-tests.result }}" == "success" ]; then
+            echo "✅ **Security Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Security Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Audit Date**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

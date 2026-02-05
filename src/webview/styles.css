@@ -1031,6 +1031,22 @@ select.path-input option {
   opacity: 0.8;
 }
 
+.search-history-menu .clear-history-btn {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rifler-border);
+  color: var(--rifler-fg-muted);
+}
+
+.search-history-menu .clear-history-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.search-history-menu .clear-history-btn .material-symbols-outlined {
+  opacity: 1;
+}
+
 .result-file-header .file-name {
   font-size: 13px;
   font-weight: 600;

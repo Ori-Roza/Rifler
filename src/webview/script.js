@@ -511,6 +511,23 @@ console.log('[Rifler] Webview script starting...');
 
         searchHistoryMenu.appendChild(btn);
       });
+
+      // Add clear button at the bottom
+      const clearBtn = document.createElement('button');
+      clearBtn.className = 'clear-history-btn';
+      clearBtn.dataset.action = 'clear';
+
+      const clearIcon = document.createElement('span');
+      clearIcon.className = 'material-symbols-outlined';
+      clearIcon.textContent = 'delete_sweep';
+
+      const clearLabel = document.createElement('span');
+      clearLabel.textContent = 'Clear History';
+
+      clearBtn.appendChild(clearIcon);
+      clearBtn.appendChild(clearLabel);
+
+      searchHistoryMenu.appendChild(clearBtn);
     }
 
     function applySearchHistoryEntry(entry) {
@@ -577,6 +594,16 @@ console.log('[Rifler] Webview script starting...');
       searchHistoryMenu.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
         if (!btn || btn.disabled) return;
+        
+        // Handle clear history action
+        if (btn.dataset.action === 'clear') {
+          console.log('[Rifler] Clear history button clicked');
+          searchHistoryMenu.classList.remove('open');
+          vscode.postMessage({ type: 'clearSearchHistory' });
+          console.log('[Rifler] Clear history message sent');
+          return;
+        }
+        
         const idxRaw = btn.dataset.index;
         const idx = Number(idxRaw);
         if (!Number.isFinite(idx)) return;
@@ -2289,6 +2316,7 @@ console.log('[Rifler] Webview script starting...');
     console.log('Webview received message:', message.type, message);
     switch (message.type) {
       case 'searchHistory':
+        console.log('[Rifler] Received searchHistory update:', message.entries);
         state.searchHistory = Array.isArray(message.entries) ? message.entries : [];
         renderSearchHistoryMenu();
         if (pendingTestHistoryEcho) {

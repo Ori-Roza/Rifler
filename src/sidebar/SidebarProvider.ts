@@ -258,6 +258,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       'validateDirectory',
       'getProjectExclusions',
       'updateProjectExclusions',
+      'clearSearchHistory',
       '__diag_ping',
       '__test_searchCompleted',
       '__test_searchResultsReceived',

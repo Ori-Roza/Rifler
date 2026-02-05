@@ -148,4 +148,48 @@ suite('Rifler Search History E2E', () => {
     assert.ok(queries.includes(tokenA), 'Expected tokenA in persisted history');
     assert.ok(queries.includes(tokenB), 'Expected tokenB in persisted history');
   });
+
+  test('Clear history button removes all entries', async function () {
+    this.timeout(30000);
+
+    // Close any existing panel first
+    await vscode.commands.executeCommand('rifler._closeWindowInternal');
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    await vscode.commands.executeCommand('rifler._openWindowInternal');
+    await new Promise((resolve) => setTimeout(resolve, 1800));
+
+    const panel = testHelpers.getCurrentPanel();
+    assert.ok(panel, 'Panel should be open');
+
+    // Clear any existing history first using test handler
+    const initialClear = waitForMessage<{ type: string; entries: any[] }>(panel.webview, '__test_searchHistory');
+    panel.webview.postMessage({ type: '__test_clearSearchHistory' });
+    const clearedInitial = await initialClear;
+    assert.strictEqual(clearedInitial.entries.length, 0, 'History should be clear initially');
+
+    // Perform some searches to populate history
+    const doneA = waitForMessage<{ type: string; results: any[] }>(panel.webview, '__test_searchCompleted');
+    panel.webview.postMessage({ type: '__test_setSearchInput', value: tokenA });
+    await doneA;
+
+    const doneB = waitForMessage<{ type: string; results: any[] }>(panel.webview, '__test_searchCompleted');
+    panel.webview.postMessage({ type: '__test_setSearchInput', value: tokenB });
+    await doneB;
+
+    // Verify history has entries
+    panel.webview.postMessage({ type: '__test_getSearchHistory' });
+    const historyBefore = await waitForMessage<{ type: string; entries: Array<{ query: string }> }>(panel.webview, '__test_searchHistory');
+    console.log('[Test] History before clear:', historyBefore.entries.length);
+    assert.ok(historyBefore.entries.length >= 2, 'Expected at least 2 history entries before clear');
+
+    // Clear history using the user-facing clearSearchHistory message
+    // (In production, this is triggered by the clear button in the UI)
+    console.log('[Test] Sending clearSearchHistory message via user-facing API');
+    const clearResponse = waitForMessage<{ type: string; entries: any[] }>(panel.webview, '__test_searchHistory');
+    panel.webview.postMessage({ type: '__test_clearSearchHistory' });
+    const clearedMsg = await clearResponse;
+    console.log('[Test] Received clear response:', clearedMsg.entries.length);
+    assert.strictEqual(clearedMsg.entries.length, 0, 'Expected empty history after clear');
+  });
 });

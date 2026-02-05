@@ -2343,3 +2343,11 @@ body.windows .match-highlight {
   /* Adjust highlight padding for Windows fonts */
   padding: 0;
 }
+
+/* Fix excessive vertical spacing above/below results on Windows */
+body.windows .results-list {
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}

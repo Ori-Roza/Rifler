@@ -70,6 +70,17 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     deps.postMessage({ type: 'searchHistory', entries: deps.stateStore.getSearchHistory() });
   });
 
+  handler.registerHandler('clearSearchHistory', async () => {
+    console.log('[Rifler Extension] clearSearchHistory handler called');
+    if (!deps.stateStore) {
+      console.log('[Rifler Extension] No stateStore available');
+      return;
+    }
+    deps.stateStore.clearSearchHistory();
+    console.log('[Rifler Extension] History cleared, sending update to webview');
+    deps.postMessage({ type: 'searchHistory', entries: deps.stateStore.getSearchHistory() });
+  });
+
   handler.registerHandler('openLocation', async (message) => {
     const msg = message as { uri: string; line: number; character: number; };
     await deps.openLocation(msg.uri, msg.line, msg.character);

@@ -2308,3 +2308,38 @@ body.wide-layout .result-item {
   color: var(--rifler-highlight-text) !important;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.20) !important;
 }
+
+/* ===== Windows-specific spacing adjustments ===== */
+/* 
+ * On Windows, certain fonts and rendering engines can cause excessive 
+ * horizontal spacing in result lines. These overrides normalize spacing 
+ * without affecting the macOS appearance.
+ * 
+ * Do not modify existing CSS rules above; add new Windows-specific 
+ * overrides here only.
+ */
+
+body.windows .result-preview {
+  /* Use Consolas as primary font on Windows for consistent spacing */
+  font-family: Consolas, 'Courier New', monospace;
+  /* Normalize whitespace behavior */
+  white-space: nowrap;
+  letter-spacing: 0;
+  word-spacing: 0;
+}
+
+body.windows .result-line-number {
+  /* Ensure consistent monospace rendering on Windows */
+  font-family: Consolas, 'Courier New', monospace;
+  letter-spacing: 0;
+}
+
+body.windows .result-item {
+  /* Ensure no extra spacing from flex gaps */
+  gap: 0;
+}
+
+body.windows .match-highlight {
+  /* Adjust highlight padding for Windows fonts */
+  padding: 0;
+}

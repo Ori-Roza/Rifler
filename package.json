@@ -3,7 +3,7 @@
   "displayName": "Rifler",
   "icon": "assets/icon.jpeg",
   "description": "Fast file search with dynamic results, regex, file mask, and full preview",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "publisher": "Ori-Roza",
   "repository": "https://github.com/ori-roza/rifler",
   "engines": {
@@ -252,6 +252,7 @@
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.1",
+    "ovsx": "^0.10.8",
     "cpx2": "^8.0.0",
     "eslint": "^9.39.2",
     "glob": "^13.0.0",

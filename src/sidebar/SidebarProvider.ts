@@ -379,7 +379,10 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           wholeWord: !!message.options.wholeWord,
           useRegex: !!message.options.useRegex,
           multiline: !!message.options.multiline,
-          fileMask: message.options.fileMask || ''
+          fileMask: message.options.fileMask || '',
+          includeCode: message.options.includeCode ?? true,
+          includeComments: message.options.includeComments ?? true,
+          includeStrings: message.options.includeStrings ?? true
         },
         queryRows: message.queryRows
       });
@@ -839,12 +842,18 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       const replaceKeybinding = cfg.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
       const maxResults = cfg.get<number>('maxResults', 10000);
       const resultsShowCollapsed = cfg.get<boolean>('results.showCollapsed', false);
+      const contextDefaults = {
+        includeCode: cfg.get<boolean>('searchContext.includeCode', true),
+        includeComments: cfg.get<boolean>('searchContext.includeComments', true),
+        includeStrings: cfg.get<boolean>('searchContext.includeStrings', true)
+      };
 
       this._view.webview.postMessage({
         type: 'config',
         replaceKeybinding,
         maxResults,
-        resultsShowCollapsed
+        resultsShowCollapsed,
+        contextDefaults
       });
 
       console.log(`${this._logLabel}._restoreState: state =`, state ? 'exists' : 'undefined', state);

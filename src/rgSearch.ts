@@ -179,6 +179,8 @@ function mapMatchToResult(evt: RipgrepMatchEvent, workspaceFolders: readonly vsc
     return { start, end };
   });
 
+  const matchRanges = submatches.map((m) => ({ start: m.start, end: m.end }));
+
   const first = submatches[0];
 
   return {
@@ -190,7 +192,8 @@ function mapMatchToResult(evt: RipgrepMatchEvent, workspaceFolders: readonly vsc
     length: Math.max(0, first.end - first.start),
     preview,
     previewMatchRange: previewMatchRanges[0],
-    previewMatchRanges
+    previewMatchRanges,
+    matchRanges
   };
 }
 

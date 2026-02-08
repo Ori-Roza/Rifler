@@ -15,6 +15,7 @@ import {
 } from './utils';
 import { startRipgrepSearch } from './rgSearch';
 import { validateDirectoryPath } from './security/pathValidation';
+import { filterResultsByCodeContext } from './codeContextFilter';
 
 type RootSpec = { fsPath: string; type: vscode.FileType };
 
@@ -130,10 +131,11 @@ export async function performSearch(
   try {
     const rawResults = await promise;
     const results = filterResultsToRoots(rawResults, rootSpecs);
+    const filteredResults = await filterResultsByCodeContext(results, options);
     if (activeSearchCancel === cancel) {
       activeSearchCancel = undefined;
     }
-    return results;
+    return filteredResults;
   } catch (error) {
     if (activeSearchCancel === cancel) {
       activeSearchCancel = undefined;
@@ -156,7 +158,8 @@ export async function performSearch(
 
         if (results.length >= effectiveMaxResults) break;
       }
-      return filterResultsToRoots(results, rootSpecs);
+      const rootFiltered = filterResultsToRoots(results, rootSpecs);
+      return await filterResultsByCodeContext(rootFiltered, options);
     } catch {
       return [];
     }

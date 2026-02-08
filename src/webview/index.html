@@ -26,6 +26,15 @@
         <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">
           <span class="material-symbols-outlined">regular_expression</span>
         </button>
+        <button type="button" class="option-btn" id="include-code" title="Include Code" data-option="include-code">
+          <span class="material-symbols-outlined">code</span>
+        </button>
+        <button type="button" class="option-btn" id="include-comments" title="Include Comments" data-option="include-comments">
+          <span class="material-symbols-outlined">comment</span>
+        </button>
+        <button type="button" class="option-btn" id="include-strings" title="Include Strings" data-option="include-strings">
+          <span class="material-symbols-outlined">format_quote</span>
+        </button>
         <div class="search-overflow" id="search-overflow"></div>
       </div>
     </div>
@@ -111,6 +120,7 @@
   <!-- Results Summary and Actions -->
   <div class="results-summary-bar">
     <span id="results-count-text" class="results-count-text">Type to search...</span>
+    <span id="context-filter-indicator" class="context-filter-indicator" hidden></span>
     <div class="summary-actions">
       <button class="collapse-all-btn" id="collapse-all-btn" style="display: none;">
         Collapse All <span class="material-symbols-outlined">unfold_less</span>

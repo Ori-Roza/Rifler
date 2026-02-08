@@ -11,6 +11,9 @@ export interface SearchOptions {
   useRegex: boolean;
   multiline?: boolean;
   fileMask: string;
+  includeCode?: boolean;
+  includeComments?: boolean;
+  includeStrings?: boolean;
 }
 
 export interface SearchResult {
@@ -26,6 +29,7 @@ export interface SearchResult {
     end: number;
   };
   previewMatchRanges?: Array<{ start: number; end: number }>;
+  matchRanges?: Array<{ start: number; end: number }>;
 }
 
 /** Scope options for search */
@@ -340,7 +344,8 @@ export function searchInContent(
           start: firstMatch.start,
           end: firstMatch.end
         },
-        previewMatchRanges: lineMatches.map(m => ({ start: m.start, end: m.end }))
+        previewMatchRanges: lineMatches.map(m => ({ start: m.start, end: m.end })),
+        matchRanges: lineMatches.map(m => ({ start: m.rawStart, end: m.rawStart + m.rawLength }))
       });
     }
   }

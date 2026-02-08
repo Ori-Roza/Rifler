@@ -13,6 +13,9 @@ export interface SearchHistoryEntry {
     useRegex: boolean;
     multiline?: boolean;
     fileMask: string;
+    includeCode?: boolean;
+    includeComments?: boolean;
+    includeStrings?: boolean;
   };
   queryRows?: number;
   ts: number;
@@ -69,7 +72,10 @@ export class StateStore {
               wholeWord: !!h?.options?.wholeWord,
               useRegex: !!h?.options?.useRegex,
               multiline: !!h?.options?.multiline,
-              fileMask: h?.options?.fileMask || ''
+              fileMask: h?.options?.fileMask || '',
+              includeCode: h?.options?.includeCode ?? true,
+              includeComments: h?.options?.includeComments ?? true,
+              includeStrings: h?.options?.includeStrings ?? true
             },
             queryRows: typeof h?.queryRows === 'number' ? h.queryRows : undefined,
             ts: typeof h?.ts === 'number' ? h.ts : 0

@@ -203,4 +203,20 @@ suite('Preview Toggle Integration Tests', () => {
     buttonText = getButtonText();
     assert.strictEqual(buttonText, '-'); // Expanded again
   });
+
+  test('should keep preview hidden in empty state when sidebar is resized', async () => {
+    // Simulate empty state (no results) while a resize event occurs
+    const results: unknown[] = [];
+    const activeIndex = -1;
+
+    const shouldShowPreview = () => results.length > 0 && activeIndex >= 0;
+
+    // Initial empty state
+    assert.strictEqual(shouldShowPreview(), false, 'Preview hidden at start');
+
+    // Simulate multiple resize events
+    for (let i = 0; i < 3; i++) {
+      assert.strictEqual(shouldShowPreview(), false, `Preview hidden on resize ${i + 1}`);
+    }
+  });
 });

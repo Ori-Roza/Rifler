@@ -1954,6 +1954,10 @@ console.log('[Rifler] Webview script starting...');
     // This function is kept for backward compatibility but does nothing
   }
 
+  function shouldShowPreview() {
+    return !!(state.results && state.results.length > 0 && state.activeIndex >= 0);
+  }
+
   function initializePanelHeights() {
     const containerHeight = getContainerHeight();
     
@@ -1979,7 +1983,7 @@ console.log('[Rifler] Webview script starting...');
       lastExpandedHeight = initialPreviewHeight > PREVIEW_MIN_HEIGHT ? initialPreviewHeight : getDefaultPreviewHeight();
     }
     
-    const isVisible = state.results && state.results.length > 0 && state.activeIndex >= 0;
+    const isVisible = shouldShowPreview();
     applyPreviewHeight(initialPreviewHeight, { 
       updateLastExpanded: initialPreviewHeight > PREVIEW_MIN_HEIGHT, 
       persist: false,
@@ -1994,7 +1998,7 @@ console.log('[Rifler] Webview script starting...');
         if (entry.contentRect.height > 0 && !previewHeight) {
           initializePanelHeights();
         } else if (previewHeight) {
-          const isVisible = state.results && state.results.length > 0 && state.activeIndex >= 0;
+          const isVisible = shouldShowPreview();
           applyPreviewHeight(previewHeight, { updateLastExpanded: false, persist: false, visible: isVisible });
         }
       }
@@ -2086,7 +2090,7 @@ console.log('[Rifler] Webview script starting...');
 
   window.addEventListener('resize', () => {
     if (!previewHeight) return;
-    applyPreviewHeight(previewHeight, { updateLastExpanded: false, persist: false });
+    applyPreviewHeight(previewHeight, { updateLastExpanded: false, persist: false, visible: shouldShowPreview() });
     scheduleVirtualRender();
   });
 
@@ -2836,14 +2840,15 @@ console.log('[Rifler] Webview script starting...');
         if (typeof message.collapsed === 'boolean') {
           state.previewPanelCollapsed = message.collapsed;
           const previewToggleBtn = document.getElementById('preview-toggle-btn');
+          const isVisible = shouldShowPreview();
           
           if (state.previewPanelCollapsed) {
             // Restore to minimum height
-            applyPreviewHeight(PREVIEW_MIN_HEIGHT, { persist: false });
+            applyPreviewHeight(PREVIEW_MIN_HEIGHT, { persist: false, visible: isVisible });
           } else {
             // Restore to last expanded height or default
             const targetHeight = lastExpandedHeight || getDefaultPreviewHeight();
-            applyPreviewHeight(targetHeight, { persist: false });
+            applyPreviewHeight(targetHeight, { persist: false, visible: isVisible });
           }
           
           if (previewToggleBtn) {

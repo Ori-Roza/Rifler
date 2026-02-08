@@ -390,4 +390,28 @@ describe('Preview Toggle Feature', () => {
       assert.strictEqual(clamped, height);
     });
   });
+
+  describe('Empty State Preview Visibility', () => {
+    function shouldShowPreview(results: unknown[], activeIndex: number): boolean {
+      return results.length > 0 && activeIndex >= 0;
+    }
+
+    test('should keep preview hidden when there are no results', () => {
+      const results: unknown[] = [];
+      const activeIndex = -1;
+      assert.strictEqual(shouldShowPreview(results, activeIndex), false);
+    });
+
+    test('should keep preview hidden when results are empty even if activeIndex is zero', () => {
+      const results: unknown[] = [];
+      const activeIndex = 0;
+      assert.strictEqual(shouldShowPreview(results, activeIndex), false);
+    });
+
+    test('should show preview only when results exist and activeIndex is valid', () => {
+      const results = [{ file: 'test.ts' }];
+      const activeIndex = 0;
+      assert.strictEqual(shouldShowPreview(results, activeIndex), true);
+    });
+  });
 });

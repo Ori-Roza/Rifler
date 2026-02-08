@@ -747,6 +747,21 @@ select.path-input option {
   outline: none;
 }
 
+.context-filter-field {
+  gap: 8px;
+}
+
+.context-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.context-toggle-group .option-btn {
+  width: 28px;
+  height: 28px;
+}
+
 .icon-btn {
   display: flex;
   align-items: center;

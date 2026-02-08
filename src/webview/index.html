@@ -26,15 +26,6 @@
         <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">
           <span class="material-symbols-outlined">regular_expression</span>
         </button>
-        <button type="button" class="option-btn" id="include-code" title="Include Code" data-option="include-code">
-          <span class="material-symbols-outlined">code</span>
-        </button>
-        <button type="button" class="option-btn" id="include-comments" title="Include Comments" data-option="include-comments">
-          <span class="material-symbols-outlined">comment</span>
-        </button>
-        <button type="button" class="option-btn" id="include-strings" title="Include Strings" data-option="include-strings">
-          <span class="material-symbols-outlined">format_quote</span>
-        </button>
         <div class="search-overflow" id="search-overflow"></div>
       </div>
     </div>
@@ -109,6 +100,23 @@
           <span class="smart-exclude-label" title="Apply smart excludes for detected project types (e.g. node_modules, target, vendor)">Smart Excludes</span>
           <input type="checkbox" id="smart-exclude-toggle" checked />
         </label>
+      </div>
+    </div>
+
+    <div class="filter-row" id="context-filter-row">
+      <div class="filter-field context-filter-field">
+        <span class="filter-label">Context:</span>
+        <div class="context-toggle-group">
+          <button type="button" class="option-btn" id="include-code" title="Include Code" data-option="include-code">
+            <span class="material-symbols-outlined">code</span>
+          </button>
+          <button type="button" class="option-btn" id="include-comments" title="Include Comments" data-option="include-comments">
+            <span class="material-symbols-outlined">comment</span>
+          </button>
+          <button type="button" class="option-btn" id="include-strings" title="Include Strings" data-option="include-strings">
+            <span class="material-symbols-outlined">format_quote</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

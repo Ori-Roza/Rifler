@@ -55,7 +55,6 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
           matchCase: !!msg.options.matchCase,
           wholeWord: !!msg.options.wholeWord,
           useRegex: !!msg.options.useRegex,
-          multiline: !!msg.options.multiline,
           fileMask: msg.options.fileMask || '',
           includeCode: msg.options.includeCode ?? true,
           includeComments: msg.options.includeComments ?? true,

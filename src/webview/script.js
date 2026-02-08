@@ -157,7 +157,6 @@ console.log('[Rifler] Webview script starting...');
   const dragHandle = document.getElementById('drag-handle');
   const previewPanelContainer = document.getElementById('preview-panel-container');
   const resultsCountText = document.getElementById('results-count-text');
-  const contextFilterIndicator = document.getElementById('context-filter-indicator');
   const resultsSummaryBar = document.querySelector('.results-summary-bar');
   const collapseAllBtn = document.getElementById('collapse-all-btn');
   const smartExcludeToggle = document.getElementById('smart-exclude-toggle');
@@ -3129,11 +3128,6 @@ console.log('[Rifler] Webview script starting...');
     if (query.length < 2) {
       resultsCountText.textContent = 'Type to search...';
       resultsCountText.style.opacity = '1';
-      if (contextFilterIndicator) {
-        contextFilterIndicator.hidden = true;
-        contextFilterIndicator.textContent = '';
-        contextFilterIndicator.title = '';
-      }
       return;
     }
 
@@ -3152,37 +3146,6 @@ console.log('[Rifler] Webview script starting...');
       resultsCountText.textContent = text;
     }
     resultsCountText.style.opacity = '1';
-    updateContextFilterIndicator(results);
-  }
-
-  function updateContextFilterIndicator(results) {
-    if (!contextFilterIndicator) return;
-
-    const includeCode = state.options.includeCode !== false;
-    const includeComments = state.options.includeComments !== false;
-    const includeStrings = state.options.includeStrings !== false;
-
-    if (includeCode && includeComments && includeStrings) {
-      contextFilterIndicator.hidden = true;
-      contextFilterIndicator.textContent = '';
-      contextFilterIndicator.title = '';
-      return;
-    }
-
-    const activeLabels = [];
-    if (includeCode) activeLabels.push('Code');
-    if (includeComments) activeLabels.push('Comments');
-    if (includeStrings) activeLabels.push('Strings');
-
-    const unsupported = getUnsupportedContextLanguages(results || []);
-    const warning = formatUnsupportedLanguageWarning(unsupported);
-
-    const label = activeLabels.length > 0 ? activeLabels.join('+') : 'None';
-    const message = warning ? `Filter: ${label} | ${warning}` : `Filter: ${label}`;
-
-    contextFilterIndicator.hidden = false;
-    contextFilterIndicator.textContent = message;
-    contextFilterIndicator.title = message;
   }
 
   function getUnsupportedContextLanguages(results) {
@@ -3214,11 +3177,6 @@ console.log('[Rifler] Webview script starting...');
     if (resultsCountText) {
       resultsCountText.textContent = 'Type to search...';
       resultsCountText.style.opacity = '1';
-    }
-    if (contextFilterIndicator) {
-      contextFilterIndicator.hidden = true;
-      contextFilterIndicator.textContent = '';
-      contextFilterIndicator.title = '';
     }
   }
 

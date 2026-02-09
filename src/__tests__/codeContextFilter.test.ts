@@ -98,4 +98,151 @@ describe('Code context filtering', () => {
     assert.strictEqual(commentsOnly.length, 1);
     assert.strictEqual(commentsOnly[0].line, 0);
   });
+
+  test('supports all context filter combinations', async () => {
+    const content = [
+      '// alpha',
+      'const beta = "beta";',
+      'gamma();'
+    ].join('\n');
+
+    (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from(content, 'utf8'));
+
+    const uri = vscode.Uri.file('/tmp/context-combos.js').toString();
+
+    const results: SearchResult[] = [
+      {
+        uri,
+        fileName: 'context-combos.js',
+        relativePath: 'context-combos.js',
+        line: 0,
+        character: 3,
+        length: 5,
+        preview: 'alpha',
+        previewMatchRange: { start: 0, end: 5 },
+        previewMatchRanges: [{ start: 0, end: 5 }],
+        matchRanges: [{ start: 3, end: 8 }]
+      },
+      {
+        uri,
+        fileName: 'context-combos.js',
+        relativePath: 'context-combos.js',
+        line: 1,
+        character: 6,
+        length: 4,
+        preview: 'const beta = "beta";',
+        previewMatchRange: { start: 6, end: 10 },
+        previewMatchRanges: [{ start: 6, end: 10 }, { start: 15, end: 19 }],
+        matchRanges: [{ start: 6, end: 10 }, { start: 15, end: 19 }]
+      },
+      {
+        uri,
+        fileName: 'context-combos.js',
+        relativePath: 'context-combos.js',
+        line: 2,
+        character: 0,
+        length: 5,
+        preview: 'gamma();',
+        previewMatchRange: { start: 0, end: 5 },
+        previewMatchRanges: [{ start: 0, end: 5 }],
+        matchRanges: [{ start: 0, end: 5 }]
+      }
+    ];
+
+    const allOn = await filterResultsByCodeContext(results, {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: false,
+      fileMask: '',
+      includeCode: true,
+      includeComments: true,
+      includeStrings: true
+    });
+    assert.strictEqual(allOn.length, 3);
+
+    const noCode = await filterResultsByCodeContext(results, {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: false,
+      fileMask: '',
+      includeCode: false,
+      includeComments: true,
+      includeStrings: true
+    });
+    assert.deepStrictEqual(noCode.map((r) => r.line), [0, 1]);
+    assert.strictEqual(noCode[1].character, 15);
+    assert.strictEqual(noCode[1].length, 4);
+
+    const noComments = await filterResultsByCodeContext(results, {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: false,
+      fileMask: '',
+      includeCode: true,
+      includeComments: false,
+      includeStrings: true
+    });
+    assert.deepStrictEqual(noComments.map((r) => r.line), [1, 2]);
+
+    const noStrings = await filterResultsByCodeContext(results, {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: false,
+      fileMask: '',
+      includeCode: true,
+      includeComments: true,
+      includeStrings: false
+    });
+    assert.deepStrictEqual(noStrings.map((r) => r.line), [0, 1, 2]);
+    assert.strictEqual(noStrings[1].character, 6);
+    assert.strictEqual(noStrings[1].length, 4);
+
+    const stringsOnly = await filterResultsByCodeContext(results, {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: false,
+      fileMask: '',
+      includeCode: false,
+      includeComments: false,
+      includeStrings: true
+    });
+    assert.deepStrictEqual(stringsOnly.map((r) => r.line), [1]);
+    assert.strictEqual(stringsOnly[0].character, 15);
+    assert.strictEqual(stringsOnly[0].length, 4);
+
+    const commentsOnly = await filterResultsByCodeContext(results, {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: false,
+      fileMask: '',
+      includeCode: false,
+      includeComments: true,
+      includeStrings: false
+    });
+    assert.deepStrictEqual(commentsOnly.map((r) => r.line), [0]);
+
+    const codeOnly = await filterResultsByCodeContext(results, {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: false,
+      fileMask: '',
+      includeCode: true,
+      includeComments: false,
+      includeStrings: false
+    });
+    assert.deepStrictEqual(codeOnly.map((r) => r.line), [1, 2]);
+    assert.strictEqual(codeOnly[0].character, 6);
+    assert.strictEqual(codeOnly[0].length, 4);
+
+    const none = await filterResultsByCodeContext(results, {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: false,
+      fileMask: '',
+      includeCode: false,
+      includeComments: false,
+      includeStrings: false
+    });
+    assert.strictEqual(none.length, 0);
+  });
 });

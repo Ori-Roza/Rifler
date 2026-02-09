@@ -1804,10 +1804,13 @@ console.log('[Rifler] Webview script starting...');
       clearResultsCountDisplay();
       state.results = [];
       state.activeIndex = -1;
+      state.renderItems = [];
       state.currentQuery = '';
       state.fileContent = null;
       state.lastPreview = null;
       state.lastSearchDuration = 0;
+
+      handleSearchResults([], { skipAutoLoad: true });
       
       applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
       

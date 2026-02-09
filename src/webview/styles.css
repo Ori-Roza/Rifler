@@ -455,6 +455,12 @@ body.loaded {
   user-select: none;
 }
 
+.context-text-icon {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .option-btn:hover {
   background-color: var(--rifler-button-hover);
   color: var(--rifler-fg);

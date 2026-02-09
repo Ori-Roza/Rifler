@@ -133,21 +133,54 @@ export async function filterResultsByCodeContext(
         continue;
       }
 
+      const lineText = lines[lineIndex] ?? '';
+      const leadingWhitespace = lineText.length - lineText.trimStart().length;
+
       const matchRanges = result.matchRanges || [{ start: result.character, end: result.character + result.length }];
-      const isAllowed = matchRanges.some((range) => {
+      const allowedIndexes: number[] = [];
+      matchRanges.forEach((range, index) => {
         const pos = Math.max(0, range.start);
         if (isInRanges(pos, lineContext.commentRanges)) {
-          return includeComments;
+          if (includeComments) allowedIndexes.push(index);
+          return;
         }
         if (isInRanges(pos, lineContext.stringRanges)) {
-          return includeStrings;
+          if (includeStrings) allowedIndexes.push(index);
+          return;
         }
-        return includeCode;
+        if (includeCode) {
+          allowedIndexes.push(index);
+        }
       });
 
-      if (isAllowed) {
-        filtered.push(result);
+      if (allowedIndexes.length === 0) {
+        continue;
       }
+
+      const allowedMatchRanges = allowedIndexes.map((idx) => matchRanges[idx]);
+      const previewRangesFromRaw = allowedMatchRanges.map((range) => ({
+        start: Math.max(0, range.start - leadingWhitespace),
+        end: Math.max(0, range.end - leadingWhitespace)
+      }));
+
+      const previewMatchRanges = Array.isArray(result.previewMatchRanges) && result.previewMatchRanges.length === matchRanges.length
+        ? allowedIndexes.map((idx) => result.previewMatchRanges![idx])
+        : previewRangesFromRaw;
+
+      const firstRange = allowedMatchRanges[0];
+      const firstPreviewRange = previewMatchRanges[0] || {
+        start: Math.max(0, firstRange.start - leadingWhitespace),
+        end: Math.max(0, firstRange.end - leadingWhitespace)
+      };
+
+      filtered.push({
+        ...result,
+        character: firstRange.start,
+        length: Math.max(0, firstRange.end - firstRange.start),
+        matchRanges: allowedMatchRanges,
+        previewMatchRanges,
+        previewMatchRange: firstPreviewRange
+      });
     }
   }
 

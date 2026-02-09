@@ -55,7 +55,10 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
           matchCase: !!msg.options.matchCase,
           wholeWord: !!msg.options.wholeWord,
           useRegex: !!msg.options.useRegex,
-          fileMask: msg.options.fileMask || ''
+          fileMask: msg.options.fileMask || '',
+          includeCode: msg.options.includeCode ?? true,
+          includeComments: msg.options.includeComments ?? true,
+          includeStrings: msg.options.includeStrings ?? true
         }
       });
       deps.postMessage({ type: 'searchHistory', entries: deps.stateStore.getSearchHistory() });

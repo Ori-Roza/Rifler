@@ -455,6 +455,12 @@ body.loaded {
   user-select: none;
 }
 
+.context-text-icon {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .option-btn:hover {
   background-color: var(--rifler-button-hover);
   color: var(--rifler-fg);
@@ -747,6 +753,26 @@ select.path-input option {
   outline: none;
 }
 
+.context-filter-field {
+  gap: 8px;
+}
+
+.context-filter-label {
+  margin-right: 4px;
+}
+
+.context-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.context-toggle-group .option-btn {
+  width: 24px;
+  height: 28px;
+  border-radius: 2px;
+}
+
 .icon-btn {
   display: flex;
   align-items: center;
@@ -841,6 +867,7 @@ select.path-input option {
   font-size: 11px;
   font-weight: 600;
 }
+
 
 .collapse-all-btn {
   background: transparent;

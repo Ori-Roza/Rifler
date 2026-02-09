@@ -217,6 +217,24 @@
           "minimum": 1,
           "markdownDescription": "Maximum number of recent searches kept in history (shown when clicking the magnifying glass icon).",
           "order": 7
+        },
+        "rifler.searchContext.includeCode": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Include code matches by default when running a search.",
+          "order": 8
+        },
+        "rifler.searchContext.includeComments": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Include comment matches by default when running a search.",
+          "order": 9
+        },
+        "rifler.searchContext.includeStrings": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Include string literal matches by default when running a search.",
+          "order": 10
         }
       }
     }

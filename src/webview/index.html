@@ -102,6 +102,23 @@
         </label>
       </div>
     </div>
+
+    <div class="filter-row" id="context-filter-row">
+      <div class="filter-field context-filter-field">
+        <span class="filter-label context-filter-label" title="Filter matches by code, comments, and strings">Context filters:</span>
+        <div class="context-toggle-group">
+          <button type="button" class="option-btn" id="include-code" title="Include Code" data-option="include-code">
+            <span class="material-symbols-outlined">code</span>
+          </button>
+          <button type="button" class="option-btn" id="include-comments" title="Include Comments" data-option="include-comments">
+            <span class="material-symbols-outlined">comment</span>
+          </button>
+          <button type="button" class="option-btn" id="include-strings" title="Include Strings" data-option="include-strings">
+            <span class="context-text-icon" aria-hidden="true">S</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
   <div id="file-mask-validation-message" class="validation-message"></div>
 </section>

@@ -60,8 +60,17 @@ console.log('[Rifler] Webview script starting...');
       wholeWord: false,
       useRegex: false,
       multiline: false,
-      fileMask: ''
+      fileMask: '',
+      includeCode: true,
+      includeComments: true,
+      includeStrings: true
     },
+    contextDefaults: {
+      includeCode: true,
+      includeComments: true,
+      includeStrings: true
+    },
+    restoredFromState: false,
     groupScrollTops: {}, // Persist scroll positions for grouped result containers
     loadingTimeout: null // Track loading overlay timeout
   };
@@ -130,6 +139,9 @@ console.log('[Rifler] Webview script starting...');
   const matchCaseToggle = document.getElementById('match-case');
   const wholeWordToggle = document.getElementById('whole-word');
   const useRegexToggle = document.getElementById('use-regex');
+  const includeCodeToggle = document.getElementById('include-code');
+  const includeCommentsToggle = document.getElementById('include-comments');
+  const includeStringsToggle = document.getElementById('include-strings');
   const fileMaskInput = document.getElementById('file-mask');
 
   // New elements for Issue #83 redesign
@@ -307,11 +319,28 @@ console.log('[Rifler] Webview script starting...');
   }
 
   applyQueryRows(state.queryRows, { skipSearch: true });
+  applyContextDefaults();
 
   function syncSearchOptionToggles() {
     if (matchCaseToggle) matchCaseToggle.classList.toggle('active', state.options.matchCase);
     if (wholeWordToggle) wholeWordToggle.classList.toggle('active', state.options.wholeWord);
     if (useRegexToggle) useRegexToggle.classList.toggle('active', state.options.useRegex);
+    if (includeCodeToggle) includeCodeToggle.classList.toggle('active', state.options.includeCode);
+    if (includeCommentsToggle) includeCommentsToggle.classList.toggle('active', state.options.includeComments);
+    if (includeStringsToggle) includeStringsToggle.classList.toggle('active', state.options.includeStrings);
+  }
+
+  function applyContextDefaults() {
+    if (typeof state.options.includeCode !== 'boolean') {
+      state.options.includeCode = !!state.contextDefaults.includeCode;
+    }
+    if (typeof state.options.includeComments !== 'boolean') {
+      state.options.includeComments = !!state.contextDefaults.includeComments;
+    }
+    if (typeof state.options.includeStrings !== 'boolean') {
+      state.options.includeStrings = !!state.contextDefaults.includeStrings;
+    }
+    syncSearchOptionToggles();
   }
 
   function applyQueryRows(rows, { skipSearch } = { skipSearch: false }) {
@@ -561,10 +590,11 @@ console.log('[Rifler] Webview script starting...');
         state.options.useRegex = !!entry.options.useRegex;
         state.options.multiline = !!entry.options.multiline;
         state.options.fileMask = entry.options.fileMask || '';
+        state.options.includeCode = entry.options.includeCode ?? state.contextDefaults.includeCode;
+        state.options.includeComments = entry.options.includeComments ?? state.contextDefaults.includeComments;
+        state.options.includeStrings = entry.options.includeStrings ?? state.contextDefaults.includeStrings;
 
-        if (matchCaseToggle) matchCaseToggle.classList.toggle('active', state.options.matchCase);
-        if (wholeWordToggle) wholeWordToggle.classList.toggle('active', state.options.wholeWord);
-        if (useRegexToggle) useRegexToggle.classList.toggle('active', state.options.useRegex);
+        syncSearchOptionToggles();
         if (fileMaskInput) fileMaskInput.value = state.options.fileMask;
       }
 
@@ -1774,10 +1804,13 @@ console.log('[Rifler] Webview script starting...');
       clearResultsCountDisplay();
       state.results = [];
       state.activeIndex = -1;
+      state.renderItems = [];
       state.currentQuery = '';
       state.fileContent = null;
       state.lastPreview = null;
       state.lastSearchDuration = 0;
+
+      handleSearchResults([], { skipAutoLoad: true });
       
       applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
       
@@ -1834,6 +1867,30 @@ console.log('[Rifler] Webview script starting...');
         }
       }
       
+      runSearch();
+    });
+  }
+
+  if (includeCodeToggle) {
+    includeCodeToggle.addEventListener('click', () => {
+      state.options.includeCode = !state.options.includeCode;
+      syncSearchOptionToggles();
+      runSearch();
+    });
+  }
+
+  if (includeCommentsToggle) {
+    includeCommentsToggle.addEventListener('click', () => {
+      state.options.includeComments = !state.options.includeComments;
+      syncSearchOptionToggles();
+      runSearch();
+    });
+  }
+
+  if (includeStringsToggle) {
+    includeStringsToggle.addEventListener('click', () => {
+      state.options.includeStrings = !state.options.includeStrings;
+      syncSearchOptionToggles();
       runSearch();
     });
   }
@@ -2386,6 +2443,17 @@ console.log('[Rifler] Webview script starting...');
         if (typeof message.resultsShowCollapsed === 'boolean') {
           state.resultsShowCollapsed = message.resultsShowCollapsed;
         }
+        if (typeof message.contextDefaults === 'object' && message.contextDefaults) {
+          state.contextDefaults.includeCode = message.contextDefaults.includeCode ?? true;
+          state.contextDefaults.includeComments = message.contextDefaults.includeComments ?? true;
+          state.contextDefaults.includeStrings = message.contextDefaults.includeStrings ?? true;
+          if (!state.restoredFromState) {
+            state.options.includeCode = state.contextDefaults.includeCode;
+            state.options.includeComments = state.contextDefaults.includeComments;
+            state.options.includeStrings = state.contextDefaults.includeStrings;
+          }
+          applyContextDefaults();
+        }
         break;
       case 'focusSearch':
         queryInput.focus();
@@ -2451,6 +2519,7 @@ console.log('[Rifler] Webview script starting...');
       case 'restoreState':
         if (message.state) {
           const s = message.state;
+          state.restoredFromState = true;
           queryInput.value = s.query || '';
           state.currentQuery = s.query || '';
           replaceInput.value = s.replaceText || '';
@@ -2460,10 +2529,10 @@ console.log('[Rifler] Webview script starting...');
           state.options = s.options || { matchCase: false, wholeWord: false, useRegex: false, multiline: false, fileMask: '' };
           state.options.multiline = !!state.options.multiline;
           state.queryRows = typeof s.queryRows === 'number' ? s.queryRows : 1;
+
+          applyContextDefaults();
           
-          matchCaseToggle.classList.toggle('active', state.options.matchCase);
-          wholeWordToggle.classList.toggle('active', state.options.wholeWord);
-          useRegexToggle.classList.toggle('active', state.options.useRegex);
+          syncSearchOptionToggles();
           fileMaskInput.value = state.options.fileMask || '';
           applyQueryRows(state.queryRows, { skipSearch: true });
           recomputeMultilineOption({ skipSearch: true });
@@ -2942,6 +3011,18 @@ console.log('[Rifler] Webview script starting...');
           queryInput.dispatchEvent(searchEvent);
         }
         break;
+      case '__test_setContextFilters':
+        if (typeof message.includeCode === 'boolean') {
+          state.options.includeCode = message.includeCode;
+        }
+        if (typeof message.includeComments === 'boolean') {
+          state.options.includeComments = message.includeComments;
+        }
+        if (typeof message.includeStrings === 'boolean') {
+          state.options.includeStrings = message.includeStrings;
+        }
+        syncSearchOptionToggles();
+        break;
       case 'editConflict':
         // Handle conflict when VS Code has edited the file while Rifler is in edit mode
         showEditConflictBanner(message.uri, message.reason);
@@ -3068,6 +3149,31 @@ console.log('[Rifler] Webview script starting...');
       resultsCountText.textContent = text;
     }
     resultsCountText.style.opacity = '1';
+  }
+
+  function getUnsupportedContextLanguages(results) {
+    const supported = new Set(['js', 'jsx', 'ts', 'tsx', 'py', 'java']);
+    const found = new Set();
+    results.forEach((result) => {
+      const ext = getFileExtension(result.fileName || result.relativePath || '');
+      if (!ext || supported.has(ext)) return;
+      found.add(ext);
+    });
+    return Array.from(found);
+  }
+
+  function formatUnsupportedLanguageWarning(unsupported) {
+    if (!unsupported || unsupported.length === 0) return '';
+    const maxList = 3;
+    const listed = unsupported.slice(0, maxList);
+    const extra = unsupported.length > maxList ? ` +${unsupported.length - maxList}` : '';
+    return `Text-only: ${listed.join(', ')}${extra}`;
+  }
+
+  function getFileExtension(fileName) {
+    const parts = String(fileName || '').split('.');
+    if (parts.length < 2) return '';
+    return parts.pop().toLowerCase();
   }
 
   function clearResultsCountDisplay() {

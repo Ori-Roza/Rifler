@@ -4748,7 +4748,7 @@ console.log('[Rifler] Webview script starting...');
       if (classMatch) {
         const classes = classMatch[1].split(' ').filter(function(c) { return c.startsWith('hljs-'); });
         if (classes.length > 0) {
-          return '<span class="' + escapeHtml(classes.join(' ')) + '"';
+          return '<span class="' + escapeHtml(classes.join(' ')) + '">';
         }
       }
       return '<span>';

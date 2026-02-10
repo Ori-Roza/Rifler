@@ -102,6 +102,11 @@
         "command": "rifler.openSelectedInEditor",
         "title": "Rifler: Open Selected Result in Editor",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "rifler.findUsages",
+        "title": "Rifler: Find Usages (LSP)",
+        "icon": "$(references)"
       }
     ],
     "menus": {
@@ -129,6 +134,11 @@
         "key": "alt+shift+f",
         "mac": "shift+option+f",
         "when": "activeWebviewPanelId == 'rifler' || view == rifler.sidebarView || view == rifler.bottomView"
+      },
+      {
+        "command": "rifler.findUsages",
+        "key": "ctrl+shift+f12",
+        "mac": "cmd+shift+f12"
       }
     ],
     "configuration": {

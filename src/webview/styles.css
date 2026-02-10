@@ -2394,3 +2394,102 @@ body.windows .results-list {
   margin-top: 0;
   margin-bottom: 0;
 }
+
+/* ============================================================================
+   LSP / Usage-Aware Search Mode
+   ============================================================================ */
+
+.lsp-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+  flex-wrap: wrap;
+}
+
+.lsp-mode-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.lsp-mode-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.15));
+  border-radius: 10px;
+  background: transparent;
+  color: var(--vscode-foreground, #ccc);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.lsp-mode-btn:hover {
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.06));
+}
+
+.lsp-mode-btn.active {
+  background: var(--vscode-button-secondaryBackground, rgba(80, 130, 200, 0.25));
+  border-color: var(--vscode-focusBorder, #007acc);
+  color: var(--vscode-button-secondaryForeground, #fff);
+}
+
+.lsp-status {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  font-style: italic;
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.lsp-status.warning {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.lsp-rename-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.15));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-foreground, #ccc);
+  cursor: pointer;
+  margin-left: 4px;
+  transition: background 0.15s;
+}
+
+.lsp-rename-btn:hover {
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.06));
+}
+
+#use-lsp.active {
+  color: var(--vscode-inputOption-activeForeground, #fff);
+  background: var(--vscode-inputOption-activeBackground, rgba(0, 122, 204, 0.4));
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.lsp-replace-warning {
+  padding: 6px 10px;
+  margin: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.15));
+  border: 1px solid var(--vscode-inputValidation-warningBorder, #cca700);
+  color: var(--vscode-foreground, #ccc);
+}
+
+.lsp-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+  margin-left: 6px;
+  vertical-align: middle;
+}

@@ -8,6 +8,7 @@ import { toggleViewCommand } from './toggleView';
 import { toggleReplaceCommand } from './toggleReplace';
 import { minimizeCommand } from './minimize';
 import { restoreCommand } from './restore';
+import { findUsagesCommand } from './findUsages';
 import { openWindowInternalCommand } from './internal/openWindowInternal';
 import { closeWindowInternalCommand } from './internal/closeWindowInternal';
 import { testEnsureOpenCommand } from './internal/testEnsureOpen';
@@ -21,6 +22,7 @@ export { toggleViewCommand } from './toggleView';
 export { toggleReplaceCommand } from './toggleReplace';
 export { minimizeCommand } from './minimize';
 export { restoreCommand } from './restore';
+export { findUsagesCommand } from './findUsages';
 export { openWindowInternalCommand } from './internal/openWindowInternal';
 export { closeWindowInternalCommand } from './internal/closeWindowInternal';
 export { testEnsureOpenCommand } from './internal/testEnsureOpen';
@@ -42,6 +44,7 @@ export function registerCommands(ctx: CommandContext): void {
     vscode.commands.registerCommand('rifler.toggleReplace', () => toggleReplaceCommand(ctx)),
     vscode.commands.registerCommand('rifler.minimize', () => minimizeCommand(ctx)),
     vscode.commands.registerCommand('rifler.restore', () => restoreCommand(ctx)),
+    vscode.commands.registerCommand('rifler.findUsages', () => findUsagesCommand(ctx)),
     vscode.commands.registerCommand('rifler._openWindowInternal', (options?: { initialQuery?: string; showReplace?: boolean }) =>
       openWindowInternalCommand(ctx, options)
     ),

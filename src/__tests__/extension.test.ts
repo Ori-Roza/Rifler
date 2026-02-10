@@ -290,6 +290,17 @@ describe('Extension - Persistent Storage and Toggle Features', () => {
       assert.ok(toggleViewCall, 'rifler.toggleView command should be registered');
     });
 
+    test('should register rifler.findUsages command', async () => {
+      (context.globalState.get as jest.Mock).mockReturnValue(undefined);
+
+      await activate(context);
+
+      const commands = (vscode.commands.registerCommand as jest.Mock).mock.calls;
+      const findUsagesCall = commands.find((call: any) => call[0] === 'rifler.findUsages');
+
+      assert.ok(findUsagesCall, 'rifler.findUsages command should be registered');
+    });
+
     test('should toggle behavior based on viewMode', async () => {
       (context.globalState.get as jest.Mock).mockReturnValue(undefined);
 

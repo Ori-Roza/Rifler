@@ -1,4 +1,5 @@
 import { SearchResult, SearchOptions, SearchScope } from '../utils';
+import { LspSearchMode, LspSearchInfo } from '../lspSearch';
 
 // ============================================================================
 // Incoming Messages (from Webview to Extension)
@@ -21,6 +22,8 @@ export interface MinimizeMessage {
     results?: SearchResult[];
     activeIndex?: number;
     lastPreview?: unknown;
+    searchMode?: 'text' | 'lsp';
+    lspSubMode?: LspSearchMode;
   };
 }
 
@@ -171,6 +174,25 @@ export interface RequestSelectionRefreshMessage {
   type: 'requestSelectionRefresh';
 }
 
+export interface LspSearchMessage {
+  type: 'lspSearch';
+  lspMode: LspSearchMode;
+}
+
+export interface GetSymbolAtCursorMessage {
+  type: 'getSymbolAtCursor';
+}
+
+export interface LspReplaceAllMessage {
+  type: 'lspReplaceAll';
+  lspMode: LspSearchMode;
+  replaceText: string;
+}
+
+export interface TriggerRenameMessage {
+  type: 'triggerRename';
+}
+
 /**
  * Union type of all possible messages from webview to extension
  */
@@ -198,7 +220,11 @@ export type IncomingMessage =
   | TestScopeInputStatusMessage
   | TestSetDirectoryInputMessage
   | TestErrorMessage
-  | DiagPingMessage;
+  | DiagPingMessage
+  | LspSearchMessage
+  | GetSymbolAtCursorMessage
+  | LspReplaceAllMessage
+  | TriggerRenameMessage;
 
 // ============================================================================
 // Outgoing Messages (from Extension to Webview)
@@ -209,6 +235,8 @@ export interface SearchResultsMessage {
   results: SearchResult[];
   activeIndex?: number;
   maxResults?: number;
+  lspMode?: LspSearchMode;
+  lspInfo?: LspSearchInfo;
 }
 
 export interface ModulesListMessage {
@@ -283,6 +311,18 @@ export interface ErrorMessage {
   message: string;
 }
 
+export interface SymbolAtCursorMessage {
+  type: 'symbolAtCursor';
+  symbolName: string | null;
+  languageId: string;
+  lspAvailable: boolean;
+}
+
+export interface SetSearchModeMessage {
+  type: 'setSearchMode';
+  mode: 'text' | 'lsp';
+}
+
 export interface ProjectExclusionsMessage {
   type: 'projectExclusions';
   projects: Array<{
@@ -312,4 +352,6 @@ export type OutgoingMessage =
   | ToggleReplaceMessage
   | RequestStateForMinimizeMessage
   | ProjectExclusionsMessage
-  | ErrorMessage;
+  | ErrorMessage
+  | SymbolAtCursorMessage
+  | SetSearchModeMessage;

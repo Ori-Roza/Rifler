@@ -26,6 +26,9 @@
         <button type="button" class="option-btn" id="use-regex" title="Use Regular Expression (Alt+R)" data-option="regex">
           <span class="material-symbols-outlined">regular_expression</span>
         </button>
+        <button type="button" class="option-btn" id="use-lsp" title="Usage-Aware Search - LSP (Alt+U)" data-option="lsp">
+          <span class="material-symbols-outlined">account_tree</span>
+        </button>
         <div class="search-overflow" id="search-overflow"></div>
       </div>
     </div>
@@ -57,6 +60,18 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- LSP Mode Row (visible when Usage-Aware mode is active) -->
+  <div class="lsp-mode-row" id="lsp-mode-row" style="display:none;">
+    <div class="lsp-mode-buttons">
+      <button type="button" class="lsp-mode-btn active" data-lsp-mode="references" title="Find all references to this symbol">References</button>
+      <button type="button" class="lsp-mode-btn" data-lsp-mode="definitions" title="Find definitions of this symbol">Definitions</button>
+      <button type="button" class="lsp-mode-btn" data-lsp-mode="implementations" title="Find implementations">Implementations</button>
+      <button type="button" class="lsp-mode-btn" data-lsp-mode="typeDefinitions" title="Find type definitions">Type Defs</button>
+    </div>
+    <span class="lsp-status" id="lsp-status"></span>
+    <button type="button" class="lsp-rename-btn" id="rename-symbol-btn" title="Rename Symbol (delegates to VS Code)" style="display:none;">Rename</button>
   </div>
 
   <!-- Replace Row (hidden by default) -->

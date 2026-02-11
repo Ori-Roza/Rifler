@@ -292,8 +292,17 @@ export async function activate(context: vscode.ExtensionContext) {
     if (foldersChanged) {
       context.globalState.update('rifler.lastWorkspaceFolders', currentWorkspaceFolders);
       // Clear persisted state on workspace change to ensure a fresh start
+      // Clear BOTH globalState and workspaceState to prevent state leakage between workspaces
       context.workspaceState.update('rifler.sidebarState', undefined);
       context.workspaceState.update('rifler.persistedSearchState', undefined);
+      context.workspaceState.update('rifler.searchHistory', undefined);
+      context.workspaceState.update('rifler.projectExclusionPreferences', undefined);
+      context.workspaceState.update('rifler.previewPanelCollapsed', undefined);
+      context.globalState.update('rifler.sidebarState', undefined);
+      context.globalState.update('rifler.persistedSearchState', undefined);
+      context.globalState.update('rifler.searchHistory', undefined);
+      context.globalState.update('rifler.projectExclusionPreferences', undefined);
+      context.globalState.update('rifler.previewPanelCollapsed', undefined);
       if (stateStore) {
         stateStore.setSavedState(undefined);
       }
@@ -574,9 +583,18 @@ export async function activate(context: vscode.ExtensionContext) {
       const currentWorkspaceFolders = vscode.workspace.workspaceFolders?.map(f => f.uri.toString()) || [];
       context.globalState.update('rifler.lastWorkspaceFolders', currentWorkspaceFolders);
 
-      // Clear persisted state
+      // Clear persisted state from BOTH globalState and workspaceState
+      // This prevents state leakage between different workspaces
       context.workspaceState.update('rifler.sidebarState', undefined);
       context.workspaceState.update('rifler.persistedSearchState', undefined);
+      context.workspaceState.update('rifler.searchHistory', undefined);
+      context.workspaceState.update('rifler.projectExclusionPreferences', undefined);
+      context.workspaceState.update('rifler.previewPanelCollapsed', undefined);
+      context.globalState.update('rifler.sidebarState', undefined);
+      context.globalState.update('rifler.persistedSearchState', undefined);
+      context.globalState.update('rifler.searchHistory', undefined);
+      context.globalState.update('rifler.projectExclusionPreferences', undefined);
+      context.globalState.update('rifler.previewPanelCollapsed', undefined);
       if (stateStore) {
         stateStore.setSavedState(undefined);
       }

@@ -608,6 +608,25 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }, undefined, context.subscriptions);
 
+  // Invalidate LSP cache when workspace files change
+  context.subscriptions.push(
+    vscode.workspace.onDidSaveTextDocument((document) => {
+      // Only invalidate for file scheme (not git, untitled, etc.)
+      if (document.uri.scheme !== 'file') return;
+      
+      // Send cache invalidation message to all active webviews
+      if (sidebarProvider) {
+        sidebarProvider.postMessage({ type: 'clearLspCache' });
+      }
+      if (bottomProvider) {
+        bottomProvider.postMessage({ type: 'clearLspCache' });
+      }
+      if (panelManager?.panel) {
+        panelManager.panel.webview.postMessage({ type: 'clearLspCache' });
+      }
+    })
+  );
+
   // Status bar toggle
   const replaceToggleStatusBar = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,

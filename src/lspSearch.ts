@@ -27,7 +27,7 @@ function uriToFsPath(uri: string): string {
       // If decoding fails, continue with the original
     }
     // Handle Windows drive letter form: /C:/... -> C:/...
-    if (/^\/[A-Za-z]:[\\\/]/.test(rest)) {
+    if (/^\/[A-Za-z]:[\\/ ]/.test(rest)) {
       rest = rest.slice(1);
     }
     // Normalize path separators for the current platform

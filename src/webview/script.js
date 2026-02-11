@@ -1718,8 +1718,6 @@ console.log('[Rifler] Webview script starting...');
 
     if (state.searchMode === 'lsp') {
       const replaceText = replaceInput.value;
-      const symbolName = state.lspInfo ? state.lspInfo.symbolName : '(symbol)';
-      const confidence = state.lspInfo ? state.lspInfo.confidence : 'partial';
       const count = state.results ? state.results.length : 0;
       // Safety: confirm before LSP replace
       if (count === 0) return;
@@ -3227,31 +3225,6 @@ console.log('[Rifler] Webview script starting...');
       resultsCountText.textContent = text;
     }
     resultsCountText.style.opacity = '1';
-  }
-
-  function getUnsupportedContextLanguages(results) {
-    const supported = new Set(['js', 'jsx', 'ts', 'tsx', 'py', 'java']);
-    const found = new Set();
-    results.forEach((result) => {
-      const ext = getFileExtension(result.fileName || result.relativePath || '');
-      if (!ext || supported.has(ext)) return;
-      found.add(ext);
-    });
-    return Array.from(found);
-  }
-
-  function formatUnsupportedLanguageWarning(unsupported) {
-    if (!unsupported || unsupported.length === 0) return '';
-    const maxList = 3;
-    const listed = unsupported.slice(0, maxList);
-    const extra = unsupported.length > maxList ? ` +${unsupported.length - maxList}` : '';
-    return `Text-only: ${listed.join(', ')}${extra}`;
-  }
-
-  function getFileExtension(fileName) {
-    const parts = String(fileName || '').split('.');
-    if (parts.length < 2) return '';
-    return parts.pop().toLowerCase();
   }
 
   function clearResultsCountDisplay() {

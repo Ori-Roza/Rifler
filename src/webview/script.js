@@ -3342,11 +3342,14 @@ console.log('[Rifler] Webview script starting...');
     if (state.searchMode !== 'lsp' || !state.lspInfo) {
       lspStatus.textContent = '';
       lspStatus.className = 'lsp-status';
+      lspStatus.removeAttribute('title');
       return;
     }
     const info = state.lspInfo;
     const confidenceLabel = info.confidence === 'high' ? 'High confidence' : 'Partial coverage';
-    lspStatus.textContent = info.languageId + ' · ' + confidenceLabel;
+    const compactConfidence = info.confidence === 'high' ? 'high' : 'partial';
+    lspStatus.textContent = 'LSP · ' + compactConfidence;
+    lspStatus.setAttribute('title', info.languageId + ' · ' + confidenceLabel);
     lspStatus.className = info.confidence === 'high' ? 'lsp-status' : 'lsp-status warning';
   }
 

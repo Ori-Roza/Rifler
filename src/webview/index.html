@@ -27,7 +27,7 @@
           <span class="material-symbols-outlined">regular_expression</span>
         </button>
         <button type="button" class="option-btn" id="use-lsp" title="Usage-Aware Search - LSP (Alt+U)" data-option="lsp">
-          <span class="material-symbols-outlined">account_tree</span>
+          <span class="material-symbols-outlined">device_hub</span>
         </button>
         <div class="search-overflow" id="search-overflow"></div>
       </div>
@@ -65,10 +65,10 @@
   <!-- LSP Mode Row (visible when Usage-Aware mode is active) -->
   <div class="lsp-mode-row" id="lsp-mode-row" style="display:none;">
     <div class="lsp-mode-buttons">
-      <button type="button" class="lsp-mode-btn active" data-lsp-mode="references" title="Find all references to this symbol">References</button>
-      <button type="button" class="lsp-mode-btn" data-lsp-mode="definitions" title="Find definitions of this symbol">Definitions</button>
-      <button type="button" class="lsp-mode-btn" data-lsp-mode="implementations" title="Find implementations">Implementations</button>
-      <button type="button" class="lsp-mode-btn" data-lsp-mode="typeDefinitions" title="Find type definitions">Type Defs</button>
+      <button type="button" class="lsp-mode-btn active" data-lsp-mode="references" title="Find all references to this symbol">Refs</button>
+      <button type="button" class="lsp-mode-btn" data-lsp-mode="definitions" title="Find definitions of this symbol">Defs</button>
+      <button type="button" class="lsp-mode-btn" data-lsp-mode="implementations" title="Find implementations">Impl</button>
+      <button type="button" class="lsp-mode-btn" data-lsp-mode="typeDefinitions" title="Find type definitions">Types</button>
     </div>
     <span class="lsp-status" id="lsp-status"></span>
     <button type="button" class="lsp-rename-btn" id="rename-symbol-btn" title="Rename Symbol (delegates to VS Code)" style="display:none;">Rename</button>

@@ -2403,74 +2403,83 @@ body.windows .results-list {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+  padding: 4px 6px;
+  border: 1px solid var(--rifler-input-border);
+  border-radius: 2px;
+  background-color: var(--rifler-input-bg);
   flex-wrap: wrap;
 }
 
 .lsp-mode-buttons {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   flex-wrap: wrap;
 }
 
 .lsp-mode-btn {
-  padding: 2px 8px;
-  font-size: 11px;
-  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.15));
-  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--rifler-font-mono);
+  color: var(--rifler-fg-muted);
   background: transparent;
-  color: var(--vscode-foreground, #ccc);
+  border: 1px solid transparent;
+  border-radius: 2px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: all 0.1s;
   white-space: nowrap;
+  user-select: none;
 }
 
 .lsp-mode-btn:hover {
-  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.06));
+  background-color: var(--rifler-button-hover);
+  color: var(--rifler-fg);
 }
 
 .lsp-mode-btn.active {
-  background: var(--vscode-button-secondaryBackground, rgba(80, 130, 200, 0.25));
-  border-color: var(--vscode-focusBorder, #007acc);
-  color: var(--vscode-button-secondaryForeground, #fff);
+  background-color: var(--rifler-primary-dim);
+  color: var(--rifler-primary);
 }
 
 .lsp-status {
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground, #888);
-  font-style: italic;
+  font-size: 10px;
+  color: var(--rifler-fg-muted);
   margin-left: auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 140px;
 }
 
 .lsp-status.warning {
-  color: var(--vscode-editorWarning-foreground, #cca700);
+  color: var(--rifler-warning);
 }
 
 .lsp-rename-btn {
-  padding: 2px 8px;
-  font-size: 11px;
-  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.15));
-  border-radius: 4px;
-  background: transparent;
-  color: var(--vscode-foreground, #ccc);
+  height: 22px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--rifler-font-mono);
+  color: var(--rifler-button-fg);
+  background: var(--rifler-button-bg);
+  border: 1px solid var(--rifler-input-border);
+  border-radius: 2px;
   cursor: pointer;
-  margin-left: 4px;
-  transition: background 0.15s;
+  transition: all 0.1s;
 }
 
 .lsp-rename-btn:hover {
-  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.06));
+  background: var(--rifler-button-hover);
 }
 
 #use-lsp.active {
-  color: var(--vscode-inputOption-activeForeground, #fff);
-  background: var(--vscode-inputOption-activeBackground, rgba(0, 122, 204, 0.4));
-  border-color: var(--vscode-focusBorder, #007acc);
+  background-color: var(--rifler-primary-dim);
+  color: var(--rifler-primary);
 }
 
 .lsp-replace-warning {
@@ -2478,9 +2487,9 @@ body.windows .results-list {
   margin: 4px 8px;
   font-size: 11px;
   border-radius: 4px;
-  background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.15));
-  border: 1px solid var(--vscode-inputValidation-warningBorder, #cca700);
-  color: var(--vscode-foreground, #ccc);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: var(--rifler-fg);
 }
 
 .lsp-badge {
@@ -2488,8 +2497,8 @@ body.windows .results-list {
   font-size: 10px;
   padding: 1px 5px;
   border-radius: 8px;
-  background: var(--vscode-badge-background, #4d4d4d);
-  color: var(--vscode-badge-foreground, #fff);
+  background: var(--rifler-badge-bg);
+  color: var(--rifler-badge-fg);
   margin-left: 6px;
   vertical-align: middle;
 }

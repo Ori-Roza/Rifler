@@ -75,7 +75,8 @@ console.log('[Rifler] Webview script starting...');
     loadingTimeout: null, // Track loading overlay timeout
     searchMode: 'text', // 'text' or 'lsp'
     lspSubMode: 'references', // 'references' | 'definitions' | 'implementations' | 'typeDefinitions'
-    lspInfo: null // { languageId, symbolName, confidence }
+    lspInfo: null, // { languageId, symbolName, confidence }
+    lspResultsCache: {} // Cache results per LSP type: { references: {...}, definitions: {...}, ... }
   };
 
     let pendingTestHistoryEcho = false;
@@ -1903,10 +1904,24 @@ console.log('[Rifler] Webview script starting...');
   if (lspModeRow) {
     lspModeRow.querySelectorAll('.lsp-mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        state.lspSubMode = btn.dataset.lspMode;
+        const newMode = btn.dataset.lspMode;
+        state.lspSubMode = newMode;
         lspModeRow.querySelectorAll('.lsp-mode-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        runSearch();
+        
+        // Check if we have cached results for this LSP type and symbol
+        const cached = state.lspResultsCache[newMode];
+        const currentSymbol = state.lspInfo?.symbolName;
+        
+        if (cached && currentSymbol && cached.symbolName === currentSymbol && cached.results) {
+          // Use cached results
+          console.log('[Rifler] Using cached LSP results for', newMode);
+          handleSearchResults(cached.results, { skipAutoLoad: false });
+          updateLspStatus();
+        } else {
+          // No cache or different symbol - trigger search
+          runSearch();
+        }
       });
     });
   }
@@ -1989,7 +2004,8 @@ console.log('[Rifler] Webview script starting...');
         activeIndex: state.activeIndex,
         lastPreview: state.lastPreview,
         searchMode: state.searchMode,
-        lspSubMode: state.lspSubMode
+        lspSubMode: state.lspSubMode,
+        lspResultsCache: state.lspResultsCache
       }
     });
   }
@@ -2448,8 +2464,27 @@ console.log('[Rifler] Webview script starting...');
           state.maxResultsCap = message.maxResults;
         }
         if (message.lspInfo) {
+          // Check if symbol changed - if so, clear cache
+          const symbolChanged = state.lspInfo && 
+            state.lspInfo.symbolName !== message.lspInfo.symbolName;
+          
+          if (symbolChanged) {
+            console.log('[Rifler] Symbol changed, clearing LSP cache');
+            state.lspResultsCache = {};
+          }
+          
           state.lspInfo = message.lspInfo;
           updateLspStatus();
+          
+          // Cache the results for this LSP type
+          if (state.searchMode === 'lsp' && message.results) {
+            state.lspResultsCache[state.lspSubMode] = {
+              results: message.results,
+              symbolName: message.lspInfo.symbolName,
+              timestamp: Date.now()
+            };
+            console.log('[Rifler] Cached LSP results for', state.lspSubMode, 'symbol:', message.lspInfo.symbolName);
+          }
         }
         handleSearchResults(message.results, { skipAutoLoad: false, activeIndex: message.activeIndex });
         break;
@@ -2530,12 +2565,18 @@ console.log('[Rifler] Webview script starting...');
         state.lastSearchDuration = 0;
         state.collapsedFiles.clear();
         state.expandedFiles.clear();
+        state.lspResultsCache = {}; // Clear LSP cache
         // Clear cache key so next render will always re-render content
         if (previewContent) previewContent.dataset.lastRenderedCacheKey = '';
         applyQueryRows(1, { skipSearch: true });
         recomputeMultilineOption({ skipSearch: true });
         applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
         handleSearchResults([], { skipAutoLoad: true });
+        break;
+      case 'clearLspCache':
+        // Invalidate LSP cache when code changes
+        console.log('[Rifler] Clearing LSP cache due to code changes');
+        state.lspResultsCache = {};
         break;
       case 'validationResult':
         if (message.field === 'regex') {
@@ -2621,6 +2662,23 @@ console.log('[Rifler] Webview script starting...');
             state.searchMode = 'lsp';
             state.lspSubMode = s.lspSubMode || 'references';
             syncLspModeUI();
+            
+            // Restore LSP cache if present and recent (within 5 minutes)
+            if (s.lspResultsCache) {
+              const now = Date.now();
+              const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+              const filteredCache = {};
+              
+              Object.keys(s.lspResultsCache).forEach(key => {
+                const cached = s.lspResultsCache[key];
+                if (cached.timestamp && (now - cached.timestamp) < CACHE_EXPIRY) {
+                  filteredCache[key] = cached;
+                }
+              });
+              
+              state.lspResultsCache = filteredCache;
+              console.log('[Rifler] Restored LSP cache with', Object.keys(filteredCache).length, 'entries');
+            }
           }
           
           if (s.results && s.results.length > 0) {
@@ -3258,7 +3316,9 @@ console.log('[Rifler] Webview script starting...');
       // Request symbol at cursor for auto-populating query
       vscode.postMessage({ type: 'getSymbolAtCursor' });
     } else {
+      // Switching to text mode - clear LSP cache
       state.lspInfo = null;
+      state.lspResultsCache = {};
       updateLspStatus();
     }
   }
@@ -3283,6 +3343,19 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function runLspSearch() {
+    // Check cache first
+    const cached = state.lspResultsCache[state.lspSubMode];
+    const currentSymbol = state.lspInfo?.symbolName;
+    
+    if (cached && currentSymbol && cached.symbolName === currentSymbol && cached.results) {
+      // Use cached results
+      console.log('[Rifler] Using cached LSP results for', state.lspSubMode);
+      handleSearchResults(cached.results, { skipAutoLoad: false });
+      updateLspStatus();
+      return;
+    }
+    
+    // No cache - perform search
     showPlaceholder('Searching usages...');
     clearResultsCountDisplay();
     state.searchStartTime = performance.now();
@@ -3290,9 +3363,18 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function handleSymbolAtCursor(message) {
+    // Check if symbol changed - if so, clear cache
+    const symbolChanged = message.symbolName && 
+      state.currentQuery !== message.symbolName;
+    
     if (message.symbolName) {
       queryInput.value = message.symbolName;
       state.currentQuery = message.symbolName;
+      
+      if (symbolChanged) {
+        console.log('[Rifler] New symbol detected, clearing LSP cache');
+        state.lspResultsCache = {};
+      }
     }
     if (message.lspAvailable === false && message.languageId) {
       if (lspStatus) {

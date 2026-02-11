@@ -76,7 +76,8 @@ console.log('[Rifler] Webview script starting...');
     searchMode: 'text', // 'text' or 'lsp'
     lspSubMode: 'references', // 'references' | 'definitions' | 'implementations' | 'typeDefinitions'
     lspInfo: null, // { languageId, symbolName, confidence }
-    lspResultsCache: {} // Cache results per LSP type: { references: {...}, definitions: {...}, ... }
+    lspResultsCache: {}, // Cache results per LSP type: { references: {...}, definitions: {...}, ... }
+    lastTextQuery: ''
   };
 
     let pendingTestHistoryEcho = false;
@@ -2460,6 +2461,10 @@ console.log('[Rifler] Webview script starting...');
         toggleReplace();
         break;
       case 'searchResults':
+        if (message.lspInfo && state.searchMode !== 'lsp') {
+          // Ignore late LSP results after switching back to text mode
+          break;
+        }
         if (message.maxResults) {
           state.maxResultsCap = message.maxResults;
         }
@@ -3313,6 +3318,7 @@ console.log('[Rifler] Webview script starting...');
     syncLspModeUI();
 
     if (state.searchMode === 'lsp') {
+      state.lastTextQuery = queryInput ? queryInput.value : (state.currentQuery || '');
       // Request symbol at cursor for auto-populating query
       vscode.postMessage({ type: 'getSymbolAtCursor' });
     } else {
@@ -3320,6 +3326,18 @@ console.log('[Rifler] Webview script starting...');
       state.lspInfo = null;
       state.lspResultsCache = {};
       updateLspStatus();
+
+      const restoredQuery = state.lastTextQuery || '';
+      if (queryInput) {
+        queryInput.value = restoredQuery;
+      }
+      state.currentQuery = restoredQuery;
+      if (restoredQuery.trim().length >= 2) {
+        runSearch();
+      } else {
+        showPlaceholder('Type at least 2 characters...');
+        clearResultsCountDisplay();
+      }
     }
   }
 

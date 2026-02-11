@@ -72,7 +72,10 @@ console.log('[Rifler] Webview script starting...');
     },
     restoredFromState: false,
     groupScrollTops: {}, // Persist scroll positions for grouped result containers
-    loadingTimeout: null // Track loading overlay timeout
+    loadingTimeout: null, // Track loading overlay timeout
+    searchMode: 'text', // 'text' or 'lsp'
+    lspSubMode: 'references', // 'references' | 'definitions' | 'implementations' | 'typeDefinitions'
+    lspInfo: null // { languageId, symbolName, confidence }
   };
 
     let pendingTestHistoryEcho = false;
@@ -143,6 +146,10 @@ console.log('[Rifler] Webview script starting...');
   const includeCommentsToggle = document.getElementById('include-comments');
   const includeStringsToggle = document.getElementById('include-strings');
   const fileMaskInput = document.getElementById('file-mask');
+  const useLspToggle = document.getElementById('use-lsp');
+  const lspModeRow = document.getElementById('lsp-mode-row');
+  const lspStatus = document.getElementById('lsp-status');
+  const renameSymbolBtn = document.getElementById('rename-symbol-btn');
 
   // New elements for Issue #83 redesign
   const filtersContainer = document.getElementById('filters-container');
@@ -328,6 +335,7 @@ console.log('[Rifler] Webview script starting...');
     if (includeCodeToggle) includeCodeToggle.classList.toggle('active', state.options.includeCode);
     if (includeCommentsToggle) includeCommentsToggle.classList.toggle('active', state.options.includeComments);
     if (includeStringsToggle) includeStringsToggle.classList.toggle('active', state.options.includeStrings);
+    if (useLspToggle) useLspToggle.classList.toggle('active', state.searchMode === 'lsp');
   }
 
   function applyContextDefaults() {
@@ -1707,6 +1715,19 @@ console.log('[Rifler] Webview script starting...');
     if (isEditMode) {
       exitEditMode(true);
     }
+
+    if (state.searchMode === 'lsp') {
+      const replaceText = replaceInput.value;
+      const count = state.results ? state.results.length : 0;
+      // Safety: confirm before LSP replace
+      if (count === 0) return;
+      vscode.postMessage({
+        type: 'lspReplaceAll',
+        lspMode: state.lspSubMode,
+        replaceText: replaceText
+      });
+      return;
+    }
     
     vscode.postMessage({
       type: 'replaceAll',
@@ -1871,6 +1892,32 @@ console.log('[Rifler] Webview script starting...');
     });
   }
 
+  // LSP Toggle
+  if (useLspToggle) {
+    useLspToggle.addEventListener('click', () => {
+      toggleLspMode();
+    });
+  }
+
+  // LSP sub-mode buttons
+  if (lspModeRow) {
+    lspModeRow.querySelectorAll('.lsp-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.lspSubMode = btn.dataset.lspMode;
+        lspModeRow.querySelectorAll('.lsp-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        runSearch();
+      });
+    });
+  }
+
+  // Rename Symbol button
+  if (renameSymbolBtn) {
+    renameSymbolBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'triggerRename' });
+    });
+  }
+
   if (includeCodeToggle) {
     includeCodeToggle.addEventListener('click', () => {
       state.options.includeCode = !state.options.includeCode;
@@ -1940,7 +1987,9 @@ console.log('[Rifler] Webview script starting...');
         smartExcludesEnabled: state.smartExcludesEnabled,
         results: state.results,
         activeIndex: state.activeIndex,
-        lastPreview: state.lastPreview
+        lastPreview: state.lastPreview,
+        searchMode: state.searchMode,
+        lspSubMode: state.lspSubMode
       }
     });
   }
@@ -2190,6 +2239,12 @@ console.log('[Rifler] Webview script starting...');
       return;
     }
 
+    if (e.altKey && !e.shiftKey && e.code === 'KeyU') {
+      e.preventDefault();
+      toggleLspMode();
+      return;
+    }
+
     if (e.altKey && e.shiftKey && e.code === 'KeyR') {
       e.preventDefault();
       toggleReplace();
@@ -2392,6 +2447,10 @@ console.log('[Rifler] Webview script starting...');
         if (message.maxResults) {
           state.maxResultsCap = message.maxResults;
         }
+        if (message.lspInfo) {
+          state.lspInfo = message.lspInfo;
+          updateLspStatus();
+        }
         handleSearchResults(message.results, { skipAutoLoad: false, activeIndex: message.activeIndex });
         break;
       case 'modulesList':
@@ -2556,6 +2615,13 @@ console.log('[Rifler] Webview script starting...');
           } else {
             toggleReplace(false);
           }
+
+          // Restore LSP mode
+          if (s.searchMode === 'lsp') {
+            state.searchMode = 'lsp';
+            state.lspSubMode = s.lspSubMode || 'references';
+            syncLspModeUI();
+          }
           
           if (s.results && s.results.length > 0) {
             handleSearchResults(s.results, { skipAutoLoad: true, activeIndex: s.activeIndex, preserveScroll: true });
@@ -2571,6 +2637,16 @@ console.log('[Rifler] Webview script starting...');
         break;
       case 'requestStateForMinimize':
         saveState();
+        break;
+      case 'symbolAtCursor':
+        handleSymbolAtCursor(message);
+        break;
+      case 'setSearchMode':
+        if (message.mode === 'lsp' && state.searchMode !== 'lsp') {
+          toggleLspMode();
+        } else if (message.mode === 'text' && state.searchMode !== 'text') {
+          toggleLspMode();
+        }
         break;
       case '__test_searchCompleted':
         vscode.postMessage({ type: '__test_searchResultsReceived', results: message.results });
@@ -3151,31 +3227,6 @@ console.log('[Rifler] Webview script starting...');
     resultsCountText.style.opacity = '1';
   }
 
-  function getUnsupportedContextLanguages(results) {
-    const supported = new Set(['js', 'jsx', 'ts', 'tsx', 'py', 'java']);
-    const found = new Set();
-    results.forEach((result) => {
-      const ext = getFileExtension(result.fileName || result.relativePath || '');
-      if (!ext || supported.has(ext)) return;
-      found.add(ext);
-    });
-    return Array.from(found);
-  }
-
-  function formatUnsupportedLanguageWarning(unsupported) {
-    if (!unsupported || unsupported.length === 0) return '';
-    const maxList = 3;
-    const listed = unsupported.slice(0, maxList);
-    const extra = unsupported.length > maxList ? ` +${unsupported.length - maxList}` : '';
-    return `Text-only: ${listed.join(', ')}${extra}`;
-  }
-
-  function getFileExtension(fileName) {
-    const parts = String(fileName || '').split('.');
-    if (parts.length < 2) return '';
-    return parts.pop().toLowerCase();
-  }
-
   function clearResultsCountDisplay() {
     if (resultsCountText) {
       resultsCountText.textContent = 'Type to search...';
@@ -3195,10 +3246,96 @@ console.log('[Rifler] Webview script starting...');
   resultsList.addEventListener('scroll', scheduleVirtualRender);
   window.addEventListener('resize', scheduleVirtualRender);
 
+  // ========================================================================
+  // LSP / Usage-Aware Search Functions
+  // ========================================================================
+
+  function toggleLspMode() {
+    state.searchMode = state.searchMode === 'lsp' ? 'text' : 'lsp';
+    syncLspModeUI();
+
+    if (state.searchMode === 'lsp') {
+      // Request symbol at cursor for auto-populating query
+      vscode.postMessage({ type: 'getSymbolAtCursor' });
+    } else {
+      state.lspInfo = null;
+      updateLspStatus();
+    }
+  }
+
+  function syncLspModeUI() {
+    const isLsp = state.searchMode === 'lsp';
+    if (useLspToggle) useLspToggle.classList.toggle('active', isLsp);
+    if (lspModeRow) lspModeRow.style.display = isLsp ? 'flex' : 'none';
+    if (renameSymbolBtn) renameSymbolBtn.style.display = isLsp ? 'inline-block' : 'none';
+
+    // Sync sub-mode buttons
+    if (lspModeRow) {
+      lspModeRow.querySelectorAll('.lsp-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lspMode === state.lspSubMode);
+      });
+    }
+
+    // In LSP mode, regex/whole-word/case toggles are irrelevant — dim them
+    if (matchCaseToggle) matchCaseToggle.style.opacity = isLsp ? '0.4' : '1';
+    if (wholeWordToggle) wholeWordToggle.style.opacity = isLsp ? '0.4' : '1';
+    if (useRegexToggle) useRegexToggle.style.opacity = isLsp ? '0.4' : '1';
+  }
+
+  function runLspSearch() {
+    showPlaceholder('Searching usages...');
+    clearResultsCountDisplay();
+    state.searchStartTime = performance.now();
+    vscode.postMessage({ type: 'lspSearch', lspMode: state.lspSubMode });
+  }
+
+  function handleSymbolAtCursor(message) {
+    if (message.symbolName) {
+      queryInput.value = message.symbolName;
+      state.currentQuery = message.symbolName;
+    }
+    if (message.lspAvailable === false && message.languageId) {
+      if (lspStatus) {
+        lspStatus.textContent = 'Language server not available for ' + message.languageId;
+        lspStatus.className = 'lsp-status warning';
+      }
+    } else if (message.lspAvailable && message.symbolName) {
+      updateLspStatus();
+      runLspSearch();
+    } else {
+      if (lspStatus) {
+        lspStatus.textContent = 'No symbol at cursor';
+        lspStatus.className = 'lsp-status warning';
+      }
+    }
+  }
+
+  function updateLspStatus() {
+    if (!lspStatus) return;
+    if (state.searchMode !== 'lsp' || !state.lspInfo) {
+      lspStatus.textContent = '';
+      lspStatus.className = 'lsp-status';
+      lspStatus.removeAttribute('title');
+      return;
+    }
+    const info = state.lspInfo;
+    const confidenceLabel = info.confidence === 'high' ? 'High confidence' : 'Partial coverage';
+    const compactConfidence = info.confidence === 'high' ? 'high' : 'partial';
+    lspStatus.textContent = 'LSP · ' + compactConfidence;
+    lspStatus.setAttribute('title', info.languageId + ' · ' + confidenceLabel);
+    lspStatus.className = info.confidence === 'high' ? 'lsp-status' : 'lsp-status warning';
+  }
+
   function runSearch() {
     try {
       if (isEditMode) {
         exitEditMode(true);
+      }
+
+      // In LSP mode, delegate to LSP search
+      if (state.searchMode === 'lsp') {
+        runLspSearch();
+        return;
       }
       
       // Don't trim when multiline is enabled - preserve newlines

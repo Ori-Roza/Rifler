@@ -2394,3 +2394,111 @@ body.windows .results-list {
   margin-top: 0;
   margin-bottom: 0;
 }
+
+/* ============================================================================
+   LSP / Usage-Aware Search Mode
+   ============================================================================ */
+
+.lsp-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--rifler-input-border);
+  border-radius: 2px;
+  background-color: var(--rifler-input-bg);
+  flex-wrap: wrap;
+}
+
+.lsp-mode-buttons {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.lsp-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--rifler-font-mono);
+  color: var(--rifler-fg-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.1s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.lsp-mode-btn:hover {
+  background-color: var(--rifler-button-hover);
+  color: var(--rifler-fg);
+}
+
+.lsp-mode-btn.active {
+  background-color: var(--rifler-primary-dim);
+  color: var(--rifler-primary);
+}
+
+.lsp-status {
+  font-size: 10px;
+  color: var(--rifler-fg-muted);
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.lsp-status.warning {
+  color: var(--rifler-warning);
+}
+
+.lsp-rename-btn {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--rifler-font-mono);
+  color: var(--rifler-button-fg);
+  background: var(--rifler-button-bg);
+  border: 1px solid var(--rifler-input-border);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.lsp-rename-btn:hover {
+  background: var(--rifler-button-hover);
+}
+
+#use-lsp.active {
+  background-color: var(--rifler-primary-dim);
+  color: var(--rifler-primary);
+}
+
+.lsp-replace-warning {
+  padding: 6px 10px;
+  margin: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: var(--rifler-fg);
+}
+
+.lsp-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--rifler-badge-bg);
+  color: var(--rifler-badge-fg);
+  margin-left: 6px;
+  vertical-align: middle;
+}

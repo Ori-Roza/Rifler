@@ -5,6 +5,13 @@ import { replaceOne, replaceAll } from '../replacer';
 import { validateRegex, validateFileMask, SearchOptions, SearchScope } from '../utils';
 import { StateStore } from '../state/StateStore';
 import { detectProjectTypes } from '../projectDetector';
+import {
+  getSymbolAtCursor,
+  executeLspSearch,
+  checkLspAvailability,
+  lspReplaceAll,
+  LspSearchMode,
+} from '../lspSearch';
 
 export interface CommonHandlerDeps {
   postMessage: (message: Record<string, unknown>) => void;
@@ -258,5 +265,127 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       });
       deps.stateStore.setProjectExclusionPreferences(preferences);
     }
+  });
+
+  // ========================================================================
+  // LSP / Usage-Aware Search Handlers
+  // ========================================================================
+
+  handler.registerHandler('getSymbolAtCursor', async () => {
+    const symbolInfo = getSymbolAtCursor();
+    if (!symbolInfo) {
+      deps.postMessage({
+        type: 'symbolAtCursor',
+        symbolName: null,
+        languageId: '',
+        lspAvailable: false,
+      });
+      return;
+    }
+
+    const lspAvailable = await checkLspAvailability(symbolInfo.uri, symbolInfo.position);
+    deps.postMessage({
+      type: 'symbolAtCursor',
+      symbolName: symbolInfo.symbolName,
+      languageId: symbolInfo.languageId,
+      lspAvailable,
+    });
+  });
+
+  handler.registerHandler('lspSearch', async (message) => {
+    const msg = message as { lspMode: LspSearchMode };
+    const symbolInfo = getSymbolAtCursor();
+
+    if (!symbolInfo) {
+      deps.postMessage({
+        type: 'searchResults',
+        results: [],
+        lspMode: msg.lspMode,
+        lspInfo: { languageId: '', symbolName: '', confidence: 'partial' as const },
+      });
+      deps.postMessage({
+        type: 'error',
+        message: 'No symbol found at cursor position. Place your cursor on a symbol and try again.',
+      });
+      return;
+    }
+
+    const lspAvailable = await checkLspAvailability(symbolInfo.uri, symbolInfo.position);
+    if (!lspAvailable) {
+      deps.postMessage({
+        type: 'searchResults',
+        results: [],
+        lspMode: msg.lspMode,
+        lspInfo: {
+          languageId: symbolInfo.languageId,
+          symbolName: symbolInfo.symbolName,
+          confidence: 'partial',
+        },
+      });
+      deps.postMessage({
+        type: 'error',
+        message: `Language server not available for ${symbolInfo.languageId}. Falling back to text search.`,
+      });
+      return;
+    }
+
+    console.log(`[Rifler LSP] Searching ${msg.lspMode} for "${symbolInfo.symbolName}" in ${symbolInfo.languageId}`);
+    const results = await executeLspSearch(symbolInfo.uri, symbolInfo.position, msg.lspMode);
+
+    // Dynamic languages might miss references
+    const dynamicLanguages = new Set(['javascript', 'python', 'ruby', 'php', 'lua']);
+    const confidence = dynamicLanguages.has(symbolInfo.languageId) ? 'partial' : 'high';
+
+    deps.postMessage({
+      type: 'searchResults',
+      results,
+      lspMode: msg.lspMode,
+      lspInfo: {
+        languageId: symbolInfo.languageId,
+        symbolName: symbolInfo.symbolName,
+        confidence,
+      },
+    });
+  });
+
+  handler.registerHandler('lspReplaceAll', async (message) => {
+    const msg = message as { lspMode: LspSearchMode; replaceText: string };
+    const symbolInfo = getSymbolAtCursor();
+
+    if (!symbolInfo) {
+      deps.postMessage({
+        type: 'error',
+        message: 'No symbol found at cursor. Cannot perform LSP replace.',
+      });
+      return;
+    }
+
+    const { replacedCount, results } = await lspReplaceAll(
+      symbolInfo.uri,
+      symbolInfo.position,
+      msg.lspMode,
+      msg.replaceText
+    );
+
+    if (replacedCount > 0) {
+      vscode.window.showInformationMessage(
+        `Rifler: Replaced ${replacedCount} usage(s) of "${symbolInfo.symbolName}" with "${msg.replaceText}"`
+      );
+    }
+
+    deps.postMessage({
+      type: 'searchResults',
+      results,
+      lspMode: msg.lspMode,
+      lspInfo: {
+        languageId: symbolInfo.languageId,
+        symbolName: symbolInfo.symbolName,
+        confidence: 'high',
+      },
+    });
+  });
+
+  handler.registerHandler('triggerRename', async () => {
+    await vscode.commands.executeCommand('editor.action.rename');
   });
 }

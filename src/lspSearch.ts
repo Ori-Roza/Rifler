@@ -3,6 +3,41 @@ import * as path from 'path';
 import { SearchResult } from './utils';
 
 // ============================================================================
+// URI Conversion
+// ============================================================================
+
+/**
+ * Convert a URI string to a filesystem path in an OS-agnostic way.
+ * Handles file:// protocol, Windows drive letters, and path normalization.
+ * Works with Jest's vscode mock which doesn't fully implement URI parsing.
+ */
+function uriToFsPath(uri: string): string {
+  const trimmed = (uri || '').trim();
+  if (!trimmed) return '';
+
+  // String-based conversion that works under Jest's vscode mock
+  if (trimmed.startsWith('file://')) {
+    let rest = trimmed.slice('file://'.length);
+    // Collapse leading slashes to a single slash for POSIX paths
+    rest = rest.replace(/^\/+/, '/');
+    // Decode URI components (e.g., %20 -> space)
+    try {
+      rest = decodeURIComponent(rest);
+    } catch {
+      // If decoding fails, continue with the original
+    }
+    // Handle Windows drive letter form: /C:/... -> C:/...
+    if (/^\/[A-Za-z]:[\\\/]/.test(rest)) {
+      rest = rest.slice(1);
+    }
+    // Normalize path separators for the current platform
+    return path.normalize(rest);
+  }
+
+  return path.normalize(trimmed);
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -123,7 +158,9 @@ export async function mapLocationsToSearchResults(
 
       const workspaceFolders = vscode.workspace.workspaceFolders;
       const wsRoot = workspaceFolders?.[0]?.uri.fsPath ?? '';
-      const fsPath = location.uri.fsPath;
+      // Use URI-safe conversion that works cross-platform
+      const uriString = location.uri.toString();
+      const fsPath = uriToFsPath(uriString);
       const relativePath = wsRoot ? path.relative(wsRoot, fsPath) : fsPath;
 
       results.push({

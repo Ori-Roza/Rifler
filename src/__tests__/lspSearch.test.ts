@@ -1,6 +1,8 @@
 jest.mock('vscode');
 
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as os from 'os';
 import {
   getSymbolAtCursor,
   executeLspSearch,
@@ -9,12 +11,25 @@ import {
   lspReplaceAll,
 } from '../lspSearch';
 
+// Use OS-agnostic paths for testing
+const WORKSPACE_ROOT = path.join(os.tmpdir(), 'test-workspace');
+const makeUri = (relPath: string) => {
+  const fsPath = path.join(WORKSPACE_ROOT, relPath);
+  // Convert to file:// URI with proper path separators
+  const normalized = fsPath.replace(/\\/g, '/');
+  const fileUri = `file://${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+  return {
+    fsPath,
+    toString: () => fileUri,
+  };
+};
+
 describe('lspSearch', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (vscode.window as any).activeTextEditor = undefined;
     (vscode.workspace as any).workspaceFolders = [
-      { uri: { fsPath: '/workspace' }, index: 0, name: 'workspace' },
+      { uri: { fsPath: WORKSPACE_ROOT }, index: 0, name: 'workspace' },
     ];
   });
 
@@ -42,7 +57,7 @@ describe('lspSearch', () => {
         start: { line: 5, character: 10 },
         end: { line: 5, character: 20 },
       };
-      const mockUri = { fsPath: '/workspace/src/file.ts', toString: () => 'file:///workspace/src/file.ts' };
+      const mockUri = makeUri('src/file.ts');
       (vscode.window as any).activeTextEditor = {
         document: {
           getWordRangeAtPosition: jest.fn().mockReturnValue(mockWordRange),
@@ -66,7 +81,7 @@ describe('lspSearch', () => {
   });
 
   describe('executeLspSearch', () => {
-    const mockUri = { fsPath: '/workspace/src/file.ts', toString: () => 'file:///workspace/src/file.ts' };
+    const mockUri = makeUri('src/file.ts');
     const mockPosition = { line: 5, character: 10 };
 
     test('dispatches to correct VS Code command for references', async () => {
@@ -128,7 +143,7 @@ describe('lspSearch', () => {
     });
 
     test('maps locations to search results', async () => {
-      const locationUri = { fsPath: '/workspace/src/other.ts', toString: () => 'file:///workspace/src/other.ts' };
+      const locationUri = makeUri('src/other.ts');
       const locations = [
         {
           uri: locationUri,
@@ -147,9 +162,9 @@ describe('lspSearch', () => {
       const results = await executeLspSearch(mockUri as any, mockPosition as any, 'references');
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({
-        uri: 'file:///workspace/src/other.ts',
+        uri: locationUri.toString(),
         fileName: 'other.ts',
-        relativePath: 'src/other.ts',
+        relativePath: path.normalize('src/other.ts'),
         line: 10,
         character: 5,
         length: 10,
@@ -161,8 +176,8 @@ describe('lspSearch', () => {
 
   describe('mapLocationsToSearchResults', () => {
     test('handles errors for individual locations gracefully', async () => {
-      const goodUri = { fsPath: '/workspace/src/good.ts', toString: () => 'file:///workspace/src/good.ts' };
-      const badUri = { fsPath: '/workspace/src/bad.ts', toString: () => 'file:///workspace/src/bad.ts' };
+      const goodUri = makeUri('src/good.ts');
+      const badUri = makeUri('src/bad.ts');
 
       const locations = [
         {
@@ -188,7 +203,7 @@ describe('lspSearch', () => {
   });
 
   describe('checkLspAvailability', () => {
-    const mockUri = { fsPath: '/workspace/src/file.ts', toString: () => 'file:///workspace/src/file.ts' };
+    const mockUri = makeUri('src/file.ts');
     const mockPosition = { line: 0, character: 0 };
 
     test('returns true when LSP responds', async () => {
@@ -205,7 +220,7 @@ describe('lspSearch', () => {
   });
 
   describe('lspReplaceAll', () => {
-    const mockUri = { fsPath: '/workspace/src/file.ts', toString: () => 'file:///workspace/src/file.ts' };
+    const mockUri = makeUri('src/file.ts');
     const mockPosition = { line: 5, character: 10 };
 
     test('returns zero replaced when no results found', async () => {
@@ -216,7 +231,7 @@ describe('lspSearch', () => {
     });
 
     test('applies WorkspaceEdit and saves documents', async () => {
-      const locationUri = { fsPath: '/workspace/src/other.ts', toString: () => 'file:///workspace/src/other.ts' };
+      const locationUri = makeUri('src/other.ts');
       const locations = [
         {
           uri: locationUri,
@@ -246,7 +261,7 @@ describe('lspSearch', () => {
     });
 
     test('returns zero replaced when applyEdit fails', async () => {
-      const locationUri = { fsPath: '/workspace/src/other.ts', toString: () => 'file:///workspace/src/other.ts' };
+      const locationUri = makeUri('src/other.ts');
       const locations = [
         {
           uri: locationUri,

@@ -264,11 +264,14 @@ console.log('[Rifler] Webview script starting...');
     const width = document.body.clientWidth;
     
     // Remove all layout classes
-    document.body.classList.remove('narrow-layout', 'normal-layout', 'wide-layout');
+    document.body.classList.remove('narrow-layout', 'normal-layout', 'wide-layout', 'ultra-narrow-layout');
     
     // Apply appropriate class based on width
     if (width < 350) {
       document.body.classList.add('narrow-layout');
+      if (width < 250) {
+        document.body.classList.add('ultra-narrow-layout');
+      }
       console.log('[Rifler] Applied narrow-layout for width:', width);
     } else if (width >= 350 && width <= 600) {
       document.body.classList.add('normal-layout');
@@ -282,21 +285,23 @@ console.log('[Rifler] Webview script starting...');
     // so it stays inside the main search textbox.
     try {
       const isNarrow = document.body.classList.contains('narrow-layout');
+      const needsOverflow = isNarrow;
+
       if (searchOverflow && searchControls && moreActionsBtn && moreActionsMenu) {
         const alreadyInOverflow = searchOverflow.contains(moreActionsBtn);
-        if (isNarrow && !alreadyInOverflow) {
+        if (needsOverflow && !alreadyInOverflow) {
           moreActionsMenu.classList.remove('open');
           searchOverflow.appendChild(moreActionsBtn);
           searchOverflow.appendChild(moreActionsMenu);
           document.body.classList.add('overflow-in-input');
-        } else if (!isNarrow && alreadyInOverflow) {
+        } else if (!needsOverflow && alreadyInOverflow) {
           moreActionsMenu.classList.remove('open');
           searchControls.appendChild(moreActionsBtn);
           searchControls.appendChild(moreActionsMenu);
           document.body.classList.remove('overflow-in-input');
         } else {
           // Keep class in sync even if the nodes are already in the right spot.
-          document.body.classList.toggle('overflow-in-input', isNarrow && alreadyInOverflow);
+          document.body.classList.toggle('overflow-in-input', needsOverflow && alreadyInOverflow);
         }
       }
     } catch {
@@ -338,6 +343,20 @@ console.log('[Rifler] Webview script starting...');
     if (includeCommentsToggle) includeCommentsToggle.classList.toggle('active', state.options.includeComments);
     if (includeStringsToggle) includeStringsToggle.classList.toggle('active', state.options.includeStrings);
     if (useLspToggle) useLspToggle.classList.toggle('active', state.searchMode === 'lsp');
+  }
+
+  function syncMoreActionsFilterState() {
+    if (!moreActionsMenu) return;
+    const map = {
+      'toggle-match-case': state.options.matchCase,
+      'toggle-whole-word': state.options.wholeWord,
+      'toggle-regex': state.options.useRegex,
+      'toggle-lsp': state.searchMode === 'lsp'
+    };
+    for (const [action, active] of Object.entries(map)) {
+      const btn = moreActionsMenu.querySelector('[data-action="' + action + '"]');
+      if (btn) btn.classList.toggle('active', !!active);
+    }
   }
 
   function applyContextDefaults() {
@@ -665,6 +684,7 @@ console.log('[Rifler] Webview script starting...');
         if (searchHistoryMenu) {
           searchHistoryMenu.classList.remove('open');
         }
+      syncMoreActionsFilterState();
       moreActionsMenu.classList.toggle('open');
     });
 
@@ -682,6 +702,22 @@ console.log('[Rifler] Webview script starting...');
           break;
         case 'clear-search':
           if (clearSearchBtn) clearSearchBtn.click();
+          break;
+        case 'toggle-match-case':
+          if (matchCaseToggle) matchCaseToggle.click();
+          syncMoreActionsFilterState();
+          break;
+        case 'toggle-whole-word':
+          if (wholeWordToggle) wholeWordToggle.click();
+          syncMoreActionsFilterState();
+          break;
+        case 'toggle-regex':
+          if (useRegexToggle) useRegexToggle.click();
+          syncMoreActionsFilterState();
+          break;
+        case 'toggle-lsp':
+          if (useLspToggle) useLspToggle.click();
+          syncMoreActionsFilterState();
           break;
       }
     });

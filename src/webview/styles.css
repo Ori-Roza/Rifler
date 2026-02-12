@@ -48,13 +48,16 @@ body {
   font-size: var(--rifler-font-size);
   color: var(--rifler-fg);
   background-color: var(--rifler-bg);
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-width: 300px;
+  min-width: 0;
   opacity: 0;
   transition: opacity 0.15s ease-in;
+}
+html {
+  height: 100%;
 }
 
 body.loaded {
@@ -293,8 +296,10 @@ body.loaded {
   flex-direction: column;
   gap: 8px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  position: relative;
   z-index: 10;
   overflow: visible;
+  max-width: 100%;
 }
 
 /* ===== Search Box Row ===== */
@@ -303,6 +308,9 @@ body.loaded {
   gap: 8px;
   align-items: center;
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .search-input-group {
@@ -316,9 +324,12 @@ body.loaded {
   border: 1px solid var(--rifler-input-border);
   border-radius: 6px;
   padding: 6px 10px;
-  transition: all 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   position: relative;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .search-input-group:focus-within {
@@ -373,6 +384,7 @@ body.loaded {
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.1s;
+  flex-shrink: 0;
 }
 
 .search-history-btn:hover {
@@ -406,6 +418,7 @@ body.loaded {
   gap: 2px;
   flex-shrink: 0;
   margin-left: auto;
+  transition: gap 0.15s ease;
 }
 
 .multiline-btn {
@@ -429,11 +442,28 @@ body.loaded {
   display: none;
 }
 
+/* When the arrow-down button is inside the search-overflow (relocated by JS),
+   always show it — regardless of layout class */
+.search-overflow:has(.more-actions-btn) {
+  display: inline-flex !important;
+  align-items: center;
+  flex-shrink: 0;
+  animation: fadeIn 0.15s ease;
+}
+.search-overflow .more-actions-btn {
+  display: inline-flex !important;
+  width: 24px;
+  height: 28px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
 .search-controls {
   display: flex;
   gap: 2px;
   flex-shrink: 0;
   align-items: center;
+  transition: gap 0.15s ease, width 0.15s ease, opacity 0.15s ease;
 }
 
 .option-btn {
@@ -451,8 +481,9 @@ body.loaded {
   border: 1px solid transparent;
   border-radius: 2px; /* rounded-sm */
   cursor: pointer;
-  transition: all 0.1s;
+  transition: opacity 0.15s ease, width 0.15s ease, padding 0.15s ease, background-color 0.1s, color 0.1s;
   user-select: none;
+  overflow: hidden;
 }
 
 .context-text-icon {
@@ -784,7 +815,8 @@ select.path-input option {
   color: var(--rifler-fg-muted);
   cursor: pointer;
   border-radius: 6px;
-  transition: all 0.1s;
+  transition: opacity 0.15s ease, width 0.15s ease, background-color 0.1s, color 0.1s;
+  overflow: hidden;
 }
 
 .icon-btn:hover {
@@ -844,6 +876,11 @@ select.path-input option {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ===== Results Summary Bar ===== */
@@ -1056,6 +1093,58 @@ select.path-input option {
 .search-history-menu .material-symbols-outlined {
   font-size: 18px;
   opacity: 0.8;
+}
+
+/* Menu filter toggle items – compact icon-only row */
+.more-actions-menu .menu-filter-row {
+  display: none;
+  gap: 2px;
+  padding: 2px 4px;
+}
+body.narrow-layout .more-actions-menu .menu-filter-row {
+  display: flex;
+}
+.more-actions-menu .menu-filter-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  gap: 0;
+  border-radius: 4px;
+  position: relative;
+}
+.more-actions-menu .menu-filter-item .menu-filter-label {
+  display: none;
+}
+.more-actions-menu .menu-filter-item .menu-check {
+  display: none;
+}
+.more-actions-menu .menu-filter-item .material-symbols-outlined {
+  font-size: 18px;
+  opacity: 0.6;
+}
+.more-actions-menu .menu-filter-item.active {
+  background: var(--rifler-list-hover);
+  color: var(--rifler-primary);
+}
+.more-actions-menu .menu-filter-item.active .material-symbols-outlined {
+  opacity: 1;
+  color: var(--rifler-primary);
+}
+.more-actions-menu .menu-separator {
+  height: 1px;
+  background: var(--rifler-border);
+  margin: 2px 4px;
+}
+
+/* Hide filter row & separator in dropdown when inline buttons are visible */
+.more-actions-menu .menu-separator {
+  display: none;
+}
+body.narrow-layout .more-actions-menu .menu-separator {
+  display: block;
 }
 
 .search-history-menu .clear-history-btn {
@@ -2134,24 +2223,16 @@ select.path-input option {
 /* ===== Responsive Layouts (Issue #98) ===== */
 /* Narrow layout for sidebar use (< 350px) */
 body.narrow-layout .search-section {
-  padding: 4px 6px;
+  padding: 6px;
   gap: 6px;
 }
 
 body.narrow-layout .search-box {
-  flex-direction: column;
-  align-items: stretch;
   gap: 4px;
 }
 
 body.narrow-layout .search-input-group {
-  padding: 4px 6px;
   gap: 4px;
-  width: 100%;
-}
-
-body.narrow-layout .search-input {
-  padding: 4px 0;
 }
 
 body.narrow-layout .search-controls {
@@ -2162,25 +2243,46 @@ body.narrow-layout .search-controls {
 
 /* When we relocate the overflow button into the input group, hide the empty controls row */
 body.narrow-layout.overflow-in-input .search-controls {
-  display: none;
+  width: 0;
+  overflow: hidden;
+  gap: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 body.narrow-layout .search-overflow {
   display: inline-flex;
   align-items: center;
   position: static;
+  flex-shrink: 0;
+}
+
+body.narrow-layout .search-options .option-btn {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-width: 0;
+}
+
+body.narrow-layout .search-options {
+  flex-shrink: 0;
+  overflow: visible;
+  min-width: 26px;
+  gap: 0;
 }
 
 body.narrow-layout .search-overflow .more-actions-btn {
-  display: inline-flex;
+  display: inline-flex !important;
   width: 24px;
   height: 28px;
   border-radius: 2px;
+  flex-shrink: 0;
 }
 
 body.narrow-layout .search-overflow .more-actions-menu {
   top: calc(100% + 6px);
   right: 0;
+  min-width: min(200px, calc(100vw - 16px));
 }
 
 body.narrow-layout .icon-btn {
@@ -2195,7 +2297,9 @@ body.narrow-layout .icon-btn {
 
 /* In narrow layout, hide individual controls and show the overflow menu */
 body.narrow-layout .search-controls .icon-btn:not(.more-actions-btn) {
-  display: none;
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 body.narrow-layout .search-controls .more-actions-btn {
   display: inline-flex;
@@ -2221,12 +2325,20 @@ body.narrow-layout .results-summary-bar {
 
 body.narrow-layout .results-count-text {
   font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 body.narrow-layout .collapse-all-btn {
   padding: 3px 6px;
   font-size: 11px;
   gap: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 body.narrow-layout .result-file-header {
@@ -2241,6 +2353,9 @@ body.narrow-layout .file-name {
 
 body.narrow-layout .file-path {
   font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 body.narrow-layout .match-count {
@@ -2284,6 +2399,7 @@ body.narrow-layout .preview-filepath {
 body.narrow-layout .replace-field-row {
   padding: 4px 6px;
   gap: 4px;
+  flex-wrap: wrap;
 }
 
 body.narrow-layout .replace-input {
@@ -2298,6 +2414,73 @@ body.narrow-layout .replace-actions {
 body.narrow-layout .replace-actions button {
   padding: 3px 8px;
   font-size: 11px;
+}
+
+body.narrow-layout .empty-state {
+  font-size: 11px;
+  padding: 8px;
+  word-break: break-word;
+}
+
+body.narrow-layout .results-summary-bar {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ===== Ultra-narrow layout (< 250px) ===== */
+body.ultra-narrow-layout .search-history-btn .search-history-caret {
+  display: none;
+}
+
+body.ultra-narrow-layout .search-history-btn {
+  padding: 2px;
+  min-width: 22px;
+}
+
+body.ultra-narrow-layout .search-input-group {
+  gap: 2px;
+  min-width: 0;
+}
+
+body.ultra-narrow-layout .search-section {
+  gap: 4px;
+}
+
+body.ultra-narrow-layout .results-count-text {
+  font-size: 10px;
+}
+
+body.ultra-narrow-layout .result-file-header {
+  padding: 3px 6px;
+  gap: 4px;
+  min-height: 28px;
+}
+
+body.ultra-narrow-layout .result-item {
+  padding: 2px 4px 2px 16px;
+}
+
+body.ultra-narrow-layout .file-name {
+  font-size: 11px;
+}
+
+body.ultra-narrow-layout .line-number {
+  min-width: 24px;
+  font-size: 9px;
+}
+
+body.ultra-narrow-layout .replace-field-row {
+  padding: 3px 4px;
+}
+
+body.ultra-narrow-layout .filters-container {
+  padding: 3px;
+  gap: 3px;
+}
+
+body.ultra-narrow-layout .lsp-mode-row {
+  padding: 3px 4px;
+  gap: 4px;
 }
 
 /* Normal layout (350px - 600px) - default styles apply */

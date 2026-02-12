@@ -37,12 +37,25 @@
   - **Match Case** - Case-sensitive search
   - **Words** - Match whole words only
   - **Regex** - Use regular expressions
-  - **File Mask** - Filter by file patterns (e.g., `*.ts`, `*.js, *.py`)
+  - **Usage-Aware (LSP)** - Semantic symbol search using Language Server Protocol
+    - Finds actual symbol references, not just text matches
+    - Supports References, Definitions, Implementations, and Type Definitions
+    - Language-aware search (like JetBrains "Find Usages")
+    - Clear indication when LSP mode is active
+    - Graceful fallback when language server unavailable
+  - **File Mask** - Filter by file patterns (e.g., `*.ts`, `*.js`)
     - Supports PyCharm-style include/exclude masks: comma/semicolon separated; `!` to exclude. Examples: `*.py`; `main.py, util.py`; `!*.txt`; `*.tsx,!*.test.tsx,!*.stories.tsx`; `*test*`.
   - **Smart Excludes** - Toggle to control automatic exclusion of common directories
     - **ON (default)** - Excludes node_modules, .git, dist, build, and other common directories
     - **OFF** - Searches all directories including node_modules (useful for searching dependencies)
     - State persists across sessions
+  - **Context Filters** - Filter matches by code context (inspired by JetBrains IDEs)
+    - **Code** - Include matches in code
+    - **Comments** - Include matches in comments
+    - **Strings** - Include matches in string literals
+    - Configure default filters via settings (`rifler.searchContext.*`)
+    - Helps avoid false positives in documentation and user-facing strings
+    - Makes Replace operations safer and more trustworthy
 - **Search & Replace**
   - **Replace One** - Replace current match and move to next
   - **Replace All** - Replace all occurrences in search results
@@ -69,6 +82,7 @@
   - `Cmd+Alt+R` (Mac) / `Ctrl+Alt+R` (Windows/Linux) - Open Replace mode
   - `Alt+R` - Open Replace in File widget
   - `Cmd+S` / `Ctrl+S` - Save current file (in edit mode)
+  - `Cmd+Shift+F12` (Mac) / `Ctrl+Shift+F12` (Windows/Linux) - Find Usages (LSP)
   - `Escape` - Exit edit mode or focus search box
 
 ## Usage
@@ -90,12 +104,74 @@ Press `Cmd+Alt+F` (Mac) or `Ctrl+Alt+F` (Windows/Linux) to **toggle** Rifler ope
 
 1. Open Rifler with `Cmd+Alt+F` (Mac) or `Ctrl+Alt+F` (Windows/Linux)
 2. Type your search query (results appear dynamically after 2+ characters)
-3. Toggle search options as needed (Match Case, Words, Regex)
+3. Toggle search options as needed (Match Case, Words, Regex, Usage-Aware)
 4. Use File Mask to filter results (e.g., `*.ts, *.js`)
 5. Toggle **Smart Excludes** (ON by default) to include/exclude common directories like node_modules
-6. Select scope (Project/Module/Directory)
-7. Navigate results with arrow keys and preview files
-8. Click on preview to edit inline, or double-click to open in main editor
+6. Use **Context Filters** to search only in code, comments, or strings
+7. Select scope (Project/Module/Directory)
+8. Navigate results with arrow keys and preview files
+9. Click on preview to edit inline, or double-click to open in main editor
+
+### Usage-Aware Search (LSP)
+
+**Usage-Aware Search** uses VS Code's Language Server Protocol to find actual symbol references, not just text matches. This is similar to JetBrains' "Find Usages" feature.
+
+**When to use:**
+- Finding where a function, class, or variable is actually used
+- Refactoring with confidence (avoids matching strings or comments with the same name)
+- Understanding symbol relationships across files
+
+**How to use:**
+1. Open Rifler
+2. Type the symbol name you want to find (or select text in editor before opening)
+3. Click the **Usage-Aware (LSP)** toggle button (device_hub icon)
+4. Choose the LSP mode:
+   - **Refs** - Find all references to the symbol
+   - **Defs** - Find definitions of the symbol
+   - **Impl** - Find implementations
+   - **Types** - Find type definitions
+
+**Example:**
+```javascript
+class User {
+  name: string;  // Definition
+}
+
+const user = "name";  // String (not found in LSP)
+user.name;  // Reference (found in LSP)
+```
+
+Text search finds all 3 occurrences. Usage-Aware search finds only the actual field definition and reference.
+
+**Note:** Results depend on your language server. Dynamic languages may have incomplete results.
+
+### Context Filters
+
+**Context Filters** allow you to search only in specific parts of your code: code, comments, or strings. This helps avoid false positives and makes replacements safer.
+
+**How to use:**
+1. Open Rifler
+2. Click the filter button (tune icon) to show filters
+3. Toggle the context filters:
+   - **Code** (code icon) - Include matches in code
+   - **Comments** (comment icon) - Include matches in comments  
+   - **Strings** (S icon) - Include matches in string literals
+
+**Example:**
+```python
+# TODO: rename foo
+print("foo")
+foo()
+```
+
+- With **Code only**: Finds only `foo()`
+- With **Code + Comments**: Finds `foo()` and the TODO comment
+- With all filters: Finds all 3 occurrences
+
+**Default behavior:** You can configure which filters are enabled by default in settings:
+- `rifler.searchContext.includeCode` (default: true)
+- `rifler.searchContext.includeComments` (default: true)
+- `rifler.searchContext.includeStrings` (default: true)
 
 ### Replace in Search Results
 1. Press `Cmd+Alt+R` (Mac) or `Ctrl+Alt+R` (Windows/Linux) to open replace mode
@@ -161,6 +237,7 @@ To customize the main Rifler keybindings, open Keyboard Shortcuts (`Cmd+K Cmd+S`
 |---------|---------------|------------------------|
 | Rifler: Toggle Open/Close | `Cmd+Alt+F` | `Ctrl+Alt+F` |
 | Rifler: Open Replace Mode | `Cmd+Alt+R` | `Ctrl+Alt+R` |
+| Rifler: Find Usages (LSP) | `Cmd+Shift+F12` | `Ctrl+Shift+F12` |
 | Rifler: Toggle View (sidebar/window) | _(not bound by default)_ | _(not bound by default)_ |
 
 ### Panel Location Configuration

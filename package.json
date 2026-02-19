@@ -107,6 +107,16 @@
         "command": "rifler.findUsages",
         "title": "Rifler: Find Usages (LSP)",
         "icon": "$(references)"
+      },
+      {
+        "command": "rifler.quickPick",
+        "title": "Rifler: Search in Files (QuickPick)",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "rifler.quickPickReplace",
+        "title": "Rifler: Replace in Files (QuickPick)",
+        "icon": "$(replace)"
       }
     ],
     "menus": {
@@ -139,11 +149,28 @@
         "command": "rifler.findUsages",
         "key": "ctrl+shift+f12",
         "mac": "cmd+shift+f12"
+      },
+      {
+        "command": "rifler.quickPick",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p"
+      },
+      {
+        "command": "rifler.quickPickReplace",
+        "key": "ctrl+alt+y",
+        "mac": "cmd+alt+y"
       }
     ],
     "configuration": {
       "title": "Rifler",
       "properties": {
+        "rifler.quickPickMaxItems": {
+          "type": "number",
+          "default": 50,
+          "minimum": 5,
+          "markdownDescription": "Maximum number of QuickPick results to display.",
+          "order": 11
+        },
         "rifler.persistSearchState": {
           "type": "boolean",
           "default": true,
@@ -232,19 +259,19 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Include code matches by default when running a search.",
-          "order": 8
+          "order": 12
         },
         "rifler.searchContext.includeComments": {
           "type": "boolean",
           "default": true,
           "markdownDescription": "Include comment matches by default when running a search.",
-          "order": 9
+          "order": 13
         },
         "rifler.searchContext.includeStrings": {
           "type": "boolean",
           "default": true,
           "markdownDescription": "Include string literal matches by default when running a search.",
-          "order": 10
+          "order": 14
         }
       }
     }

@@ -3,6 +3,7 @@ import { MessageHandler } from './handler';
 import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
 import { validateRegex, validateFileMask, SearchOptions, SearchScope } from '../utils';
+import { validateDirectoryPath } from '../security/pathValidation';
 import { StateStore } from '../state/StateStore';
 import { detectProjectTypes } from '../projectDetector';
 import {
@@ -41,11 +42,26 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       ? (msg.options.fileMask ? `${msg.options.fileMask},${msg.exclusionPatterns}` : msg.exclusionPatterns)
       : (msg.options.fileMask || '');
 
+    let directoryPath = msg.directoryPath;
+    if (msg.scope === 'directory' && msg.directoryPath && vscode.workspace.workspaceFolders?.length) {
+      try {
+        directoryPath = validateDirectoryPath(msg.directoryPath);
+      } catch (error) {
+        console.warn('[Rifler] Blocking directory scope search due to invalid path:', error);
+        deps.postMessage({
+          type: 'error',
+          message: 'Directory path must be within the workspace.'
+        });
+        deps.postMessage({ type: 'searchResults', results: [], maxResults: 10000 });
+        return;
+      }
+    }
+
     const results = await performSearch(
       msg.query,
       msg.scope,
       { ...msg.options, fileMask: mergedFileMask },
-      msg.directoryPath,
+      directoryPath,
       msg.modulePath,
       10000,
       msg.smartExcludesEnabled ?? true
@@ -131,6 +147,9 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     const msg = message as { directoryPath: string };
     console.log('[Rifler Backend] Validating directory:', msg.directoryPath);
     try {
+      if (msg.directoryPath && vscode.workspace.workspaceFolders?.length) {
+        validateDirectoryPath(msg.directoryPath);
+      }
       const uri = vscode.Uri.file(msg.directoryPath);
       const stat = await vscode.workspace.fs.stat(uri);
       const exists = stat.type === vscode.FileType.Directory;

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { quickPickCommand } from '../commands/quickPick';
 import { quickPickReplaceCommand } from '../commands/quickPickReplace';
 import { performSearch } from '../search';
+import { replaceOne } from '../replacer';
 import { CommandContext } from '../commands/types';
 
 jest.mock('../search', () => ({
@@ -202,7 +203,6 @@ describe('quickPickReplaceCommand', () => {
     const acceptHandler = onDidAccept.mock.calls[0][0];
     await acceptHandler();
 
-    const { replaceOne } = require('../replacer');
     expect(replaceOne).toHaveBeenCalled();
   });
 });

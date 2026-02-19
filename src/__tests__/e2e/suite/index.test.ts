@@ -28,6 +28,8 @@ suite('Extension Test Suite', () => {
     const commands = await vscode.commands.getCommands(true);
     assert.ok(commands.includes('rifler.open'));
     assert.ok(commands.includes('rifler.openReplace'));
+    assert.ok(commands.includes('rifler.quickPick'));
+    assert.ok(commands.includes('rifler.quickPickReplace'));
   });
 
   test('Should open search panel', async () => {
@@ -50,6 +52,18 @@ suite('Extension Test Suite', () => {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Test passes if command executes without error
+    assert.ok(true);
+  });
+
+  test('Should open QuickPick search', async () => {
+    await vscode.commands.executeCommand('rifler.quickPick');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    assert.ok(true);
+  });
+
+  test('Should open QuickPick replace', async () => {
+    await vscode.commands.executeCommand('rifler.quickPickReplace');
+    await new Promise(resolve => setTimeout(resolve, 500));
     assert.ok(true);
   });
 

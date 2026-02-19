@@ -5,12 +5,18 @@ export const Uri = {
     fsPath: `${base.fsPath}/${pathSegments.join('/')}`,
     toString: () => `${base.fsPath}/${pathSegments.join('/')}`
   })),
+  // Extension uri is used for icon paths
+  toString: () => 'file:///extension',
 };
 
 export const Range = jest.fn((startLine, startChar, endLine, endChar) => ({
   start: { line: startLine, character: startChar },
   end: { line: endLine, character: endChar },
 }));
+
+export const Position = jest.fn((line, character) => ({ line, character }));
+
+export const Selection = jest.fn((start, end) => ({ start, end }));
 
 export const WorkspaceEdit = jest.fn(() => ({
   replace: jest.fn(),
@@ -64,6 +70,29 @@ export const window = {
   showErrorMessage: jest.fn(),
   showInformationMessage: jest.fn(),
   showQuickPick: jest.fn().mockResolvedValue(undefined),
+  showInputBox: jest.fn().mockResolvedValue(undefined),
+  showTextDocument: jest.fn().mockResolvedValue({
+    selection: undefined,
+    revealRange: jest.fn(),
+  }),
+  createQuickPick: jest.fn().mockReturnValue({
+    title: '',
+    placeholder: '',
+    matchOnDescription: false,
+    matchOnDetail: false,
+    ignoreFocusOut: false,
+    busy: false,
+    value: '',
+    items: [],
+    selectedItems: [],
+    onDidChangeValue: jest.fn().mockReturnValue({ dispose: jest.fn() }),
+    onDidAccept: jest.fn().mockReturnValue({ dispose: jest.fn() }),
+    onDidHide: jest.fn().mockReturnValue({ dispose: jest.fn() }),
+    onDidTriggerButton: jest.fn().mockReturnValue({ dispose: jest.fn() }),
+    show: jest.fn(),
+    hide: jest.fn(),
+    dispose: jest.fn()
+  }),
   activeTextEditor: undefined,
   onDidChangeActiveTextEditor: jest.fn().mockReturnValue({ dispose: jest.fn() }),
   tabGroups: {
@@ -101,7 +130,14 @@ export const StatusBarAlignment = {
   Right: 2,
 };
 
+export const TextEditorRevealType = {
+  Default: 0,
+  InCenter: 3,
+};
+
 export const ThemeColor = jest.fn((name) => ({ name }));
+
+export const ThemeIcon = jest.fn((id) => ({ id }));
 
 export const FileType = {
   Unknown: 0,

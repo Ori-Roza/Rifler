@@ -21,6 +21,7 @@
 ## Features
 
 - **Dynamic Search** - Results appear as you type (no Find button needed)
+- **QuickPick Search** - A keyboard-first QuickPick search mode with live results and inline filters
 - **Search From Selection** - Select text in the editor, then open Rifler and it will be used as the initial search query
 - **Fresh State** - Automatically clears search results and state when switching workspaces
 - **High Performance**
@@ -82,7 +83,9 @@
   - `Cmd+Alt+R` (Mac) / `Ctrl+Alt+R` (Windows/Linux) - Open Replace mode
   - `Alt+R` - Open Replace in File widget
   - `Cmd+S` / `Ctrl+S` - Save current file (in edit mode)
-  - `Cmd+Shift+F12` (Mac) / `Ctrl+Shift+F12` (Windows/Linux) - Find Usages (LSP)
+- `Cmd+Shift+F12` (Mac) / `Ctrl+Shift+F12` (Windows/Linux) - Find Usages (LSP)
+- `Cmd+Alt+P` (Mac) / `Ctrl+Alt+P` (Windows/Linux) - QuickPick search
+- `Cmd+Alt+Y` (Mac) / `Ctrl+Alt+Y` (Windows/Linux) - QuickPick replace
   - `Escape` - Exit edit mode or focus search box
 
 ## Usage
@@ -111,6 +114,24 @@ Press `Cmd+Alt+F` (Mac) or `Ctrl+Alt+F` (Windows/Linux) to **toggle** Rifler ope
 7. Select scope (Project/Module/Directory)
 8. Navigate results with arrow keys and preview files
 9. Click on preview to edit inline, or double-click to open in main editor
+
+### QuickPick Search
+
+Use **Rifler: Search in Files (QuickPick)** for a lightweight, keyboard-first search flow:
+
+1. Press `Cmd+Alt+P` (Mac) or `Ctrl+Alt+P` (Windows/Linux)
+2. Type your query (results appear as you type)
+3. Toggle **Match Case**, **Whole Word**, and **Regex** using the QuickPick buttons
+4. Press `Enter` to open the selected result in the editor
+
+### QuickPick Replace
+
+Use **Rifler: Replace in Files (QuickPick)** for a fast replace flow:
+
+1. Run **Rifler: Replace in Files (QuickPick)** from the Command Palette
+2. Type your query (results appear as you type)
+3. Toggle **Match Case**, **Whole Word**, and **Regex** using the QuickPick buttons
+4. Select a match, enter replacement text, then choose **Replace One** or **Replace All**
 
 ### Usage-Aware Search (LSP)
 

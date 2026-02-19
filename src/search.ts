@@ -204,9 +204,7 @@ async function resolveSearchRoots(
           const safePath = validateDirectoryPath(trimmedPath);
           await addIfExists(safePath);
         } catch (error) {
-          console.warn(`[Rifler] Directory path validation failed for "${trimmedPath}", attempting search anyway:`, error);
-          // Fall back to searching the directory anyway (with warning) to avoid completely breaking search
-          await addIfExists(trimmedPath);
+          console.warn(`[Rifler] Directory path validation failed for "${trimmedPath}", blocking directory scope search:`, error);
         }
       } else {
         // No workspace folders (test mode or edge case) - allow path without validation

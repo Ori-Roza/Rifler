@@ -1324,11 +1324,14 @@ console.log('[Rifler] Webview script starting...');
     // Update line numbers based on content
     if (fileEditor && editorLineNumbers) {
       const lines = state.fileContent.content.split('\n');
-      let html = '';
+      editorLineNumbers.textContent = '';
+      const lineFragment = document.createDocumentFragment();
       for (let i = 1; i <= lines.length; i++) {
-        html += '<div>' + i + '</div>';
+        const lineEl = document.createElement('div');
+        lineEl.textContent = String(i);
+        lineFragment.appendChild(lineEl);
       }
-      editorLineNumbers.innerHTML = html;
+      editorLineNumbers.appendChild(lineFragment);
     }
     
     // Set caret position before showing editor
@@ -1577,22 +1580,16 @@ console.log('[Rifler] Webview script starting...');
     if (typeof hljs !== 'undefined') {
       try {
         if (language && hljs.getLanguage(language)) {
-          highlighted = hljs.highlight(text, { language }).value;
+          highlighted = sanitizeHighlightedHtml(hljs.highlight(text, { language }).value);
         } else {
-          highlighted = hljs.highlightAuto(text).value;
+          highlighted = sanitizeHighlightedHtml(hljs.highlightAuto(text).value);
         }
       } catch (e) {
         console.error('[Rifler] Highlight error in editor:', e);
-        highlighted = text
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
+        highlighted = escapeHtml(text);
       }
     } else {
-      highlighted = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+      highlighted = escapeHtml(text);
     }
     
     if (searchQuery && searchQuery.length > 0) {
@@ -1640,7 +1637,7 @@ console.log('[Rifler] Webview script starting...');
           }
         }
         
-        highlighted = temp.innerHTML;
+        highlighted = sanitizeHighlightedHtml(temp.innerHTML);
       } catch {
         // Ignore highlight errors
         void 0;
@@ -1661,12 +1658,14 @@ console.log('[Rifler] Webview script starting...');
     const lines = text.split(String.fromCharCode(10));
     const lineCount = lines.length;
     
-    let html = '';
+    editorLineNumbers.textContent = '';
+    const lineFragment = document.createDocumentFragment();
     for (let i = 1; i <= lineCount; i++) {
-      html += '<div>' + i + '</div>';
+      const lineEl = document.createElement('div');
+      lineEl.textContent = String(i);
+      lineFragment.appendChild(lineEl);
     }
-    
-    editorLineNumbers.innerHTML = html;
+    editorLineNumbers.appendChild(lineFragment);
   }
 
   function replaceOne() {
@@ -2395,38 +2394,55 @@ console.log('[Rifler] Webview script starting...');
       ? `This file changed in VS Code while editing in Rifler`
       : `Conflict: cannot apply edit to ${escapeHtml(fileName)}`;
     
-    banner.innerHTML = `
-      <span>${escapeHtml(message)}</span>
-      <div style="display: flex; gap: 8px;">
-        <button class="conflict-action-btn" data-action="overwrite" style="
-          background: #dc3545;
-          color: white;
-          border: none;
-          padding: 6px 12px;
-          border-radius: 3px;
-          cursor: pointer;
-          font-size: 12px;
-        ">Overwrite VS Code</button>
-        <button class="conflict-action-btn" data-action="reload" style="
-          background: #6c757d;
-          color: white;
-          border: none;
-          padding: 6px 12px;
-          border-radius: 3px;
-          cursor: pointer;
-          font-size: 12px;
-        ">Reload from VS Code</button>
-        <button class="conflict-action-btn" data-action="dismiss" style="
-          background: transparent;
-          color: #664d03;
-          border: 1px solid #664d03;
-          padding: 6px 12px;
-          border-radius: 3px;
-          cursor: pointer;
-          font-size: 12px;
-        ">Dismiss</button>
-      </div>
-    `;
+    banner.textContent = '';
+    const bannerMessage = document.createElement('span');
+    bannerMessage.textContent = message;
+    const actions = document.createElement('div');
+    actions.style.display = 'flex';
+    actions.style.gap = '8px';
+
+    const overwriteBtn = document.createElement('button');
+    overwriteBtn.className = 'conflict-action-btn';
+    overwriteBtn.dataset.action = 'overwrite';
+    overwriteBtn.textContent = 'Overwrite VS Code';
+    overwriteBtn.style.background = '#dc3545';
+    overwriteBtn.style.color = 'white';
+    overwriteBtn.style.border = 'none';
+    overwriteBtn.style.padding = '6px 12px';
+    overwriteBtn.style.borderRadius = '3px';
+    overwriteBtn.style.cursor = 'pointer';
+    overwriteBtn.style.fontSize = '12px';
+
+    const reloadBtn = document.createElement('button');
+    reloadBtn.className = 'conflict-action-btn';
+    reloadBtn.dataset.action = 'reload';
+    reloadBtn.textContent = 'Reload from VS Code';
+    reloadBtn.style.background = '#6c757d';
+    reloadBtn.style.color = 'white';
+    reloadBtn.style.border = 'none';
+    reloadBtn.style.padding = '6px 12px';
+    reloadBtn.style.borderRadius = '3px';
+    reloadBtn.style.cursor = 'pointer';
+    reloadBtn.style.fontSize = '12px';
+
+    const dismissBtn = document.createElement('button');
+    dismissBtn.className = 'conflict-action-btn';
+    dismissBtn.dataset.action = 'dismiss';
+    dismissBtn.textContent = 'Dismiss';
+    dismissBtn.style.background = 'transparent';
+    dismissBtn.style.color = '#664d03';
+    dismissBtn.style.border = '1px solid #664d03';
+    dismissBtn.style.padding = '6px 12px';
+    dismissBtn.style.borderRadius = '3px';
+    dismissBtn.style.cursor = 'pointer';
+    dismissBtn.style.fontSize = '12px';
+
+    actions.appendChild(overwriteBtn);
+    actions.appendChild(reloadBtn);
+    actions.appendChild(dismissBtn);
+
+    banner.appendChild(bannerMessage);
+    banner.appendChild(actions);
     
     // Attach event handlers to buttons
     banner.querySelectorAll('.conflict-action-btn').forEach(btn => {
@@ -4200,10 +4216,25 @@ console.log('[Rifler] Webview script starting...');
 
   function handleModulesList(modules) {
     state.modules = modules;
-    moduleSelect.innerHTML = modules.length === 0
-      ? '<option value="">No modules found</option>'
-      : '<option value="">Select module...</option>' +
-        modules.map(m => '<option value="' + escapeAttr(m.path) + '">' + escapeHtml(m.name) + '</option>').join('');
+    moduleSelect.textContent = '';
+    const placeholder = document.createElement('option');
+    if (modules.length === 0) {
+      placeholder.value = '';
+      placeholder.textContent = 'No modules found';
+      moduleSelect.appendChild(placeholder);
+      return;
+    }
+
+    placeholder.value = '';
+    placeholder.textContent = 'Select module...';
+    moduleSelect.appendChild(placeholder);
+
+    modules.forEach(m => {
+      const option = document.createElement('option');
+      option.value = String(m.path || '');
+      option.textContent = String(m.name || '');
+      moduleSelect.appendChild(option);
+    });
   }
 
   function handleCurrentDirectory(directory) {
@@ -4308,10 +4339,29 @@ console.log('[Rifler] Webview script starting...');
     const menu = document.createElement('div');
     menu.className = 'context-menu';
     menu.id = 'result-context-menu';
-    menu.innerHTML = 
-      '<div class="context-menu-item" data-action="open">Open in Editor<span class="shortcut">Ctrl+Enter</span></div>' +
-      '<div class="context-menu-item" data-action="copy-path">Copy File Path</div>' +
-      '<div class="context-menu-item" data-action="copy-relative">Copy Relative Path</div>';
+
+    const openItem = document.createElement('div');
+    openItem.className = 'context-menu-item';
+    openItem.dataset.action = 'open';
+    openItem.textContent = 'Open in Editor';
+    const shortcut = document.createElement('span');
+    shortcut.className = 'shortcut';
+    shortcut.textContent = 'Ctrl+Enter';
+    openItem.appendChild(shortcut);
+
+    const copyPathItem = document.createElement('div');
+    copyPathItem.className = 'context-menu-item';
+    copyPathItem.dataset.action = 'copy-path';
+    copyPathItem.textContent = 'Copy File Path';
+
+    const copyRelativeItem = document.createElement('div');
+    copyRelativeItem.className = 'context-menu-item';
+    copyRelativeItem.dataset.action = 'copy-relative';
+    copyRelativeItem.textContent = 'Copy Relative Path';
+
+    menu.appendChild(openItem);
+    menu.appendChild(copyPathItem);
+    menu.appendChild(copyRelativeItem);
 
     menu.style.left = e.clientX + 'px';
     menu.style.top = e.clientY + 'px';
@@ -4478,7 +4528,7 @@ console.log('[Rifler] Webview script starting...');
             highlighted = hljs.highlightAuto(text).value;
           }
           // console.log('[Rifler] Highlighted segment:', highlighted.substring(0, 20));
-          return highlighted;
+          return sanitizeHighlightedHtml(highlighted);
         } catch {
           // Ignore highlight errors
           void 0;
@@ -4984,7 +5034,7 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function escapeAttr(text) {
-    return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return String(text || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function sanitizeHighlightedHtml(highlightedHtml) {
@@ -5015,6 +5065,9 @@ console.log('[Rifler] Webview script starting...');
       sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
     } while (sanitized !== previous);
     
+    // Remove href/src with unsafe schemes
+    sanitized = sanitized.replace(/\s+(href|src)\s*=\s*(["'])\s*(javascript:|data:)[^\2]*\2/gi, '');
+
     // Sanitize span tags to only keep class attributes with hljs- prefix
     sanitized = sanitized.replace(/<span([^>]*)>/gi, function(_match, attrs) {
       const classMatch = attrs.match(/class\s*=\s*["']([^"']*)["']/i);

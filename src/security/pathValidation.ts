@@ -30,10 +30,10 @@ export function isWithinWorkspace(targetPath: string): boolean {
     const rel = path.relative(wsPath, normalized);
     
     // Path is safe if:
-    // 1. Relative path exists (not empty)
+    // 1. Is the workspace root (rel === '') OR within it
     // 2. Doesn't start with .. (not going up)
     // 3. Isn't absolute (contained within workspace)
-    return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
   });
 }
 
@@ -61,7 +61,7 @@ export function isUriSafe(uri: vscode.Uri): boolean {
     const rel = path.relative(wsPath, filePath);
     
     // Same checks as isWithinWorkspace
-    return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
   });
 }
 

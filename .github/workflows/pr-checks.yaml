@@ -229,7 +229,7 @@ jobs:
 
       - name: Run E2E tests (Linux, custom distribution)
         if: runner.os == 'Linux' && matrix.distribution != 'vscode'
-        run: xvfb-run -a npm run test:e2e -- --vscodeExecutablePath "$VSCODE_EXECUTABLE_PATH"
+        run: xvfb-run -a npm run test:e2e
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
 
@@ -253,6 +253,6 @@ jobs:
 
       - name: Run E2E tests (Windows, custom distribution)
         if: runner.os == 'Windows' && matrix.distribution != 'vscode'
-        run: npm run test:e2e -- --vscodeExecutablePath "$env:VSCODE_EXECUTABLE_PATH"
+        run: npm run test:e2e
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true

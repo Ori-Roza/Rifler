@@ -210,12 +210,6 @@ jobs:
           Invoke-WebRequest -Uri $downloadUrl -OutFile $execPath
           "VSCODE_EXECUTABLE_PATH=$execPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       
-      - name: Run E2E tests (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run -a npm run test:e2e
-        env:
-          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
-
       - name: Verify distribution (Linux)
         if: runner.os == 'Linux' && matrix.distribution != 'vscode'
         run: |
@@ -231,10 +225,16 @@ jobs:
               echo "$VERSION_OUTPUT" | grep -qi "Antigravity" || { echo "Antigravity not detected in version output." >&2; exit 1; }
               ;;
           esac
-      
-      - name: Run E2E tests (Windows)
-        if: runner.os == 'Windows'
-        run: npm run test:e2e
+
+      - name: Run E2E tests (Linux, VS Code)
+        if: runner.os == 'Linux' && matrix.distribution == 'vscode'
+        run: xvfb-run -a npm run test:e2e
+        env:
+          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+
+      - name: Run E2E tests (Linux, custom distribution)
+        if: runner.os == 'Linux' && matrix.distribution != 'vscode'
+        run: xvfb-run -a npm run test:e2e -- --vscodeExecutablePath "$VSCODE_EXECUTABLE_PATH"
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
 
@@ -254,3 +254,15 @@ jobs:
               if ($versionOutput -notmatch "Antigravity") { Write-Error "Antigravity not detected in version output."; exit 1 }
             }
           }
+
+      - name: Run E2E tests (Windows, VS Code)
+        if: runner.os == 'Windows' && matrix.distribution == 'vscode'
+        run: npm run test:e2e
+        env:
+          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+
+      - name: Run E2E tests (Windows, custom distribution)
+        if: runner.os == 'Windows' && matrix.distribution != 'vscode'
+        run: npm run test:e2e -- --vscodeExecutablePath "$env:VSCODE_EXECUTABLE_PATH"
+        env:
+          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true

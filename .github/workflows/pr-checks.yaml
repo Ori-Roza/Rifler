@@ -134,7 +134,7 @@ jobs:
 
           mkdir -p e2e-app
           ARCHIVE="e2e-app/app"
-          curl -L "$DOWNLOAD_URL" -o "$ARCHIVE"
+          curl -fL -A "Mozilla/5.0" -H "Accept: application/octet-stream" "$DOWNLOAD_URL" -o "$ARCHIVE"
 
           FILE_TYPE=$(file -b "$ARCHIVE")
           case "$FILE_TYPE" in
@@ -143,6 +143,10 @@ jobs:
               ;;
             *"Zip archive"*)
               unzip -q "$ARCHIVE" -d e2e-app
+              ;;
+            *"HTML"*|*"ASCII text"*)
+              echo "Downloaded file does not look like an app archive. File type: $FILE_TYPE" >&2
+              exit 1
               ;;
             *"gzip compressed"*)
               tar -xzf "$ARCHIVE" -C e2e-app
@@ -156,6 +160,10 @@ jobs:
             *"ELF"*)
               chmod +x "$ARCHIVE"
               EXEC_PATH="$GITHUB_WORKSPACE/$ARCHIVE"
+              ;;
+            *)
+              echo "Unsupported archive type: $FILE_TYPE" >&2
+              exit 1
               ;;
           esac
 

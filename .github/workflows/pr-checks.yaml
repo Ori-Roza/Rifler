@@ -85,6 +85,7 @@ jobs:
         run: npm run compile
 
   e2e-test:
+    name: E2E (${{ matrix.distribution }}, ${{ matrix.os }}, ${{ matrix.node-version }})
     runs-on: ${{ matrix.os }}
     
     strategy:

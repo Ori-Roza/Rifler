@@ -38,13 +38,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         node-version: [20.x]
-        distribution: [vscode, cursor, antigravity]
-
-    env:
-      CURSOR_LINUX_URL: https://api2.cursor.sh/updates/download/golden/linux-x64-deb/cursor/2.5
-      CURSOR_WINDOWS_URL: https://api2.cursor.sh/updates/download/golden/win32-x64-user/cursor/2.5
-      ANTIGRAVITY_LINUX_URL: https://antigravity.google/download/linux
-      ANTIGRAVITY_WINDOWS_URL: https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/1.18.4-5780041996042240/windows-x64/Antigravity.exe
     
     steps:
       - uses: actions/checkout@v6
@@ -92,6 +85,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         node-version: [20.x]
+        distribution: [vscode, cursor, antigravity]
+
+    env:
+      CURSOR_LINUX_URL: https://api2.cursor.sh/updates/download/golden/linux-x64-deb/cursor/2.5
+      CURSOR_WINDOWS_URL: https://api2.cursor.sh/updates/download/golden/win32-x64-user/cursor/2.5
+      ANTIGRAVITY_LINUX_URL: https://antigravity.google/download/linux
+      ANTIGRAVITY_WINDOWS_URL: https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/1.18.4-5780041996042240/windows-x64/Antigravity.exe
     
     steps:
       - uses: actions/checkout@v6

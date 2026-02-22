@@ -206,9 +206,42 @@ jobs:
         run: xvfb-run -a npm run test:e2e
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+
+      - name: Verify distribution (Linux)
+        if: runner.os == 'Linux' && matrix.distribution != 'vscode'
+        run: |
+          echo "VSCODE_EXECUTABLE_PATH=$VSCODE_EXECUTABLE_PATH"
+          VERSION_OUTPUT=$($VSCODE_EXECUTABLE_PATH --version 2>&1 || true)
+          echo "$VERSION_OUTPUT"
+
+          case "${{ matrix.distribution }}" in
+            cursor)
+              echo "$VERSION_OUTPUT" | grep -qi "Cursor" || { echo "Cursor not detected in version output." >&2; exit 1; }
+              ;;
+            antigravity)
+              echo "$VERSION_OUTPUT" | grep -qi "Antigravity" || { echo "Antigravity not detected in version output." >&2; exit 1; }
+              ;;
+          esac
       
       - name: Run E2E tests (Windows)
         if: runner.os == 'Windows'
         run: npm run test:e2e
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+
+      - name: Verify distribution (Windows)
+        if: runner.os == 'Windows' && matrix.distribution != 'vscode'
+        shell: pwsh
+        run: |
+          Write-Host "VSCODE_EXECUTABLE_PATH=$env:VSCODE_EXECUTABLE_PATH"
+          $versionOutput = & $env:VSCODE_EXECUTABLE_PATH --version 2>&1
+          Write-Host $versionOutput
+
+          switch ("${{ matrix.distribution }}") {
+            "cursor" {
+              if ($versionOutput -notmatch "Cursor") { Write-Error "Cursor not detected in version output."; exit 1 }
+            }
+            "antigravity" {
+              if ($versionOutput -notmatch "Antigravity") { Write-Error "Antigravity not detected in version output."; exit 1 }
+            }
+          }

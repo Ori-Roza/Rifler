@@ -6,6 +6,7 @@ const vscodeExecutablePath = process.env.VSCODE_EXECUTABLE_PATH;
 const useInstallation = vscodeExecutablePath
   ? { fromPath: vscodeExecutablePath }
   : undefined;
+const extensionDevelopmentPath = __dirname;
 
 const userDataDir = path.join(os.tmpdir(), 'rifler-vscode-test');
 const extensionsDir = path.join(os.tmpdir(), 'rifler-vscode-test-extensions');
@@ -16,6 +17,7 @@ module.exports = defineConfig([
     files: 'out/__tests__/e2e/suite/**/*.test.js',
     version: 'stable',
     useInstallation,
+    extensionDevelopmentPath,
     workspaceFolder: './test-fixtures/workspace',
     mocha: {
       ui: 'tdd',
@@ -33,6 +35,7 @@ module.exports = defineConfig([
     files: 'out/__tests__/e2e/suite/**/*.test.js',
     version: 'stable',
     useInstallation,
+    extensionDevelopmentPath,
     workspaceFolder: './test-fixtures/workspace',
     mocha: {
       ui: 'tdd',

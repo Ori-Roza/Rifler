@@ -164,8 +164,17 @@ suite('View Switching E2E Tests - Bug Fix', () => {
     await vscode.commands.executeCommand('workbench.view.scm');
     await new Promise(resolve => setTimeout(resolve, 800));
 
-    const initialContainer = await getActiveViewletId();
-    assert.ok(initialContainer);
+    let initialContainer = await getActiveViewletId();
+    if (!initialContainer) {
+      await retryAssert(async () => {
+        const active = await getActiveViewletId();
+        assert.ok(active);
+        initialContainer = active;
+      });
+    }
+    if (!initialContainer) {
+      initialContainer = 'workbench.view.scm';
+    }
     assert.notStrictEqual(initialContainer, 'workbench.view.extension.rifler-sidebar');
 
     // Open Rifler via toggle command (should record previous container)

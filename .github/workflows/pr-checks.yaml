@@ -188,21 +188,36 @@ jobs:
         if: runner.os == 'Windows' && matrix.distribution != 'vscode'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
           $downloadUrl = ""
           $installerPath = ""
           $execPath = ""
+          $candidatePaths = @()
+          $installArgsPrimary = @('/verysilent', '/norestart', '/sp-')
+          $installArgsFallback = @('/S')
+          $installTimeoutSeconds = 300
           switch ("${{ matrix.distribution }}") {
             "cursor" {
               $downloadUrl = "${{ env.CURSOR_WINDOWS_URL }}"
               $installerPath = Join-Path $env:GITHUB_WORKSPACE "e2e-app\\CursorInstaller.exe"
-              $execPath = Join-Path $env:LOCALAPPDATA "Programs\\Cursor\\Cursor.exe"
-              $fallbackExecPath = "C:\\Program Files\\Cursor\\Cursor.exe"
+              $candidatePaths = @(
+                (Join-Path $env:LOCALAPPDATA "Programs\\Cursor\\Cursor.exe"),
+                "C:\\Program Files\\Cursor\\Cursor.exe"
+              )
             }
             "antigravity" {
               $downloadUrl = "${{ env.ANTIGRAVITY_WINDOWS_URL }}"
               $installerPath = Join-Path $env:GITHUB_WORKSPACE "e2e-app\\AntigravityInstaller.exe"
-              $execPath = "C:\\Program Files\\Google\\Antigravity\\Antigravity.exe"
-              $fallbackExecPath = $null
+              $localInstallDir = Join-Path $env:LOCALAPPDATA "Antigravity"
+              $installArgsPrimary = @('/verysilent', '/norestart', '/sp-', "/currentuser", "/dir=$localInstallDir")
+              $candidatePaths = @(
+                "C:\\Program Files\\Google\\Antigravity\\Antigravity.exe",
+                "C:\\Program Files (x86)\\Google\\Antigravity\\Antigravity.exe",
+                (Join-Path $env:LOCALAPPDATA "Google\\Antigravity\\Antigravity.exe"),
+                (Join-Path $env:LOCALAPPDATA "Programs\\Antigravity\\Antigravity.exe"),
+                (Join-Path $env:LOCALAPPDATA "Antigravity\\Antigravity.exe")
+              )
             }
           }
 
@@ -214,19 +229,46 @@ jobs:
           New-Item -ItemType Directory -Force -Path e2e-app | Out-Null
           Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath
 
-          $silentArgs = @('/verysilent', '/norestart', '/sp-')
-          $process = Start-Process -FilePath $installerPath -ArgumentList $silentArgs -Wait -PassThru
-          if ($process.ExitCode -ne 0 -or -not (Test-Path $execPath)) {
-            $silentArgs = @('/S')
-            $process = Start-Process -FilePath $installerPath -ArgumentList $silentArgs -Wait -PassThru
+          Write-Host "Downloaded installer to $installerPath"
+          Write-Host "Attempting silent install (primary args): $($installArgsPrimary -join ' ')"
+          $process = Start-Process -FilePath $installerPath -ArgumentList $installArgsPrimary -PassThru
+          $completed = $false
+          try {
+            Wait-Process -Id $process.Id -Timeout $installTimeoutSeconds | Out-Null
+            $completed = $true
+          } catch {
+            $completed = $false
+          }
+          if (-not $completed) {
+            Write-Host "Installer timed out after $installTimeoutSeconds seconds."
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
           }
 
-          if (-not (Test-Path $execPath) -and $fallbackExecPath -and (Test-Path $fallbackExecPath)) {
-            $execPath = $fallbackExecPath
+          if (-not $completed -or $process.ExitCode -ne 0) {
+            Write-Host "Retrying silent install (fallback args): $($installArgsFallback -join ' ')"
+            $process = Start-Process -FilePath $installerPath -ArgumentList $installArgsFallback -PassThru
+            $completed = $false
+            try {
+              Wait-Process -Id $process.Id -Timeout $installTimeoutSeconds | Out-Null
+              $completed = $true
+            } catch {
+              $completed = $false
+            }
+            if (-not $completed) {
+              Write-Host "Fallback installer timed out after $installTimeoutSeconds seconds."
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
           }
 
-          if (-not (Test-Path $execPath)) {
-            Write-Error "Installed executable not found for ${{ matrix.distribution }} at $execPath."
+          foreach ($candidate in $candidatePaths) {
+            if (Test-Path $candidate) {
+              $execPath = $candidate
+              break
+            }
+          }
+
+          if ([string]::IsNullOrWhiteSpace($execPath)) {
+            Write-Error "Installed executable not found for ${{ matrix.distribution }}."
             exit 1
           }
 

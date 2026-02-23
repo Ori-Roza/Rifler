@@ -290,12 +290,16 @@ jobs:
         run: xvfb-run -a npm run test:e2e
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+          VSCODE_TEST_USER_DATA_DIR: ${{ runner.temp }}/rifler-vscode-user-data-${{ github.run_id }}-${{ matrix.distribution }}
+          VSCODE_TEST_EXTENSIONS_DIR: ${{ runner.temp }}/rifler-vscode-extensions-${{ github.run_id }}-${{ matrix.distribution }}
 
       - name: Run E2E tests (Linux, custom distribution)
         if: runner.os == 'Linux' && matrix.distribution != 'vscode'
         run: xvfb-run -a npm run test:e2e
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+          VSCODE_TEST_USER_DATA_DIR: ${{ runner.temp }}/rifler-vscode-user-data-${{ github.run_id }}-${{ matrix.distribution }}
+          VSCODE_TEST_EXTENSIONS_DIR: ${{ runner.temp }}/rifler-vscode-extensions-${{ github.run_id }}-${{ matrix.distribution }}
 
       - name: Verify distribution (Windows)
         if: runner.os == 'Windows' && matrix.distribution != 'vscode'
@@ -314,12 +318,16 @@ jobs:
         run: npm run test:e2e
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+          VSCODE_TEST_USER_DATA_DIR: ${{ runner.temp }}\rifler-vscode-user-data-${{ github.run_id }}-${{ matrix.distribution }}
+          VSCODE_TEST_EXTENSIONS_DIR: ${{ runner.temp }}\rifler-vscode-extensions-${{ github.run_id }}-${{ matrix.distribution }}
 
       - name: Run E2E tests (Windows, custom distribution)
         if: runner.os == 'Windows' && matrix.distribution != 'vscode'
         run: npm run test:e2e
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+          VSCODE_TEST_USER_DATA_DIR: ${{ runner.temp }}\rifler-vscode-user-data-${{ github.run_id }}-${{ matrix.distribution }}
+          VSCODE_TEST_EXTENSIONS_DIR: ${{ runner.temp }}\rifler-vscode-extensions-${{ github.run_id }}-${{ matrix.distribution }}
 
       - name: Cleanup E2E apps (Windows)
         if: runner.os == 'Windows'

@@ -126,7 +126,15 @@ jobs:
               echo "deb [signed-by=/etc/apt/keyrings/antigravity-repo-key.gpg] https://us-central1-apt.pkg.dev/projects/antigravity-auto-updater-dev/ antigravity-debian main" | sudo tee /etc/apt/sources.list.d/antigravity.list > /dev/null
               sudo apt-get update
               sudo apt-get install -y antigravity
-              EXEC_PATH="/usr/bin/antigravity"
+              if [ -x "/usr/share/antigravity/antigravity" ]; then
+                EXEC_PATH="/usr/share/antigravity/antigravity"
+              elif [ -x "/usr/lib/antigravity/antigravity" ]; then
+                EXEC_PATH="/usr/lib/antigravity/antigravity"
+              elif [ -x "/opt/antigravity/antigravity" ]; then
+                EXEC_PATH="/opt/antigravity/antigravity"
+              else
+                EXEC_PATH="/usr/bin/antigravity"
+              fi
               ;;
           esac
 

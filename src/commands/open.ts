@@ -25,9 +25,9 @@ export async function openCommand(ctx: CommandContext): Promise<void> {
         console.log('[Rifler] toggling, riflerVisible:', riflerVisible);
         
         if (riflerVisible) {
-          // Rifler is visible: close the sidebar
-          console.log('[Rifler] closing sidebar');
-          await vscode.commands.executeCommand('workbench.action.closeSidebar');
+          // Rifler is visible: switch back to the previous sidebar container
+          console.log('[Rifler] restoring previous sidebar');
+          await ctx.viewManager.restorePreviousSidebarOrFallback();
         } else {
           // Rifler is not visible: open it
           console.log('[Rifler] opening sidebar');

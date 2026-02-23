@@ -35,6 +35,7 @@ module.exports = defineConfig([
     },
     launchArgs: [
       '--disable-workspace-trust',
+      '--disable-extensions',
       `--user-data-dir=${userDataDir}`,
       `--extensions-dir=${extensionsDir}`
     ],
@@ -53,6 +54,7 @@ module.exports = defineConfig([
     },
     launchArgs: [
       '--disable-workspace-trust',
+      '--disable-extensions',
       `--user-data-dir=${userDataDir}`,
       `--extensions-dir=${extensionsDir}`,
       '--new-window',

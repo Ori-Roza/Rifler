@@ -189,15 +189,20 @@ jobs:
         shell: pwsh
         run: |
           $downloadUrl = ""
+          $installerPath = ""
           $execPath = ""
           switch ("${{ matrix.distribution }}") {
             "cursor" {
               $downloadUrl = "${{ env.CURSOR_WINDOWS_URL }}"
-              $execPath = Join-Path $env:GITHUB_WORKSPACE "e2e-app\\Cursor.exe"
+              $installerPath = Join-Path $env:GITHUB_WORKSPACE "e2e-app\\CursorInstaller.exe"
+              $execPath = Join-Path $env:LOCALAPPDATA "Programs\\Cursor\\Cursor.exe"
+              $fallbackExecPath = "C:\\Program Files\\Cursor\\Cursor.exe"
             }
             "antigravity" {
               $downloadUrl = "${{ env.ANTIGRAVITY_WINDOWS_URL }}"
-              $execPath = Join-Path $env:GITHUB_WORKSPACE "e2e-app\\Antigravity.exe"
+              $installerPath = Join-Path $env:GITHUB_WORKSPACE "e2e-app\\AntigravityInstaller.exe"
+              $execPath = "C:\\Program Files\\Google\\Antigravity\\Antigravity.exe"
+              $fallbackExecPath = $null
             }
           }
 
@@ -207,7 +212,24 @@ jobs:
           }
 
           New-Item -ItemType Directory -Force -Path e2e-app | Out-Null
-          Invoke-WebRequest -Uri $downloadUrl -OutFile $execPath
+          Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath
+
+          $silentArgs = @('/verysilent', '/norestart', '/sp-')
+          $process = Start-Process -FilePath $installerPath -ArgumentList $silentArgs -Wait -PassThru
+          if ($process.ExitCode -ne 0 -or -not (Test-Path $execPath)) {
+            $silentArgs = @('/S')
+            $process = Start-Process -FilePath $installerPath -ArgumentList $silentArgs -Wait -PassThru
+          }
+
+          if (-not (Test-Path $execPath) -and $fallbackExecPath -and (Test-Path $fallbackExecPath)) {
+            $execPath = $fallbackExecPath
+          }
+
+          if (-not (Test-Path $execPath)) {
+            Write-Error "Installed executable not found for ${{ matrix.distribution }} at $execPath."
+            exit 1
+          }
+
           "VSCODE_EXECUTABLE_PATH=$execPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       
       - name: Verify distribution (Linux)
@@ -256,3 +278,10 @@ jobs:
         run: npm run test:e2e
         env:
           VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+
+      - name: Cleanup E2E apps (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-Process Antigravity -ErrorAction SilentlyContinue | Stop-Process -Force
+          Get-Process Cursor -ErrorAction SilentlyContinue | Stop-Process -Force

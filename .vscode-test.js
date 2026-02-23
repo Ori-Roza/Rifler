@@ -1,4 +1,5 @@
 const { defineConfig } = require('@vscode/test-cli');
+const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
@@ -8,8 +9,16 @@ const useInstallation = vscodeExecutablePath
   : undefined;
 const extensionDevelopmentPath = __dirname;
 
-const userDataDir = path.join(os.tmpdir(), 'rifler-vscode-test');
-const extensionsDir = path.join(os.tmpdir(), 'rifler-vscode-test-extensions');
+function resolveTempDir(envVarName, prefix) {
+  const envValue = process.env[envVarName];
+  if (envValue) {
+    return envValue;
+  }
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+const userDataDir = resolveTempDir('VSCODE_TEST_USER_DATA_DIR', 'rifler-vscode-test-');
+const extensionsDir = resolveTempDir('VSCODE_TEST_EXTENSIONS_DIR', 'rifler-vscode-test-extensions-');
 
 module.exports = defineConfig([
   {

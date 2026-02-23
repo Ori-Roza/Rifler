@@ -20,6 +20,7 @@ module.exports = defineConfig([
     mocha: {
       ui: 'tdd',
       timeout: 20000,
+      reporter: 'spec',
     },
     launchArgs: [
       '--disable-workspace-trust',
@@ -36,6 +37,7 @@ module.exports = defineConfig([
     mocha: {
       ui: 'tdd',
       timeout: 20000,
+      reporter: 'spec',
     },
     launchArgs: [
       '--disable-workspace-trust',

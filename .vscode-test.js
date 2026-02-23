@@ -1,9 +1,14 @@
 const { defineConfig } = require('@vscode/test-cli');
+const os = require('os');
+const path = require('path');
 
 const vscodeExecutablePath = process.env.VSCODE_EXECUTABLE_PATH;
 const useInstallation = vscodeExecutablePath
   ? { fromPath: vscodeExecutablePath }
   : undefined;
+
+const userDataDir = path.join(os.tmpdir(), 'rifler-vscode-test');
+const extensionsDir = path.join(os.tmpdir(), 'rifler-vscode-test-extensions');
 
 module.exports = defineConfig([
   {
@@ -18,7 +23,8 @@ module.exports = defineConfig([
     },
     launchArgs: [
       '--disable-workspace-trust',
-      '--user-data-dir=/tmp/vscode-test'
+      `--user-data-dir=${userDataDir}`,
+      `--extensions-dir=${extensionsDir}`
     ],
   },
   {
@@ -33,7 +39,8 @@ module.exports = defineConfig([
     },
     launchArgs: [
       '--disable-workspace-trust',
-      '--user-data-dir=/tmp/vscode-test',
+      `--user-data-dir=${userDataDir}`,
+      `--extensions-dir=${extensionsDir}`,
       '--new-window',
       '--disable-gpu-sandbox',
     ],

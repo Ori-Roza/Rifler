@@ -1,62 +1,337 @@
-const { defineConfig } = require('@vscode/test-cli');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+name: PR Checks
 
-const vscodeExecutablePath = process.env.VSCODE_EXECUTABLE_PATH;
-const useInstallation = vscodeExecutablePath
-  ? { fromPath: vscodeExecutablePath }
-  : undefined;
-const extensionDevelopmentPath = __dirname;
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - master
+      - develop
 
-function resolveTempDir(envVarName, prefix) {
-  const envValue = process.env[envVarName];
-  if (envValue) {
-    return envValue;
-  }
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-}
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    steps:
+      - uses: actions/checkout@v6
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linter
+        run: npm run lint
 
-const userDataDir = resolveTempDir('VSCODE_TEST_USER_DATA_DIR', 'rifler-vscode-test-');
-const extensionsDir = resolveTempDir('VSCODE_TEST_EXTENSIONS_DIR', 'rifler-vscode-test-extensions-');
+  test:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node-version: [20.x]
+    
+    steps:
+      - uses: actions/checkout@v6
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run unit tests
+        run: npm test
 
-module.exports = defineConfig([
-  {
-    label: 'e2e-tests',
-    files: 'out/__tests__/e2e/suite/**/*.test.js',
-    version: 'stable',
-    useInstallation,
-    extensionDevelopmentPath,
-    workspaceFolder: './test-fixtures/workspace',
-    mocha: {
-      ui: 'tdd',
-      timeout: 20000,
-      reporter: 'spec',
-    },
-    launchArgs: [
-      '--disable-workspace-trust',
-      `--user-data-dir=${userDataDir}`,
-      `--extensions-dir=${extensionsDir}`
-    ],
-  },
-  {
-    label: 'e2e-tests-visible',
-    files: 'out/__tests__/e2e/suite/**/*.test.js',
-    version: 'stable',
-    useInstallation,
-    extensionDevelopmentPath,
-    workspaceFolder: './test-fixtures/workspace',
-    mocha: {
-      ui: 'tdd',
-      timeout: 20000,
-      reporter: 'spec',
-    },
-    launchArgs: [
-      '--disable-workspace-trust',
-      `--user-data-dir=${userDataDir}`,
-      `--extensions-dir=${extensionsDir}`,
-      '--new-window',
-      '--disable-gpu-sandbox',
-    ],
-  },
-], { concurrency: 1 });
+  build:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node-version: [20.x]
+    
+    steps:
+      - uses: actions/checkout@v6
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Compile TypeScript
+        run: npm run compile
+
+  e2e-test:
+    name: E2E (${{ matrix.distribution }}, ${{ matrix.os }}, ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node-version: [20.x]
+        distribution: [vscode, cursor, antigravity]
+
+    env:
+      CURSOR_LINUX_URL: https://api2.cursor.sh/updates/download/golden/linux-x64-deb/cursor/2.5
+      CURSOR_WINDOWS_URL: https://api2.cursor.sh/updates/download/golden/win32-x64-user/cursor/2.5
+      ANTIGRAVITY_WINDOWS_URL: https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/1.18.4-5780041996042240/windows-x64/Antigravity.exe
+    
+    steps:
+      - uses: actions/checkout@v6
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Compile TypeScript
+        run: npm run compile
+      
+      - name: Copy webview assets
+        run: npm run copy-webview
+
+      - name: Resolve E2E distribution (Linux)
+        if: runner.os == 'Linux' && matrix.distribution != 'vscode'
+        run: |
+          DOWNLOAD_URL=""
+          EXEC_PATH=""
+          case "${{ matrix.distribution }}" in
+            cursor)
+              DOWNLOAD_URL="${{ env.CURSOR_LINUX_URL }}"
+              EXEC_PATH="$GITHUB_WORKSPACE/e2e-app/usr/share/cursor/cursor"
+              ;;
+            antigravity)
+              sudo mkdir -p /etc/apt/keyrings
+              curl -fsSL https://us-central1-apt.pkg.dev/doc/repo-signing-key.gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/antigravity-repo-key.gpg
+              echo "deb [signed-by=/etc/apt/keyrings/antigravity-repo-key.gpg] https://us-central1-apt.pkg.dev/projects/antigravity-auto-updater-dev/ antigravity-debian main" | sudo tee /etc/apt/sources.list.d/antigravity.list > /dev/null
+              sudo apt-get update
+              sudo apt-get install -y antigravity
+              EXEC_PATH="/usr/bin/antigravity"
+              ;;
+          esac
+
+          if [ -n "$DOWNLOAD_URL" ]; then
+            mkdir -p e2e-app
+            ARCHIVE="e2e-app/app"
+            curl -fL -A "Mozilla/5.0" -H "Accept: application/octet-stream" "$DOWNLOAD_URL" -o "$ARCHIVE"
+
+            FILE_TYPE=$(file -b "$ARCHIVE")
+            case "$FILE_TYPE" in
+              *"Debian binary package"*)
+                dpkg-deb -x "$ARCHIVE" e2e-app
+                ;;
+              *"Zip archive"*)
+                unzip -q "$ARCHIVE" -d e2e-app
+                ;;
+              *"HTML"*|*"ASCII text"*)
+                echo "Downloaded file does not look like an app archive. File type: $FILE_TYPE" >&2
+                exit 1
+                ;;
+              *"gzip compressed"*)
+                tar -xzf "$ARCHIVE" -C e2e-app
+                ;;
+              *"XZ compressed"*)
+                tar -xJf "$ARCHIVE" -C e2e-app
+                ;;
+              *"bzip2 compressed"*)
+                tar -xjf "$ARCHIVE" -C e2e-app
+                ;;
+              *"ELF"*)
+                chmod +x "$ARCHIVE"
+                EXEC_PATH="$GITHUB_WORKSPACE/$ARCHIVE"
+                ;;
+              *)
+                echo "Unsupported archive type: $FILE_TYPE" >&2
+                exit 1
+                ;;
+            esac
+          fi
+
+          if [ -z "$EXEC_PATH" ]; then
+            if [ -x "$GITHUB_WORKSPACE/e2e-app/usr/share/antigravity/antigravity" ]; then
+              EXEC_PATH="$GITHUB_WORKSPACE/e2e-app/usr/share/antigravity/antigravity"
+            elif [ -x "$GITHUB_WORKSPACE/e2e-app/usr/bin/antigravity" ]; then
+              EXEC_PATH="$GITHUB_WORKSPACE/e2e-app/usr/bin/antigravity"
+            elif [ -x "$GITHUB_WORKSPACE/e2e-app/antigravity" ]; then
+              EXEC_PATH="$GITHUB_WORKSPACE/e2e-app/antigravity"
+            fi
+          fi
+
+          if [ -z "$EXEC_PATH" ] || [ ! -x "$EXEC_PATH" ]; then
+            echo "Could not resolve executable for ${{ matrix.distribution }}." >&2
+            exit 1
+          fi
+
+          echo "VSCODE_EXECUTABLE_PATH=$EXEC_PATH" >> "$GITHUB_ENV"
+
+      - name: Resolve E2E distribution (Windows)
+        if: runner.os == 'Windows' && matrix.distribution != 'vscode'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $downloadUrl = ""
+          $installerPath = ""
+          $execPath = ""
+          $candidatePaths = @()
+          $installArgsPrimary = @('/verysilent', '/norestart', '/sp-')
+          $installArgsFallback = @('/S')
+          $installTimeoutSeconds = 300
+          switch ("${{ matrix.distribution }}") {
+            "cursor" {
+              $downloadUrl = "${{ env.CURSOR_WINDOWS_URL }}"
+              $installerPath = Join-Path $env:GITHUB_WORKSPACE "e2e-app\CursorInstaller.exe"
+              $candidatePaths = @(
+                (Join-Path $env:LOCALAPPDATA "Programs\Cursor\Cursor.exe"),
+                "C:\Program Files\Cursor\Cursor.exe"
+              )
+            }
+            "antigravity" {
+              $downloadUrl = "${{ env.ANTIGRAVITY_WINDOWS_URL }}"
+              $installerPath = Join-Path $env:GITHUB_WORKSPACE "e2e-app\AntigravityInstaller.exe"
+              $localInstallDir = Join-Path $env:LOCALAPPDATA "Antigravity"
+              $installArgsPrimary = @('/verysilent', '/norestart', '/sp-', "/currentuser", "/dir=$localInstallDir")
+              $candidatePaths = @(
+                "C:\Program Files\Google\Antigravity\Antigravity.exe",
+                "C:\Program Files (x86)\Google\Antigravity\Antigravity.exe",
+                (Join-Path $env:LOCALAPPDATA "Google\Antigravity\Antigravity.exe"),
+                (Join-Path $env:LOCALAPPDATA "Programs\Antigravity\Antigravity.exe"),
+                (Join-Path $env:LOCALAPPDATA "Antigravity\Antigravity.exe")
+              )
+            }
+          }
+
+          if ([string]::IsNullOrWhiteSpace($downloadUrl)) {
+            Write-Error "Missing download URL for ${{ matrix.distribution }}."
+            exit 1
+          }
+
+          New-Item -ItemType Directory -Force -Path e2e-app | Out-Null
+          Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath
+
+          Write-Host "Downloaded installer to $installerPath"
+          Write-Host "Attempting silent install (primary args): $($installArgsPrimary -join ' ')"
+          $process = Start-Process -FilePath $installerPath -ArgumentList $installArgsPrimary -PassThru
+          $completed = $false
+          try {
+            Wait-Process -Id $process.Id -Timeout $installTimeoutSeconds | Out-Null
+            $completed = $true
+          } catch {
+            $completed = $false
+          }
+          if (-not $completed) {
+            Write-Host "Installer timed out after $installTimeoutSeconds seconds."
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          }
+
+          if (-not $completed -or $process.ExitCode -ne 0) {
+            Write-Host "Retrying silent install (fallback args): $($installArgsFallback -join ' ')"
+            $process = Start-Process -FilePath $installerPath -ArgumentList $installArgsFallback -PassThru
+            $completed = $false
+            try {
+              Wait-Process -Id $process.Id -Timeout $installTimeoutSeconds | Out-Null
+              $completed = $true
+            } catch {
+              $completed = $false
+            }
+            if (-not $completed) {
+              Write-Host "Fallback installer timed out after $installTimeoutSeconds seconds."
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          foreach ($candidate in $candidatePaths) {
+            if (Test-Path $candidate) {
+              $execPath = $candidate
+              break
+            }
+          }
+
+          if ([string]::IsNullOrWhiteSpace($execPath)) {
+            Write-Error "Installed executable not found for ${{ matrix.distribution }}."
+            exit 1
+          }
+
+          "VSCODE_EXECUTABLE_PATH=$execPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      
+      - name: Verify distribution (Linux)
+        if: runner.os == 'Linux' && matrix.distribution != 'vscode'
+        run: |
+          echo "VSCODE_EXECUTABLE_PATH=$VSCODE_EXECUTABLE_PATH"
+          if [ -z "$VSCODE_EXECUTABLE_PATH" ] || [ ! -x "$VSCODE_EXECUTABLE_PATH" ]; then
+            echo "Executable path is missing or not executable." >&2
+            exit 1
+          fi
+          VERSION_OUTPUT=$($VSCODE_EXECUTABLE_PATH --version 2>&1 || true)
+          echo "$VERSION_OUTPUT"
+
+      - name: Run E2E tests (Linux, VS Code)
+        if: runner.os == 'Linux' && matrix.distribution == 'vscode'
+        run: xvfb-run -a npm run test:e2e
+        env:
+          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+          VSCODE_TEST_USER_DATA_DIR: ${{ runner.temp }}/rifler-vscode-user-data-${{ github.run_id }}-${{ matrix.distribution }}
+          VSCODE_TEST_EXTENSIONS_DIR: ${{ runner.temp }}/rifler-vscode-extensions-${{ github.run_id }}-${{ matrix.distribution }}
+
+      - name: Run E2E tests (Linux, custom distribution)
+        if: runner.os == 'Linux' && matrix.distribution != 'vscode'
+        run: xvfb-run -a npm run test:e2e
+        env:
+          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+          VSCODE_TEST_USER_DATA_DIR: ${{ runner.temp }}/rifler-vscode-user-data-${{ github.run_id }}-${{ matrix.distribution }}
+          VSCODE_TEST_EXTENSIONS_DIR: ${{ runner.temp }}/rifler-vscode-extensions-${{ github.run_id }}-${{ matrix.distribution }}
+
+      - name: Verify distribution (Windows)
+        if: runner.os == 'Windows' && matrix.distribution != 'vscode'
+        shell: pwsh
+        run: |
+          Write-Host "VSCODE_EXECUTABLE_PATH=$env:VSCODE_EXECUTABLE_PATH"
+          if ([string]::IsNullOrWhiteSpace($env:VSCODE_EXECUTABLE_PATH) -or -not (Test-Path $env:VSCODE_EXECUTABLE_PATH)) {
+            Write-Error "Executable path is missing or not found."
+            exit 1
+          }
+          $versionOutput = & $env:VSCODE_EXECUTABLE_PATH --version 2>&1
+          Write-Host $versionOutput
+
+      - name: Run E2E tests (Windows, VS Code)
+        if: runner.os == 'Windows' && matrix.distribution == 'vscode'
+        run: npm run test:e2e
+        env:
+          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+          VSCODE_TEST_USER_DATA_DIR: ${{ runner.temp }}\rifler-vscode-user-data-${{ github.run_id }}-${{ matrix.distribution }}
+          VSCODE_TEST_EXTENSIONS_DIR: ${{ runner.temp }}\rifler-vscode-extensions-${{ github.run_id }}-${{ matrix.distribution }}
+
+      - name: Run E2E tests (Windows, custom distribution)
+        if: runner.os == 'Windows' && matrix.distribution != 'vscode'
+        run: npm run test:e2e
+        env:
+          VSCODE_TEST_DISABLE_WORKSPACE_TRUST: true
+          VSCODE_TEST_USER_DATA_DIR: ${{ runner.temp }}\rifler-vscode-user-data-${{ github.run_id }}-${{ matrix.distribution }}
+          VSCODE_TEST_EXTENSIONS_DIR: ${{ runner.temp }}\rifler-vscode-extensions-${{ github.run_id }}-${{ matrix.distribution }}
+
+      - name: Cleanup E2E apps (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-Process Antigravity -ErrorAction SilentlyContinue | Stop-Process -Force
+          Get-Process Cursor -ErrorAction SilentlyContinue | Stop-Process -Force

@@ -253,8 +253,9 @@ async function fallbackSearchInDirectory(
       const [entryName, entryType] = entry;
       const fullPath = path.join(dirPath, entryName);
       if (entryType === vscode.FileType.Directory) {
-        const shouldExclude = smartExcludesEnabled && EXCLUDE_DIRS.has(entryName);
-        if (!shouldExclude && !entryName.startsWith('.')) {
+        const isDotDir = entryName.startsWith('.');
+        const shouldExclude = smartExcludesEnabled && (EXCLUDE_DIRS.has(entryName) || isDotDir);
+        if (!shouldExclude) {
           tasks.push(fallbackSearchInDirectory(fullPath, regex, fileMask, results, maxResults, limiter, perFileTimeBudgetMs, smartExcludesEnabled));
         }
       } else if (entryType === vscode.FileType.File) {

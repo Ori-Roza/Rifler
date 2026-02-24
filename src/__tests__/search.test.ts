@@ -183,7 +183,7 @@ describe('Search', () => {
         expect(calls).not.toContain('/workspace/node_modules');
       });
 
-      test('should exclude hidden directories', async () => {
+      test('should exclude hidden directories when smart excludes are enabled', async () => {
         const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
         (vscode.workspace as any).workspaceFolders = [workspaceFolder];
         
@@ -198,10 +198,30 @@ describe('Search', () => {
           return Promise.resolve([]);
         });
 
-        await performSearch('test', 'project', defaultOptions);
+        await performSearch('test', 'project', defaultOptions, undefined, undefined, 10000, true);
 
         const calls = mockWorkspaceFs.readDirectory.mock.calls.map(c => c[0].fsPath);
         expect(calls).not.toContain('/workspace/.git');
+      });
+
+      test('should include hidden directories when smart excludes are disabled', async () => {
+        const workspaceFolder = { uri: { fsPath: '/workspace' }, name: 'test', index: 0 };
+        (vscode.workspace as any).workspaceFolders = [workspaceFolder];
+
+        mockWorkspaceFs.readDirectory.mockImplementation((uri: vscode.Uri) => {
+          if (uri.fsPath === '/workspace') {
+            return Promise.resolve([
+              ['.github', vscode.FileType.Directory],
+              ['src', vscode.FileType.Directory]
+            ]);
+          }
+          return Promise.resolve([]);
+        });
+
+        await performSearch('test', 'project', defaultOptions, undefined, undefined, 10000, false);
+
+        const calls = mockWorkspaceFs.readDirectory.mock.calls.map(c => c[0].fsPath);
+        expect(calls).toContain('/workspace/.github');
       });
     });
 

@@ -26,9 +26,12 @@ suite('Rifler Smart Excludes E2E', () => {
   let workspaceRoot: string;
   let nodeModulesDir: string;
   let nodeModulesFile: string;
+  let hiddenDir: string;
+  let hiddenFile: string;
   let regularFile: string;
 
   const searchToken = 'smart_exclude_test_token_xyz';
+  const hiddenToken = 'smart_exclude_hidden_token_abc';
 
   before(async () => {
     const extension = vscode.extensions.getExtension('Ori-Roza.rifler');
@@ -60,6 +63,12 @@ suite('Rifler Smart Excludes E2E', () => {
     regularFile = path.join(workspaceRoot, 'regular-file.ts');
     fs.writeFileSync(regularFile, `// This file should always appear\nexport const token = "${searchToken}";\n`);
 
+    // Create hidden directory and file with its own token
+    hiddenDir = path.join(workspaceRoot, '.github');
+    fs.mkdirSync(hiddenDir, { recursive: true });
+    hiddenFile = path.join(hiddenDir, 'workflow.yml');
+    fs.writeFileSync(hiddenFile, `name: Hidden Test\n- name: Run unit tests\n  token: "${hiddenToken}"\n`);
+
     // Wait for file system to update
     await new Promise((resolve) => setTimeout(resolve, 1000));
   });
@@ -74,6 +83,12 @@ suite('Rifler Smart Excludes E2E', () => {
     try {
       if (fs.existsSync(regularFile)) {
         fs.unlinkSync(regularFile);
+      }
+      if (fs.existsSync(hiddenFile)) {
+        fs.unlinkSync(hiddenFile);
+      }
+      if (fs.existsSync(hiddenDir)) {
+        fs.rmSync(hiddenDir, { recursive: true, force: true });
       }
       const nodeModulesRoot = path.join(workspaceRoot, 'node_modules');
       if (fs.existsSync(nodeModulesRoot)) {
@@ -167,5 +182,36 @@ suite('Rifler Smart Excludes E2E', () => {
       return fsPath.includes('node_modules');
     });
     assert.ok(nodeModulesHit, 'Expected node_modules file to be included when smart excludes is OFF');
+  });
+
+  test('Smart excludes OFF should include hidden directories', async function () {
+    this.timeout(25000);
+
+    await vscode.commands.executeCommand('rifler._openWindowInternal');
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    const panel = testHelpers.getCurrentPanel();
+    assert.ok(panel, 'Panel should be open');
+
+    const hiddenFileExists = fs.existsSync(hiddenFile);
+    console.log('[E2E] File check - hidden:', hiddenFileExists, hiddenFile);
+    assert.ok(hiddenFileExists, 'Hidden file should exist');
+
+    // Disable smart excludes checkbox
+    panel.webview.postMessage({ type: '__test_setSmartExcludes', enabled: false });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // Run search
+    const searchDone = waitForMessage<{ type: string; results: any[] }>(panel.webview, '__test_searchCompleted');
+    panel.webview.postMessage({ type: '__test_setSearchInput', value: hiddenToken });
+
+    const msg = await searchDone;
+    const results = Array.isArray(msg.results) ? msg.results : [];
+
+    const hiddenHit = results.some((r) => {
+      const fsPath = vscode.Uri.parse(r.uri).fsPath;
+      return path.resolve(fsPath) === path.resolve(hiddenFile);
+    });
+    assert.ok(hiddenHit, 'Expected hidden file to be included when smart excludes is OFF');
   });
 });

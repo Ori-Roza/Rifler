@@ -245,6 +245,7 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
   // This allows searching in node_modules and other typically-ignored directories
   if (smartExcludesEnabled === false) {
     args.push('--no-ignore');
+    args.push('--hidden');
   }
 
   args.push(...buildGlobArgs(fileMask, smartExcludesEnabled ?? true));

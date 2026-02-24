@@ -3544,6 +3544,7 @@ console.log('[Rifler] Webview script starting...');
       }
 
       console.log('Sending search message:', message);
+      console.log('[Rifler Webview] Search payload:', JSON.stringify(message));
       vscode.postMessage(message);
     } catch (error) {
       console.error('Error in runSearch:', error);

@@ -94,6 +94,8 @@ export async function filterResultsByCodeContext(
     return [];
   }
 
+  const contextFiltersActive = !(includeCode && includeComments && includeStrings);
+
   const resultsByFile = new Map<string, SearchResult[]>();
   for (const result of results) {
     const list = resultsByFile.get(result.uri) || [];
@@ -106,12 +108,18 @@ export async function filterResultsByCodeContext(
   for (const [uri, fileResults] of resultsByFile.entries()) {
     const languageId = getLanguageIdFromFileName(fileResults[0]?.fileName || '');
     if (!languageId || !SUPPORTED_LANGUAGES.has(languageId)) {
+      if (contextFiltersActive && !includeStrings) {
+        continue;
+      }
       filtered.push(...fileResults);
       continue;
     }
 
     const config = LANGUAGE_CONFIGS[languageId];
     if (!config) {
+      if (contextFiltersActive && !includeStrings) {
+        continue;
+      }
       filtered.push(...fileResults);
       continue;
     }

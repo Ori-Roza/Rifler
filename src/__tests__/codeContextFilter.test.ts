@@ -245,4 +245,33 @@ describe('Code context filtering', () => {
     });
     assert.strictEqual(none.length, 0);
   });
+
+  test('drops unsupported language results when strings are excluded', async () => {
+    const results: SearchResult[] = [
+      {
+        uri: 'file:///test/foo.yml',
+        fileName: 'foo.yml',
+        relativePath: 'foo.yml',
+        line: 0,
+        character: 10,
+        length: 4,
+        preview: '- name: Run unit tests',
+        previewMatchRange: { start: 10, end: 14 },
+        previewMatchRanges: [{ start: 10, end: 14 }],
+        matchRanges: [{ start: 10, end: 14 }]
+      }
+    ];
+
+    const filtered = await filterResultsByCodeContext(results, {
+      matchCase: false,
+      wholeWord: false,
+      useRegex: false,
+      fileMask: '',
+      includeCode: true,
+      includeComments: true,
+      includeStrings: false
+    });
+
+    assert.strictEqual(filtered.length, 0);
+  });
 });

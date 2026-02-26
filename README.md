@@ -21,7 +21,7 @@
 ## Features
 
 - **Dynamic Search** - Results appear as you type (no Find button needed)
-- **QuickPick Search** - A keyboard-first QuickPick search mode with live results and inline filters
+- **QuickPick Search** - A keyboard-first QuickPick search mode with live results, inline filters, and a "Show all results in Rifler" overflow for larger queries
 - **Search From Selection** - Select text in the editor, then open Rifler and it will be used as the initial search query
 - **Fresh State** - Automatically clears search results and state when switching workspaces
 - **High Performance**
@@ -122,7 +122,8 @@ Use **Rifler: Search in Files (QuickPick)** for a lightweight, keyboard-first se
 1. Press `Cmd+Alt+P` (Mac) or `Ctrl+Alt+P` (Windows/Linux)
 2. Type your query (results appear as you type)
 3. Toggle **Match Case**, **Whole Word**, and **Regex** using the QuickPick buttons
-4. Press `Enter` to open the selected result in the editor
+4. If results hit the cap, select **Show all results in Rifler** to open the full panel with the same query
+5. Press `Enter` to open the selected result in the editor
 
 ### QuickPick Replace
 
@@ -131,7 +132,8 @@ Use **Rifler: Replace in Files (QuickPick)** for a fast replace flow:
 1. Run **Rifler: Replace in Files (QuickPick)** from the Command Palette
 2. Type your query (results appear as you type)
 3. Toggle **Match Case**, **Whole Word**, and **Regex** using the QuickPick buttons
-4. Select a match, enter replacement text, then choose **Replace One** or **Replace All**
+4. If results hit the cap, select **Show all results in Rifler** to open the full panel in replace mode
+5. Select a match, enter replacement text, then choose **Replace One** or **Replace All**
 
 ### Usage-Aware Search (LSP)
 

@@ -269,14 +269,6 @@ const openQuickPickReplaceCommand = vscode.commands.registerCommand(
   "description": "Use QuickPick UI instead of webview for search"
 },
 
-"rifler.quickPickMaxItems": {
-  "type": "integer",
-  "default": 50,
-  "minimum": 10,
-  "maximum": 500,
-  "description": "Maximum items to show in quick pick"
-},
-
 "rifler.quickPickPreviewLines": {
   "type": "integer",
   "default": 2,

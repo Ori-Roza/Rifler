@@ -7,8 +7,7 @@ type QuickPickSearchItem = vscode.QuickPickItem & { result?: SearchResult };
 
 export async function quickPickCommand(ctx: CommandContext): Promise<void> {
   const config = vscode.workspace.getConfiguration('rifler');
-  const maxItemsRaw = config.get<number>('quickPickMaxItems', 50);
-  const maxItems = Math.max(1, Math.floor(maxItemsRaw || 50));
+  const MAX_ITEMS = 50;
   const includeCode = config.get<boolean>('searchContext.includeCode', true);
   const includeComments = config.get<boolean>('searchContext.includeComments', true);
   const includeStrings = config.get<boolean>('searchContext.includeStrings', true);
@@ -72,10 +71,19 @@ export async function quickPickCommand(ctx: CommandContext): Promise<void> {
     };
 
     try {
-      const results = await performSearch(trimmed, 'project', options, undefined, undefined, maxItems, true);
+      const results = await performSearch(trimmed, 'project', options, undefined, undefined, MAX_ITEMS, true);
       if (disposed || currentSearchId !== searchCounter) return;
 
-      quickPick.items = results.slice(0, maxItems).map((result) => toQuickPickItem(result));
+      const items = results.slice(0, MAX_ITEMS).map((result) => toQuickPickItem(result));
+      if (results.length >= MAX_ITEMS) {
+        items.push({
+          label: '$(link-external) Show all results in Rifler',
+          description: '',
+          detail: `Search for "${trimmed}" in the full Rifler panel`,
+          alwaysShow: true
+        });
+      }
+      quickPick.items = items;
     } catch (error) {
       console.error('[Rifler] QuickPick search failed:', error);
       if (disposed || currentSearchId !== searchCounter) return;
@@ -127,6 +135,14 @@ export async function quickPickCommand(ctx: CommandContext): Promise<void> {
   });
   quickPick.onDidAccept(async () => {
     const selected = quickPick.selectedItems[0];
+    if (selected && !selected.result) {
+      quickPick.hide();
+      await ctx.viewManager.openView({
+        initialQuery: quickPick.value.trim(),
+        initialQueryFocus: false
+      });
+      return;
+    }
     if (selected?.result) {
       await openLocation(selected.result.uri, selected.result.line, selected.result.character);
     }

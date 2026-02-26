@@ -164,13 +164,6 @@
     "configuration": {
       "title": "Rifler",
       "properties": {
-        "rifler.quickPickMaxItems": {
-          "type": "number",
-          "default": 50,
-          "minimum": 5,
-          "markdownDescription": "Maximum number of QuickPick results to display.",
-          "order": 11
-        },
         "rifler.persistSearchState": {
           "type": "boolean",
           "default": true,

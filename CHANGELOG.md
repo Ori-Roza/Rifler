@@ -2,6 +2,73 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.3](https://github.com/Ori-Roza/Rifler/compare/v1.2.2...v1.2.3) (2026-02-19)
+
+
+### Features
+
+* add QuickPick search and replace ([467607b](https://github.com/Ori-Roza/Rifler/commit/467607b97a58e385900621712d4412d3d1380967))
+* add QuickPick overflow option for full Rifler search ([0a7bab1](https://github.com/Ori-Roza/Rifler/commit/0a7bab1a77b33835c3b22c776be5db2b13aa8cbc))
+* allow hidden directories when smart excludes are off ([c19e534](https://github.com/Ori-Roza/Rifler/commit/c19e5348352a11e8ae41db1f7b69a22f7804b2a1))
+* add sidebar toggle functionality to restore previous container ([3e5301f](https://github.com/Ori-Roza/Rifler/commit/3e5301f01f1f0a77bfe70b591d4de7836de5c7f3))
+* default to first result on openActiveResult ([b062c46](https://github.com/Ori-Roza/Rifler/commit/b062c46175fcb7f5bb0f78aa584a8cd59a10c260))
+
+
+### Bug Fixes
+
+* update component name and adjust QuickPick settings ([7110ac1](https://github.com/Ori-Roza/Rifler/commit/7110ac1516992833c3c0a7a1088f6824c5ce620e))
+* fix E2E tests to handle missing initial container gracefully ([991b636](https://github.com/Ori-Roza/Rifler/commit/991b63667058dcf63407c21c411c54e0029f3ca2))
+* fix E2E tests to ensure initial container is correctly identified and fallback is applied ([8ed4bed](https://github.com/Ori-Roza/Rifler/commit/8ed4bed3c2d0762a9fd4f50f2cd87f10f8592100))
+
+
+### Documentation
+
+* add documentation for Context Filters and Usage-Aware Search features ([79875bb](https://github.com/Ori-Roza/Rifler/commit/79875bb8c17d75d05ba6aa7f51f67e1a0bc9f7d4))
+* document QuickPick overflow behavior ([ee89bdb](https://github.com/Ori-Roza/Rifler/commit/ee89bdb51e888af9d05383f1332aa0962803b5d0))
+
+
+### Security
+
+* enforce workspace path validation ([a79b17a](https://github.com/Ori-Roza/Rifler/commit/a79b17adb410d30cd3f8a4d95bb5faad2ce6d51f))
+
+
+### Refactoring
+
+* enhance filtering logic and logging in search functionality ([e8e502e](https://github.com/Ori-Roza/Rifler/commit/e8e502eff576cd46ef3486f952ef6588c88f12ca))
+* normalize Windows paths in search tests ([291fd5a](https://github.com/Ori-Roza/Rifler/commit/291fd5aa874a0cf699d2d7a5d83e54370f9056ef))
+* refactor temporary directory resolution in E2E test configuration ([449bb60](https://github.com/Ori-Roza/Rifler/commit/449bb60c3d9a0d2ebd61f8ebc299d6f2c7d62938))
+* refactor PR checks workflow configuration ([b89cfca](https://github.com/Ori-Roza/Rifler/commit/b89cfcad16093d5f4f3bdc8ba0483d6581641cf8))
+* refactor antigravity installation and cleanup ([614e158](https://github.com/Ori-Roza/Rifler/commit/614e1587c2806d61ece7aa81613af9c0c0035f91))
+
+
+### Chore
+
+* add E2E test configuration and update test scripts ([84393ff](https://github.com/Ori-Roza/Rifler/commit/84393ff3a8f48c7c1a901998ded8b65adcc8d6ed))
+* add E2E test verification script and update test commands ([d720e28](https://github.com/Ori-Roza/Rifler/commit/d720e287c384ac4a58c5bfa6b79d44bb21d8a31c))
+* add E2E test job to PR checks workflow ([9c81a20](https://github.com/Ori-Roza/Rifler/commit/9c81a20df39cdefb7ab4f86c50cb1d2b9ba35585))
+* add extensionDevelopmentPath to E2E test configuration ([8e21470](https://github.com/Ori-Roza/Rifler/commit/8e2147019e6b42b413d57e5c94d9e475f1ad0f2a))
+* add support for cursor and antigravity distributions ([cc5911f](https://github.com/Ori-Roza/Rifler/commit/cc5911f1cf62a605a3a99cf51f111cfd6b7376f4))
+* add '--disable-extensions' launch argument and downgrade VS Code engine version ([824e67d](https://github.com/Ori-Roza/Rifler/commit/824e67d5fb1c659c48118a302d92a9bd1d7af3fc))
+* add distribution verification for Linux and Windows ([6ff54ad](https://github.com/Ori-Roza/Rifler/commit/6ff54adc9cf1ccefe0b1c6c11bedbb38f9b0ed63))
+* add vscodeExecutablePath for test configuration ([515c408](https://github.com/Ori-Roza/Rifler/commit/515c40882ea59acbcf55dfd55d3544b84967174c))
+* update E2E test configurations for Linux and Windows ([2aa687d](https://github.com/Ori-Roza/Rifler/commit/2aa687da0aad23c4c3b2d5560b11969b5b1a225d))
+* update E2E test scripts to include '--fail-zero' flag for better error handling ([81cceb4](https://github.com/Ori-Roza/Rifler/commit/81cceb4e4ee11e32427312d61da90dc70f0f4db9))
+* update launch arguments for VS Code test configuration ([9fe21c1](https://github.com/Ori-Roza/Rifler/commit/9fe21c1f373bd6c8fc10b6b31c51fdd0d7a19f31))
+* update pr-checks workflow configuration ([00f1fdd](https://github.com/Ori-Roza/Rifler/commit/00f1fdd1f7fc1c8e706082e9b18ddb2d0741b7d0))
+* update pr-checks workflow configuration ([20913ab](https://github.com/Ori-Roza/Rifler/commit/20913ab5289c1a0f136da2a8038245e7c5994541))
+* update pr-checks workflow configuration ([6884907](https://github.com/Ori-Roza/Rifler/commit/68849070e7014eb537a888c3f1b6f86b4d3fbe7c))
+* update pr-checks workflow configuration ([e17ae6c](https://github.com/Ori-Roza/Rifler/commit/e17ae6c8d2d639f366702d58b64a77f07bb97d49))
+* update pr-checks workflow configuration ([f8a7860](https://github.com/Ori-Roza/Rifler/commit/f8a7860a2c2d524ece1ea09e5ef3f2e32d47d092))
+* update pr-checks workflow configuration ([fec0e7d](https://github.com/Ori-Roza/Rifler/commit/fec0e7d048585f316079934ecb75d6c7c37ce84e))
+* modify Windows installer logic in PR checks workflow ([e92ac32](https://github.com/Ori-Roza/Rifler/commit/e92ac321078d420c8c1503a69a8c10e491ace056))
+* reintroduce distribution and environment variables ([140a891](https://github.com/Ori-Roza/Rifler/commit/140a891392af1e60af5f155bb8ed17ed5a59e8a4))
+* remove distribution checks for version verification ([d85fbab](https://github.com/Ori-Roza/Rifler/commit/d85fbab184f655cf4dc075d9b63b5c35947c5d4a))
+* simplify E2E test commands by removing executable path ([322625c](https://github.com/Ori-Roza/Rifler/commit/322625c1189c9f661876e7ee7f1c29be8739c1c7))
+* drop analysis export from PR ([10e3212](https://github.com/Ori-Roza/Rifler/commit/10e3212080f25ed8c847da242cae0221d5a6b9d8))
+* revert VS Code engine version to ^1.105.0 in package.json ([4d32fd4](https://github.com/Ori-Roza/Rifler/commit/4d32fd4dc3b9e0209c761c5c29812de654168bb9))
+* revert @types/vscode version to ^1.105.0 in package.json ([e27b718](https://github.com/Ori-Roza/Rifler/commit/e27b718c59108153b5a2cc9b60ec2e26e46b6352))
+* bump version to 1.2.3 ([7362d5d](https://github.com/Ori-Roza/Rifler/commit/7362d5d3111b427cf0e7a34fc04b05f06c56f5eb))
+
 ## [1.1.4](https://github.com/Ori-Roza/Rifler/compare/v1.1.3...v1.1.4) (2026-01-01)
 
 

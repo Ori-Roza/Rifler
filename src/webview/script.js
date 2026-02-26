@@ -5018,8 +5018,13 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function openActiveResult() {
-    if (state.activeIndex < 0 || state.activeIndex >= state.results.length) return;
-    const result = state.results[state.activeIndex];
+    let activeIndex = state.activeIndex;
+    if (activeIndex < 0 && state.results.length > 0) {
+      activeIndex = 0;
+      state.activeIndex = 0;
+    }
+    if (activeIndex < 0 || activeIndex >= state.results.length) return;
+    const result = state.results[activeIndex];
     vscode.postMessage({
       type: 'openLocation',
       uri: result.uri,

@@ -220,7 +220,9 @@ describe('Search', () => {
 
         await performSearch('test', 'project', defaultOptions, undefined, undefined, 10000, false);
 
-        const calls = mockWorkspaceFs.readDirectory.mock.calls.map(c => c[0].fsPath);
+        const calls = mockWorkspaceFs.readDirectory.mock.calls
+          .map(c => c[0].fsPath)
+          .map((fsPath) => fsPath.replace(/\\/g, '/'));
         expect(calls).toContain('/workspace/.github');
       });
     });

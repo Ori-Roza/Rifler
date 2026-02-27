@@ -88,6 +88,13 @@
 - `Cmd+Alt+Y` (Mac) / `Ctrl+Alt+Y` (Windows/Linux) - QuickPick replace
   - `Escape` - Exit edit mode or focus search box
 
+## Telemetry
+
+- Rifler sends anonymous usage telemetry to improve the extension.
+- It follows the global VS Code telemetry setting; disable VS Code telemetry to stop sends.
+- Search query text is not sent—only metadata like query length, filters, and result counts.
+- A one-time notice appears on first run with a link to view the telemetry output channel.
+
 ## Usage
 
 ### Opening Rifler

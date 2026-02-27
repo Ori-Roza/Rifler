@@ -15,7 +15,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
   );
   const scriptUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'script.js')
-  );
+  ).with({ query: `v=${Date.now()}` });
   const toolkitUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'node_modules', '@vscode/webview-ui-toolkit', 'dist', 'toolkit.js')
   );

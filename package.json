@@ -9,6 +9,15 @@
   "engines": {
     "vscode": "^1.105.0"
   },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "tags": [
+    "telemetry",
+    "usesOnlineServices"
+  ],
   "categories": [
     "Other"
   ],
@@ -29,7 +38,17 @@
     "fast search",
     "code search"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:rifler.sidebarView",
+    "onView:rifler.bottomView",
+    "onCommand:rifler.open",
+    "onCommand:rifler.openReplace",
+    "onCommand:rifler.openSidebar",
+    "onCommand:rifler.openSidebarReplace",
+    "onCommand:rifler.quickPick",
+    "onCommand:rifler.quickPickReplace",
+    "onCommand:rifler.showTelemetryOutput"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -117,6 +136,10 @@
         "command": "rifler.quickPickReplace",
         "title": "Rifler: Replace in Files (QuickPick)",
         "icon": "$(replace)"
+      },
+      {
+        "command": "rifler.showTelemetryOutput",
+        "title": "Rifler: Show Telemetry Output"
       }
     ],
     "menus": {
@@ -266,6 +289,7 @@
           "markdownDescription": "Include string literal matches by default when running a search.",
           "order": 14
         }
+        
       }
     }
   },

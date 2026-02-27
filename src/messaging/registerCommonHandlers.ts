@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { MessageHandler } from './handler';
 import { performSearch } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
-import { validateRegex, validateFileMask, SearchOptions, SearchScope } from '../utils';
+import { validateRegex, validateFileMask, SearchOptions, SearchScope, SearchResult } from '../utils';
+import { getTelemetryLogger } from '../telemetry';
 import { validateDirectoryPath } from '../security/pathValidation';
 import { StateStore } from '../state/StateStore';
 import { detectProjectTypes } from '../projectDetector';
@@ -25,18 +26,15 @@ export interface CommonHandlerDeps {
   stateStore?: StateStore;
 }
 
+let lastSearchTelemetry: Record<string, unknown> | undefined;
+
 export function registerCommonHandlers(handler: MessageHandler, deps: CommonHandlerDeps) {
   handler.registerHandler('runSearch', async (message) => {
     const msg = message as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; smartExcludesEnabled?: boolean; exclusionPatterns?: string };
-    console.log('[Rifler] runSearch handler called:', {
-      query: msg.query,
-      scope: msg.scope,
-      hasDirectoryPath: !!msg.directoryPath,
-      directoryPath: msg.directoryPath,
-      options: msg.options,
-      smartExcludesEnabled: msg.smartExcludesEnabled,
-      exclusionPatterns: msg.exclusionPatterns
-    });
+
+    const telemetryLogger = getTelemetryLogger();
+
+    const startTime = Date.now();
 
     const mergedFileMask = (msg.smartExcludesEnabled && msg.exclusionPatterns)
       ? (msg.options.fileMask ? `${msg.options.fileMask},${msg.exclusionPatterns}` : msg.exclusionPatterns)
@@ -57,16 +55,68 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       }
     }
 
-    const results = await performSearch(
-      msg.query,
-      msg.scope,
-      { ...msg.options, fileMask: mergedFileMask },
-      directoryPath,
-      msg.modulePath,
-      10000,
-      msg.smartExcludesEnabled ?? true
-    );
-    console.log('[Rifler] Search returned', results.length, 'results');
+    let results: SearchResult[] = [];
+    let searchError: string | undefined;
+    try {
+      results = await performSearch(
+        msg.query,
+        msg.scope,
+        { ...msg.options, fileMask: mergedFileMask },
+        directoryPath,
+        msg.modulePath,
+        10000,
+        msg.smartExcludesEnabled ?? true
+      );
+      console.log('[Rifler] Search returned', results.length, 'results');
+    } catch (error) {
+      searchError = error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      const durationMs = Date.now() - startTime;
+
+      telemetryLogger?.logUsage('search_completed', {
+        duration_ms: durationMs,
+        results_count: results.length,
+        query_length: msg.query?.length ?? 0,
+        search_engine: 'rg',
+        scope: msg.scope,
+        search_mode: 'text',
+        regex_enabled: !!msg.options.useRegex,
+        match_case: !!msg.options.matchCase,
+        whole_word: !!msg.options.wholeWord,
+        multiline: !!msg.options.multiline,
+        smart_excludes_enabled: msg.smartExcludesEnabled ?? true,
+        include_code: msg.options.includeCode ?? true,
+        include_comments: msg.options.includeComments ?? true,
+        include_strings: msg.options.includeStrings ?? true,
+        file_mask_count: (mergedFileMask ? mergedFileMask.split(/[;,]+/).filter(Boolean).length : 0),
+        has_exclusion_patterns: !!msg.exclusionPatterns,
+        query_rows: (message as { queryRows?: number }).queryRows ?? 1,
+        error: searchError,
+      });
+
+      lastSearchTelemetry = {
+        event: 'search_completed',
+        duration_ms: durationMs,
+        results_count: results.length,
+        query_length: msg.query?.length ?? 0,
+        search_engine: 'rg',
+        scope: msg.scope,
+        search_mode: 'text',
+        regex_enabled: !!msg.options.useRegex,
+        match_case: !!msg.options.matchCase,
+        whole_word: !!msg.options.wholeWord,
+        multiline: !!msg.options.multiline,
+        smart_excludes_enabled: msg.smartExcludesEnabled ?? true,
+        include_code: msg.options.includeCode ?? true,
+        include_comments: msg.options.includeComments ?? true,
+        include_strings: msg.options.includeStrings ?? true,
+        file_mask_count: (mergedFileMask ? mergedFileMask.split(/[;,]+/).filter(Boolean).length : 0),
+        has_exclusion_patterns: !!msg.exclusionPatterns,
+        query_rows: (message as { queryRows?: number }).queryRows ?? 1,
+        error: searchError,
+      };
+    }
 
     if (deps.stateStore) {
       deps.stateStore.recordSearch({
@@ -87,7 +137,7 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       deps.postMessage({ type: 'searchHistory', entries: deps.stateStore.getSearchHistory() });
     }
 
-    deps.postMessage({ type: 'searchResults', results, maxResults: 10000 });
+    deps.postMessage({ type: 'searchResults', results, maxResults: 10000, telemetry: lastSearchTelemetry });
   });
 
   handler.registerHandler('__test_clearSearchHistory', async () => {
@@ -110,6 +160,10 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
   handler.registerHandler('openLocation', async (message) => {
     const msg = message as { uri: string; line: number; character: number; };
     await deps.openLocation(msg.uri, msg.line, msg.character);
+    const telemetryLogger = getTelemetryLogger();
+    telemetryLogger?.logUsage('file_opened', {
+      source: 'search_result',
+    });
   });
 
   handler.registerHandler('getModules', async () => {
@@ -174,6 +228,10 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
   handler.registerHandler('replaceOne', async (message) => {
     const msg = message as { uri: string; line: number; character: number; length: number; replaceText: string };
     await replaceOne(msg.uri, msg.line, msg.character, msg.length, msg.replaceText);
+    const telemetryLogger = getTelemetryLogger();
+    telemetryLogger?.logUsage('replace_one', {
+      is_regex: false,
+    });
   });
 
   handler.registerHandler('replaceAll', async (message) => {
@@ -197,6 +255,13 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
         deps.postMessage({ type: 'searchResults', results, maxResults: 10000 });
       }
     );
+    const telemetryLogger = getTelemetryLogger();
+    telemetryLogger?.logUsage('replace_all', {
+      scope: msg.scope,
+      is_regex: !!msg.options.useRegex,
+      match_case: !!msg.options.matchCase,
+      whole_word: !!msg.options.wholeWord,
+    });
   });
 
   handler.registerHandler('validateRegex', async (message) => {
@@ -228,7 +293,11 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
   // Test-only: echo search completion back to webview so e2e hooks can resolve
   handler.registerHandler('__test_searchCompleted', async (message) => {
     const msg = message as { results?: unknown[] };
-    deps.postMessage({ type: '__test_searchCompleted', results: msg.results });
+    deps.postMessage({
+      type: '__test_searchCompleted',
+      results: msg.results,
+      telemetry: lastSearchTelemetry,
+    });
   });
 
   handler.registerHandler('executeCommand', async (message) => {

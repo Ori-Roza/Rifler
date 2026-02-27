@@ -14,6 +14,7 @@ import { quickPickReplaceCommand } from './quickPickReplace';
 import { openWindowInternalCommand } from './internal/openWindowInternal';
 import { closeWindowInternalCommand } from './internal/closeWindowInternal';
 import { testEnsureOpenCommand } from './internal/testEnsureOpen';
+import { showTelemetryOutput } from '../telemetry';
 
 // Re-export command functions for external use
 export { openCommand } from './open';
@@ -51,6 +52,7 @@ export function registerCommands(ctx: CommandContext): void {
     vscode.commands.registerCommand('rifler.findUsages', () => findUsagesCommand(ctx)),
     vscode.commands.registerCommand('rifler.quickPick', () => quickPickCommand(ctx)),
     vscode.commands.registerCommand('rifler.quickPickReplace', () => quickPickReplaceCommand(ctx)),
+    vscode.commands.registerCommand('rifler.showTelemetryOutput', () => showTelemetryOutput()),
     vscode.commands.registerCommand('rifler._openWindowInternal', (options?: { initialQuery?: string; showReplace?: boolean }) =>
       openWindowInternalCommand(ctx, options)
     ),

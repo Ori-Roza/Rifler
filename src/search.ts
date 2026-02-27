@@ -16,6 +16,7 @@ import {
 import { startRipgrepSearch } from './rgSearch';
 import { validateDirectoryPath } from './security/pathValidation';
 import { filterResultsByCodeContext } from './codeContextFilter';
+import { getTelemetryLogger } from './telemetry';
 
 type RootSpec = { fsPath: string; type: vscode.FileType };
 
@@ -141,6 +142,9 @@ export async function performSearch(
       activeSearchCancel = undefined;
     }
     console.error('Error during ripgrep search:', error);
+    getTelemetryLogger()?.logError(error instanceof Error ? error : new Error(String(error)), {
+      stage: 'ripgrep',
+    });
     // Fallback to JS search to preserve behavior (useful for tests or missing rg)
     try {
       const results: SearchResult[] = [];
@@ -160,7 +164,10 @@ export async function performSearch(
       }
       const rootFiltered = filterResultsToRoots(results, rootSpecs);
       return await filterResultsByCodeContext(rootFiltered, options);
-    } catch {
+    } catch (fallbackError) {
+      getTelemetryLogger()?.logError(fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)), {
+        stage: 'fallback',
+      });
       return [];
     }
   }

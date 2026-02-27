@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { getTelemetryLogger } from '../telemetry';
 import { RiflerSidebarProvider } from '../sidebar/SidebarProvider';
 import { StateStore } from '../state/StateStore';
 import { MinimizeMessage } from '../messaging/types';
@@ -285,6 +286,12 @@ export class ViewManager {
     
     // Open in new location
     await this.openView({ forcedLocation: newLocation });
+
+    const telemetryLogger = getTelemetryLogger();
+    telemetryLogger?.logUsage('view_switched', {
+      from: currentLocation,
+      to: newLocation,
+    });
   }
 
   private async _rememberPreviousSidebarContainer(): Promise<void> {

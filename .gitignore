@@ -11,3 +11,4 @@ dist/
 logs/
 *.log
 npm-debug.log*
+telemetry-dashboard/

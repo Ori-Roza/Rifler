@@ -14,6 +14,7 @@ import { getWebviewHtml } from '../webview/webviewUtils';
 import { MessageHandler } from '../messaging/handler';
 import { registerCommonHandlers } from '../messaging/registerCommonHandlers';
 import { StateStore } from '../state/StateStore';
+import { getTelemetryLogger } from '../telemetry';
 
 interface SidebarState {
   query?: string;
@@ -354,15 +355,46 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const results = await performSearch(
-      message.query,
-      message.scope as SearchScope,
-      message.options,
-      message.directoryPath,
-      message.modulePath,
-      10000,
-      message.smartExcludesEnabled ?? true
-    );
+    const startTime = Date.now();
+    let results: SearchResult[] = [];
+    let searchError: string | undefined;
+
+    try {
+      results = await performSearch(
+        message.query,
+        message.scope as SearchScope,
+        message.options,
+        message.directoryPath,
+        message.modulePath,
+        10000,
+        message.smartExcludesEnabled ?? true
+      );
+    } catch (error) {
+      searchError = error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      const durationMs = Date.now() - startTime;
+      const telemetryLogger = getTelemetryLogger();
+      telemetryLogger?.logUsage('search_completed', {
+        duration_ms: durationMs,
+        results_count: results.length,
+        query_length: message.query?.length ?? 0,
+        search_engine: 'rg',
+        scope: message.scope,
+        search_mode: 'text',
+        regex_enabled: !!message.options.useRegex,
+        match_case: !!message.options.matchCase,
+        whole_word: !!message.options.wholeWord,
+        multiline: !!message.options.multiline,
+        smart_excludes_enabled: message.smartExcludesEnabled ?? true,
+        include_code: message.options.includeCode ?? true,
+        include_comments: message.options.includeComments ?? true,
+        include_strings: message.options.includeStrings ?? true,
+        file_mask_count: (message.options.fileMask ? message.options.fileMask.split(/[;,]+/).filter(Boolean).length : 0),
+        query_rows: message.queryRows ?? 1,
+        error: searchError,
+      });
+    }
 
     const activeIndex = message.activeIndex ?? (results.length > 0 ? 0 : -1);
 

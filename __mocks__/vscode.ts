@@ -104,6 +104,14 @@ export const window = {
     hide: jest.fn(),
     dispose: jest.fn(),
   }),
+  createOutputChannel: jest.fn().mockReturnValue({
+    appendLine: jest.fn(),
+    append: jest.fn(),
+    clear: jest.fn(),
+    show: jest.fn(),
+    hide: jest.fn(),
+    dispose: jest.fn(),
+  }),
   registerWebviewViewProvider: jest.fn().mockReturnValue({ dispose: jest.fn() }),
 };
 

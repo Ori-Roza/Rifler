@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { CommandContext } from './types';
 import { performSearch } from '../search';
 import { SearchOptions, SearchResult } from '../utils';
+import { getTelemetryLogger } from '../telemetry';
+import { openLocation } from '../extension';
 
 type QuickPickSearchItem = vscode.QuickPickItem & { result?: SearchResult };
 
@@ -135,16 +137,28 @@ export async function quickPickCommand(ctx: CommandContext): Promise<void> {
   });
   quickPick.onDidAccept(async () => {
     const selected = quickPick.selectedItems[0];
+    const telemetryLogger = getTelemetryLogger();
+    const queryValue = quickPick.value.trim();
     if (selected && !selected.result) {
       quickPick.hide();
       await ctx.viewManager.openView({
-        initialQuery: quickPick.value.trim(),
+        initialQuery: queryValue,
         initialQueryFocus: false
+      });
+      telemetryLogger?.logUsage('quickpick_used', {
+        overflow_to_webview: true,
+        result_selected: false,
+        query_length: queryValue.length,
       });
       return;
     }
     if (selected?.result) {
       await openLocation(selected.result.uri, selected.result.line, selected.result.character);
+      telemetryLogger?.logUsage('quickpick_used', {
+        overflow_to_webview: false,
+        result_selected: true,
+        query_length: queryValue.length,
+      });
     }
     quickPick.hide();
   });
@@ -195,15 +209,6 @@ function buildQuickPickPlaceholder(toggleState: { matchCase: boolean; wholeWord:
   const wholeWordLabel = `W:${toggleState.wholeWord ? 'on' : 'off'}`;
   const regexLabel = `.*:${toggleState.useRegex ? 'on' : 'off'}`;
   return `Type to search in workspace (${matchCaseLabel} ${wholeWordLabel} ${regexLabel})`;
-}
-
-async function openLocation(uriString: string, line: number, character: number): Promise<void> {
-  const uri = vscode.Uri.parse(uriString);
-  const doc = await vscode.workspace.openTextDocument(uri);
-  const editor = await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
-  const position = new vscode.Position(line, character);
-  editor.selection = new vscode.Selection(position, position);
-  editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
 }
 
 function getSelectedText(): string | undefined {

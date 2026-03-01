@@ -82,6 +82,10 @@ console.log('[Rifler] Webview script starting...');
 
     let pendingTestHistoryEcho = false;
 
+  // Highlight cache to avoid redundant hljs.highlight() calls during re-renders
+  const highlightCache = new Map();
+  const HIGHLIGHT_CACHE_MAX = 2000;
+
   const vscode = acquireVsCodeApi();
 
   try {
@@ -181,6 +185,23 @@ console.log('[Rifler] Webview script starting...');
   const resultsPanel = document.getElementById('results-panel');
   const previewPanel = document.getElementById('preview-panel');
   const mainContent = document.querySelector('.main-content');
+
+  // Delegated dblclick handler for preview lines (avoids per-element listeners)
+  if (previewContent) {
+    previewContent.addEventListener('dblclick', (e) => {
+      const lineEl = e.target.closest('.pvLine');
+      if (!lineEl) return;
+      const lineNum = parseInt(lineEl.dataset.line, 10);
+      if (!isNaN(lineNum) && state.fileContent) {
+        vscode.postMessage({
+          type: 'openLocation',
+          uri: state.fileContent.uri,
+          line: lineNum,
+          character: 0
+        });
+      }
+    });
+  }
 
   let VIRTUAL_ROW_HEIGHT = 40;
   let measuredRowHeight = 0;
@@ -821,30 +842,7 @@ console.log('[Rifler] Webview script starting...');
 
   if (collapseAllBtn) {
     collapseAllBtn.addEventListener('click', () => {
-      if (state.results.length === 0) return;
-      
-      const allPaths = new Set();
-      state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
-      
-      // Check if all files are currently collapsed
-      const allCurrentlyCollapsed = Array.from(allPaths).every(p => {
-        if (state.collapsedFiles.has(p)) return true;
-        if (state.expandedFiles.has(p)) return false;
-        return state.resultsShowCollapsed;
-      });
-      
-      if (allCurrentlyCollapsed) {
-        // All collapsed, expand all
-        state.collapsedFiles.clear();
-        allPaths.forEach(p => state.expandedFiles.add(p));
-      } else {
-        // Not all collapsed, collapse all
-        state.expandedFiles.clear();
-        allPaths.forEach(p => state.collapsedFiles.add(p));
-      }
-      
-      handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex, preserveScroll: true });
-      updateCollapseButtonText();
+      toggleCollapseAll();
     });
   }
   
@@ -3493,6 +3491,9 @@ console.log('[Rifler] Webview script starting...');
         exitEditMode(true);
       }
 
+      // Clear highlight cache for new search
+      highlightCache.clear();
+
       // In LSP mode, delegate to LSP search
       if (state.searchMode === 'lsp') {
         runLspSearch();
@@ -3673,7 +3674,6 @@ console.log('[Rifler] Webview script starting...');
     }
 
     console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
-    console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
     updateResultsCountDisplay(results);
     if (collapseAllBtn) {
       collapseAllBtn.style.display = results.length > 0 ? 'flex' : 'none';
@@ -3719,6 +3719,230 @@ console.log('[Rifler] Webview script starting...');
     }
   }
 
+  // ========================================================================
+  // Incremental expand/collapse — patch renderItems in-place
+  // ========================================================================
+
+  /**
+   * Build the match items that should appear under a given file header.
+   * Uses the same logic as handleSearchResults but for a single group.
+   */
+  function buildMatchItemsForPath(filePath) {
+    const matches = [];
+    state.results.forEach((r, idx) => {
+      const p = r.relativePath || r.fileName;
+      if (p === filePath) {
+        matches.push({ ...r, originalIndex: idx });
+      }
+    });
+    if (matches.length === 0) return [];
+
+    const items = [];
+    if (matches.length > 5) {
+      items.push({
+        type: 'matchesGroup',
+        path: filePath,
+        matches: matches,
+        top: 0,
+        height: 150
+      });
+    } else {
+      matches.forEach((match, matchIdx) => {
+        items.push({
+          type: 'match',
+          ...match,
+          isFirstInGroup: matchIdx === 0,
+          isLastInGroup: matchIdx === matches.length - 1,
+          groupSize: matches.length,
+          groupPath: filePath,
+          top: 0,
+          height: 28
+        });
+      });
+    }
+    return items;
+  }
+
+  /**
+   * Recalculate top positions for all renderItems starting from a given index.
+   */
+  function recalcTopPositions(fromIndex) {
+    if (state.renderItems.length === 0) return;
+    if (fromIndex <= 0) {
+      state.renderItems[0].top = 0;
+      fromIndex = 1;
+    }
+    for (let i = fromIndex; i < state.renderItems.length; i++) {
+      const prev = state.renderItems[i - 1];
+      state.renderItems[i].top = prev.top + (prev.height || VIRTUAL_ROW_HEIGHT);
+    }
+    if (virtualContent && state.renderItems.length > 0) {
+      const last = state.renderItems[state.renderItems.length - 1];
+      virtualContent.style.height = (last.top + (last.height || VIRTUAL_ROW_HEIGHT)) + 'px';
+    }
+  }
+
+  /**
+   * Toggle collapse/expand for a single file path by patching renderItems in-place.
+   * Much faster than rebuilding the entire list via handleSearchResults.
+   */
+  function toggleCollapseForPath(filePath, forceExpand) {
+    const headerIdx = state.renderItems.findIndex(
+      it => it.type === 'fileHeader' && it.path === filePath
+    );
+    if (headerIdx === -1) return;
+
+    const header = state.renderItems[headerIdx];
+    const shouldExpand = forceExpand !== undefined ? forceExpand : header.isCollapsed;
+
+    if (shouldExpand) {
+      header.isCollapsed = false;
+      state.collapsedFiles.delete(filePath);
+      state.expandedFiles.add(filePath);
+
+      const newItems = buildMatchItemsForPath(filePath);
+      state.renderItems.splice(headerIdx + 1, 0, ...newItems);
+      recalcTopPositions(headerIdx + 1);
+    } else {
+      header.isCollapsed = true;
+      state.expandedFiles.delete(filePath);
+      state.collapsedFiles.add(filePath);
+
+      let removeCount = 0;
+      for (let i = headerIdx + 1; i < state.renderItems.length; i++) {
+        if (state.renderItems[i].type === 'fileHeader' || state.renderItems[i].type === 'endOfResults') break;
+        removeCount++;
+      }
+      if (removeCount > 0) {
+        state.renderItems.splice(headerIdx + 1, removeCount);
+        recalcTopPositions(headerIdx + 1);
+      }
+    }
+
+    renderResultsVirtualized();
+    updateCollapseButtonText();
+  }
+
+  /**
+   * Toggle all groups expanded or collapsed at once.
+   * Patches renderItems by iterating existing headers rather than re-grouping from results.
+   */
+  function toggleCollapseAll() {
+    if (state.results.length === 0) return;
+
+    const allPaths = new Set();
+    state.results.forEach(r => allPaths.add(r.relativePath || r.fileName));
+
+    const allCurrentlyCollapsed = Array.from(allPaths).every(p => {
+      if (state.collapsedFiles.has(p)) return true;
+      if (state.expandedFiles.has(p)) return false;
+      return state.resultsShowCollapsed;
+    });
+
+    if (allCurrentlyCollapsed) {
+      state.collapsedFiles.clear();
+      allPaths.forEach(p => state.expandedFiles.add(p));
+    } else {
+      state.expandedFiles.clear();
+      allPaths.forEach(p => state.collapsedFiles.add(p));
+    }
+
+    const newRenderItems = [];
+    let cumulativeTop = 0;
+
+    const seenPaths = new Set();
+    for (const item of state.renderItems) {
+      if (item.type === 'fileHeader' && !seenPaths.has(item.path)) {
+        seenPaths.add(item.path);
+        const isCollapsed = !allCurrentlyCollapsed;
+        const headerItem = {
+          ...item,
+          isCollapsed: isCollapsed,
+          top: cumulativeTop,
+          height: 40
+        };
+        newRenderItems.push(headerItem);
+        cumulativeTop += 40;
+
+        if (!isCollapsed) {
+          const matchItems = buildMatchItemsForPath(item.path);
+          matchItems.forEach(mi => {
+            mi.top = cumulativeTop;
+            newRenderItems.push(mi);
+            cumulativeTop += mi.height;
+          });
+        }
+      }
+    }
+
+    if (state.results.length > 0) {
+      newRenderItems.push({
+        type: 'endOfResults',
+        top: cumulativeTop,
+        height: 48
+      });
+      cumulativeTop += 48;
+    }
+
+    state.renderItems = newRenderItems;
+    if (virtualContent) {
+      virtualContent.style.height = cumulativeTop + 'px';
+    }
+
+    renderResultsVirtualized();
+    updateCollapseButtonText();
+  }
+
+  /**
+   * Binary search to find the first renderItem whose bottom edge is >= threshold.
+   * Returns the index of the first item that could be visible.
+   */
+  function findFirstVisibleIndex(items, scrollTop, overscan) {
+    const threshold = scrollTop - overscan;
+    let lo = 0, hi = items.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      const itemBottom = (items[mid].top || 0) + (items[mid].height || VIRTUAL_ROW_HEIGHT);
+      if (itemBottom < threshold) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo;
+  }
+
+  /**
+   * Binary search to find the first renderItem whose top edge is > threshold.
+   * Returns the exclusive end index.
+   */
+  function findLastVisibleIndex(items, scrollTop, viewportHeight, overscan) {
+    const threshold = scrollTop + viewportHeight + overscan;
+    let lo = 0, hi = items.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >>> 1;
+      if ((items[mid].top || 0) > threshold) {
+        hi = mid - 1;
+      } else {
+        lo = mid;
+      }
+    }
+    // lo now points to the last item whose top <= threshold
+    // Return lo+1 as exclusive end (but cap at items.length)
+    return Math.min(lo + 1, items.length);
+  }
+
+  /**
+   * Generate a stable key for a render item used for DOM recycling.
+   */
+  function makeRenderItemKey(itemData) {
+    if (itemData.type === 'fileHeader') return 'fh:' + itemData.path;
+    if (itemData.type === 'matchesGroup') return 'mg:' + itemData.path;
+    if (itemData.type === 'match') return 'm:' + itemData.originalIndex;
+    if (itemData.type === 'endOfResults') return 'eor';
+    return 'u:' + (itemData.top || 0);
+  }
+
   function renderResultsVirtualized() {
     if (state.renderItems.length === 0) return;
 
@@ -3726,38 +3950,68 @@ console.log('[Rifler] Webview script starting...');
     const viewportHeight = resultsList.clientHeight || 1;
     const scrollTop = resultsList.scrollTop;
     
-    // Find visible items based on their stored top positions
-    let start = 0;
-    let end = total;
-    
-    for (let i = 0; i < total; i++) {
-      const item = state.renderItems[i];
-      const itemTop = item.top || 0;
-      const itemBottom = itemTop + (item.height || VIRTUAL_ROW_HEIGHT);
-      
-      if (itemBottom < scrollTop - 200) {
-        start = i + 1;
-      }
-      if (itemTop > scrollTop + viewportHeight + 200 && end === total) {
-        end = i;
-        break;
-      }
-    }
+    // Find visible items using binary search on pre-sorted top positions
+    const start = findFirstVisibleIndex(state.renderItems, scrollTop, 200);
+    const end = findLastVisibleIndex(state.renderItems, scrollTop, viewportHeight, 200);
 
     // Set total height based on last item's position
     const lastItem = state.renderItems[total - 1];
     const totalHeight = (lastItem.top || 0) + (lastItem.height || VIRTUAL_ROW_HEIGHT);
     virtualContent.style.height = totalHeight + 'px';
 
-    const fragment = document.createDocumentFragment();
-    for (let i = start; i < end; i++) {
-      fragment.appendChild(renderResultRow(state.renderItems[i]));
+    // Preserve grouped scroll positions before DOM changes
+    captureGroupScrollTopsFromDom();
+
+    // Build map of existing DOM nodes keyed by pool key
+    const existingNodes = new Map();
+    for (const child of Array.from(virtualContent.children)) {
+      const key = child.dataset.poolKey;
+      if (key) existingNodes.set(key, child);
     }
 
-    // Preserve grouped scroll positions before virtual DOM swap
-    captureGroupScrollTopsFromDom();
-    virtualContent.innerHTML = '';
-    virtualContent.appendChild(fragment);
+    // Determine which keys should be visible
+    const visibleKeys = new Set();
+    for (let i = start; i < end; i++) {
+      visibleKeys.add(makeRenderItemKey(state.renderItems[i]));
+    }
+
+    // Remove nodes that are no longer visible
+    for (const [key, node] of existingNodes) {
+      if (!visibleKeys.has(key)) {
+        node.remove();
+        existingNodes.delete(key);
+      }
+    }
+
+    // Add or update visible nodes
+    for (let i = start; i < end; i++) {
+      const itemData = state.renderItems[i];
+      const key = makeRenderItemKey(itemData);
+      const existing = existingNodes.get(key);
+
+      if (existing) {
+        // Update position and active state on existing node
+        existing.style.top = (itemData.top || 0) + 'px';
+        if (itemData.type === 'match' || itemData.type === 'matchesGroup') {
+          const isActive = itemData.originalIndex === state.activeIndex;
+          if (itemData.type === 'match') {
+            existing.classList.toggle('active', isActive);
+          }
+          // Update active class on match items inside matchesGroup
+          if (itemData.type === 'matchesGroup') {
+            existing.querySelectorAll('.result-item').forEach(el => {
+              const idx = parseInt(el.dataset.index, 10);
+              el.classList.toggle('active', idx === state.activeIndex);
+            });
+          }
+        }
+      } else {
+        // Create new node
+        const node = renderResultRow(itemData);
+        node.dataset.poolKey = key;
+        virtualContent.appendChild(node);
+      }
+    }
 
     // Restore grouped scroll positions after render
     restoreGroupScrollTopsToDom();
@@ -3827,18 +4081,7 @@ console.log('[Rifler] Webview script starting...');
         
         // Otherwise toggle collapse/expand
         const willExpand = itemData.isCollapsed;
-        if (itemData.isCollapsed) {
-          // Expanding: remove from collapsedFiles and add to expandedFiles
-          state.collapsedFiles.delete(itemData.path);
-          state.expandedFiles.add(itemData.path);
-        } else {
-          // Collapsing: remove from expandedFiles and add to collapsedFiles
-          state.expandedFiles.delete(itemData.path);
-          state.collapsedFiles.add(itemData.path);
-        }
-        
-        handleSearchResults(state.results, { skipAutoLoad: true, activeIndex: state.activeIndex, preserveScroll: true });
-        updateCollapseButtonText();
+        toggleCollapseForPath(itemData.path);
 
         if (willExpand) {
           activateFirstMatchForPath(itemData.path);
@@ -3863,57 +4106,112 @@ console.log('[Rifler] Webview script starting...');
       groupContainer.style.paddingLeft = '8px';
       groupContainer.style.marginLeft = '8px';
       groupContainer.style.borderLeft = '2px solid rgba(255,255,255,0.1)';
-      itemData.matches.forEach((match, idx) => {
-        const matchEl = document.createElement('div');
-        const isActive = match.originalIndex === state.activeIndex;
-        matchEl.className = 'result-item' + (isActive ? ' active' : '');
-        matchEl.dataset.index = String(match.originalIndex);
-        matchEl.dataset.localIndex = String(idx);
-        matchEl.title = match.relativePath || match.fileName;
-        matchEl.style.position = 'static';
-        matchEl.style.height = '28px';
-        matchEl.style.top = 'auto';
-        matchEl.style.width = '100%';
-        
-        const language = getLanguageFromFilename(match.fileName);
-        const previewHtml = highlightMatchSafe(
-          match.preview,
-          match.previewMatchRanges || [match.previewMatchRange],
-          language
-        );
+      groupContainer.style.position = 'relative';
 
-        matchEl.innerHTML = 
-          '<div class="result-meta">' +
-            '<span class="result-line-number">' + (match.line + 1) + '</span>' +
-          '</div>' +
-          '<div class="result-preview hljs">' + previewHtml + '</div>';
+      const MATCH_HEIGHT = 28;
+      const matches = itemData.matches;
+      const totalGroupHeight = matches.length * MATCH_HEIGHT;
 
-        matchEl.addEventListener('click', () => {
-          // Single click selects/loads preview (no show/hide toggle)
-          if (match.originalIndex === state.activeIndex) {
-            const active = state.results?.[state.activeIndex];
-            if (active && (!state.fileContent || state.fileContent.uri !== active.uri)) {
-              loadFileContent(active);
+      // Spacer element to maintain scrollable height
+      const spacer = document.createElement('div');
+      spacer.style.height = totalGroupHeight + 'px';
+      spacer.style.position = 'relative';
+      spacer.style.width = '100%';
+      groupContainer.appendChild(spacer);
+
+      // Inner virtualisation: only render visible match rows
+      const GROUP_OVERSCAN = 3; // extra rows above/below
+
+      function renderGroupVisible() {
+        const scrollTop = groupContainer.scrollTop;
+        const containerHeight = groupContainer.clientHeight || 150;
+        const firstIdx = Math.max(0, Math.floor(scrollTop / MATCH_HEIGHT) - GROUP_OVERSCAN);
+        const lastIdx = Math.min(matches.length - 1, Math.ceil((scrollTop + containerHeight) / MATCH_HEIGHT) + GROUP_OVERSCAN);
+
+        // Build set of indices that should be visible
+        const wantedIndices = new Set();
+        for (let i = firstIdx; i <= lastIdx; i++) wantedIndices.add(i);
+
+        // Remove elements that are no longer visible
+        const existing = new Map();
+        for (const child of Array.from(spacer.children)) {
+          const li = parseInt(child.dataset.localIndex, 10);
+          if (!isNaN(li)) {
+            if (!wantedIndices.has(li)) {
+              child.remove();
+            } else {
+              existing.set(li, child);
             }
-            return;
           }
-          if (!state.groupScrollTops) state.groupScrollTops = {};
-          state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
-          setActiveIndex(match.originalIndex);
-        });
+        }
 
-        matchEl.addEventListener('dblclick', () => {
-          // Double click opens file in editor
-          openActiveResult();
-        });
+        // Add or update visible elements
+        for (let idx = firstIdx; idx <= lastIdx; idx++) {
+          const match = matches[idx];
+          const existingEl = existing.get(idx);
+          if (existingEl) {
+            // Update active state only
+            const isActive = match.originalIndex === state.activeIndex;
+            existingEl.classList.toggle('active', isActive);
+            continue;
+          }
 
-        matchEl.addEventListener('contextmenu', (e) => {
-          e.preventDefault();
-          showContextMenu(e, match.originalIndex);
-        });
+          const matchEl = document.createElement('div');
+          const isActive = match.originalIndex === state.activeIndex;
+          matchEl.className = 'result-item' + (isActive ? ' active' : '');
+          matchEl.dataset.index = String(match.originalIndex);
+          matchEl.dataset.localIndex = String(idx);
+          matchEl.title = match.relativePath || match.fileName;
+          matchEl.style.position = 'absolute';
+          matchEl.style.height = MATCH_HEIGHT + 'px';
+          matchEl.style.top = (idx * MATCH_HEIGHT) + 'px';
+          matchEl.style.left = '0';
+          matchEl.style.right = '0';
+          matchEl.style.width = '100%';
+          
+          const language = getLanguageFromFilename(match.fileName);
+          const previewHtml = highlightMatchSafe(
+            match.preview,
+            match.previewMatchRanges || [match.previewMatchRange],
+            language
+          );
 
-        groupContainer.appendChild(matchEl);
-      });
+          matchEl.innerHTML = 
+            '<div class="result-meta">' +
+              '<span class="result-line-number">' + (match.line + 1) + '</span>' +
+            '</div>' +
+            '<div class="result-preview hljs">' + previewHtml + '</div>';
+
+          matchEl.addEventListener('click', () => {
+            // Single click selects/loads preview (no show/hide toggle)
+            if (match.originalIndex === state.activeIndex) {
+              const active = state.results?.[state.activeIndex];
+              if (active && (!state.fileContent || state.fileContent.uri !== active.uri)) {
+                loadFileContent(active);
+              }
+              return;
+            }
+            if (!state.groupScrollTops) state.groupScrollTops = {};
+            state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
+            setActiveIndex(match.originalIndex);
+          });
+
+          matchEl.addEventListener('dblclick', () => {
+            // Double click opens file in editor
+            openActiveResult();
+          });
+
+          matchEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showContextMenu(e, match.originalIndex);
+          });
+
+          spacer.appendChild(matchEl);
+        }
+      }
+
+      // Initial render
+      renderGroupVisible();
 
       // Restore previous scroll position for this file's group if available (after children are added)
       const restoreScroll = () => {
@@ -3921,16 +4219,24 @@ console.log('[Rifler] Webview script starting...');
         if (typeof saved === 'number') {
           groupContainer.scrollTop = saved;
         }
+        renderGroupVisible();
       };
       restoreScroll();
       requestAnimationFrame(restoreScroll);
       requestAnimationFrame(() => requestAnimationFrame(restoreScroll));
 
-      // Persist scroll position on scroll so it survives re-renders
+      // Persist scroll position on scroll and re-render inner virtual rows
       groupContainer.dataset.path = itemData.path;
+      let groupRafId = 0;
       groupContainer.addEventListener('scroll', () => {
         if (!state.groupScrollTops) state.groupScrollTops = {};
         state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
+        if (!groupRafId) {
+          groupRafId = requestAnimationFrame(() => {
+            groupRafId = 0;
+            renderGroupVisible();
+          });
+        }
       });
 
       item.appendChild(groupContainer);
@@ -4674,19 +4980,7 @@ console.log('[Rifler] Webview script starting...');
       }
     }
 
-    previewContent.querySelectorAll('.pvLine').forEach(lineEl => {
-      lineEl.addEventListener('dblclick', () => {
-        const lineNum = parseInt(lineEl.dataset.line, 10);
-        if (state.fileContent) {
-          vscode.postMessage({
-            type: 'openLocation',
-            uri: state.fileContent.uri,
-            line: lineNum,
-            character: 0
-          });
-        }
-      });
-    });
+    // Per-element dblclick listeners removed — using delegated handler on previewContent instead
   }
 
   function loadFileContent(result) {
@@ -4774,23 +5068,33 @@ console.log('[Rifler] Webview script starting...');
 
     state.activeIndex = index;
 
-    // Only rebuild results list if we're not using lightweight navigation
-    if (!skipRender) {
-      renderResultsVirtualized();
-    }
-    
-    // After render, apply active styling and ensure visibility
-    requestAnimationFrame(() => {
-      const activeEl = document.querySelector(`.result-item[data-index="${index}"]`);
-      if (activeEl) {
-        document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
-        activeEl.classList.add('active');
-        activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      }
-      
+    // Check if target element already exists in DOM for lightweight update
+    const existingEl = virtualContent
+      ? virtualContent.querySelector(`.result-item[data-index="${index}"]`)
+      : null;
+
+    if (existingEl) {
+      // Lightweight: just toggle .active class, no re-render needed
+      document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
+      existingEl.classList.add('active');
+      existingEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       ensureActiveVisible();
       ensureActiveVisibleInGroup();
-    });
+    } else if (!skipRender) {
+      // Target is off-screen — need re-render to bring it into view
+      renderResultsVirtualized();
+
+      requestAnimationFrame(() => {
+        const activeEl = document.querySelector(`.result-item[data-index="${index}"]`);
+        if (activeEl) {
+          document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
+          activeEl.classList.add('active');
+          activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+        ensureActiveVisible();
+        ensureActiveVisibleInGroup();
+      });
+    }
 
     if (!skipLoad) {
       loadFileContent(state.results[index]);
@@ -4875,15 +5179,7 @@ console.log('[Rifler] Webview script starting...');
    * Expand a collapsed group and re-render
    */
   function expandGroup(path) {
-    state.collapsedFiles.delete(path);
-    state.expandedFiles.add(path);
-
-    // Rebuild renderItems without losing scroll or active selection
-    handleSearchResults(state.results, {
-      skipAutoLoad: true,
-      activeIndex: state.activeIndex,
-      preserveScroll: true
-    });
+    toggleCollapseForPath(path, true);
   }
 
   /**
@@ -5003,22 +5299,34 @@ console.log('[Rifler] Webview script starting...');
     // Update state: just track the active index (no group logic needed)
     state.activeIndex = resultIndex;
 
-    // Re-render virtual list so the active item is guaranteed to exist in DOM
-    renderResultsVirtualized();
+    // Check if the target item is already in the DOM — if so, skip full re-render
+    const targetEl = virtualContent
+      ? virtualContent.querySelector(`.result-item[data-index="${resultIndex}"]`)
+      : null;
 
-    // After render, re-select the actual DOM element for this index and apply .active
-    requestAnimationFrame(() => {
-      const fresh = document.querySelector(`.result-item[data-index="${resultIndex}"]`);
-      if (fresh) {
-        document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
-        fresh.classList.add('active');
-        fresh.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      }
-      
-      // Ensure visibility in both main list and group containers
+    if (targetEl) {
+      // Lightweight update: just toggle .active class without DOM teardown
+      const currentActive = virtualContent.querySelectorAll('.result-item.active');
+      currentActive.forEach(el => el.classList.remove('active'));
+      targetEl.classList.add('active');
+      targetEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       ensureActiveVisible();
       ensureActiveVisibleInGroup();
-    });
+    } else {
+      // Target is off-screen — need full re-render to bring it into view
+      renderResultsVirtualized();
+
+      requestAnimationFrame(() => {
+        const fresh = document.querySelector(`.result-item[data-index="${resultIndex}"]`);
+        if (fresh) {
+          document.querySelectorAll('.result-item.active').forEach(el => el.classList.remove('active'));
+          fresh.classList.add('active');
+          fresh.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+        ensureActiveVisible();
+        ensureActiveVisibleInGroup();
+      });
+    }
 
     // Load file content for preview (same as mouse click selection)
     if (!isEditMode) {
@@ -5102,6 +5410,11 @@ console.log('[Rifler] Webview script starting...');
   }
 
   function highlightMatchSafe(rawText, ranges, language = null) {
+    // Build cache key from inputs
+    const cacheKey = rawText + '|' + (language || '') + '|' + JSON.stringify(ranges);
+    const cached = highlightCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+
     // Normalize ranges to an array
     let matchRanges = [];
     if (Array.isArray(ranges)) {
@@ -5115,6 +5428,8 @@ console.log('[Rifler] Webview script starting...');
       .filter(r => r && typeof r.start === 'number' && typeof r.end === 'number' && r.start >= 0 && r.end > r.start && r.start < rawText.length)
       .sort((a, b) => a.start - b.start);
 
+    let result;
+
     if (matchRanges.length === 0) {
       if (typeof hljs !== 'undefined') {
         try {
@@ -5123,61 +5438,70 @@ console.log('[Rifler] Webview script starting...');
             if (rawText.length > 0 && !res.includes('class="hljs-')) {
               console.warn(`[Rifler] highlightMatchSafe: No hljs classes found in result for ${language}. Input: ${rawText.substring(0, 20)}`);
             }
-            return sanitizeHighlightedHtml(res);
+            result = sanitizeHighlightedHtml(res);
           } else {
-            return sanitizeHighlightedHtml(hljs.highlightAuto(rawText).value);
+            result = sanitizeHighlightedHtml(hljs.highlightAuto(rawText).value);
           }
         } catch (e) {
           console.error('[Rifler] highlightMatchSafe error:', e);
+          result = escapeHtml(rawText);
         }
+      } else {
+        result = escapeHtml(rawText);
       }
-      return escapeHtml(rawText);
-    }
+    } else {
+      result = '';
+      let lastIndex = 0;
 
-    let result = '';
-    let lastIndex = 0;
+      for (const range of matchRanges) {
+        const start = range.start;
+        const end = Math.min(range.end, rawText.length);
 
-    for (const range of matchRanges) {
-      const start = range.start;
-      const end = Math.min(range.end, rawText.length);
+        if (start < lastIndex) continue; // Skip overlapping ranges
 
-      if (start < lastIndex) continue; // Skip overlapping ranges
+        const before = rawText.substring(lastIndex, start);
+        const match = rawText.substring(start, end);
 
-      const before = rawText.substring(lastIndex, start);
-      const match = rawText.substring(start, end);
+        if (typeof hljs !== 'undefined') {
+          try {
+            if (language && language !== 'file' && hljs.getLanguage(language)) {
+              result += sanitizeHighlightedHtml(hljs.highlight(before, { language }).value);
+              result += '<span class="match">' + sanitizeHighlightedHtml(hljs.highlight(match, { language }).value) + '</span>';
+            } else {
+              result += sanitizeHighlightedHtml(hljs.highlightAuto(before).value);
+              result += '<span class="match">' + sanitizeHighlightedHtml(hljs.highlightAuto(match).value) + '</span>';
+            }
+          } catch {
+            result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
+          }
+        } else {
+          result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
+        }
+        lastIndex = end;
+      }
 
+      const remaining = rawText.substring(lastIndex);
       if (typeof hljs !== 'undefined') {
         try {
           if (language && language !== 'file' && hljs.getLanguage(language)) {
-            result += sanitizeHighlightedHtml(hljs.highlight(before, { language }).value);
-            result += '<span class="match">' + sanitizeHighlightedHtml(hljs.highlight(match, { language }).value) + '</span>';
+            result += sanitizeHighlightedHtml(hljs.highlight(remaining, { language }).value);
           } else {
-            result += sanitizeHighlightedHtml(hljs.highlightAuto(before).value);
-            result += '<span class="match">' + sanitizeHighlightedHtml(hljs.highlightAuto(match).value) + '</span>';
+            result += sanitizeHighlightedHtml(hljs.highlightAuto(remaining).value);
           }
         } catch {
-          result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
+          result += escapeHtml(remaining);
         }
       } else {
-        result += escapeHtml(before) + '<span class="match">' + escapeHtml(match) + '</span>';
-      }
-      lastIndex = end;
-    }
-
-    const remaining = rawText.substring(lastIndex);
-    if (typeof hljs !== 'undefined') {
-      try {
-        if (language && language !== 'file' && hljs.getLanguage(language)) {
-          result += sanitizeHighlightedHtml(hljs.highlight(remaining, { language }).value);
-        } else {
-          result += sanitizeHighlightedHtml(hljs.highlightAuto(remaining).value);
-        }
-      } catch {
         result += escapeHtml(remaining);
       }
-    } else {
-      result += escapeHtml(remaining);
     }
+
+    // Store in cache with LRU eviction
+    if (highlightCache.size >= HIGHLIGHT_CACHE_MAX) {
+      const firstKey = highlightCache.keys().next().value;
+      highlightCache.delete(firstKey);
+    }
+    highlightCache.set(cacheKey, result);
 
     return result;
   }

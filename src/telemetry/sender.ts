@@ -8,7 +8,7 @@ type TelemetryPayload = {
   is_error?: boolean;
 };
 
-interface QueueItem extends TelemetryPayload {}
+type QueueItem = TelemetryPayload;
 
 interface CircuitBreakerState {
   consecutiveFailures: number;

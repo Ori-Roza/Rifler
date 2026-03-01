@@ -2513,6 +2513,9 @@ console.log('[Rifler] Webview script starting...');
         toggleReplace();
         break;
       case 'searchResults':
+        if (message.telemetry) {
+          console.log('[Rifler Webview] Telemetry via searchResults', message.telemetry);
+        }
         if (message.lspInfo && state.searchMode !== 'lsp') {
           // Ignore late LSP results after switching back to text mode
           break;
@@ -2764,7 +2767,13 @@ console.log('[Rifler] Webview script starting...');
         }
         break;
       case '__test_searchCompleted':
+        if (message.telemetry) {
+          console.log('[Rifler Webview] Telemetry via test_searchCompleted', message.telemetry);
+        }
         vscode.postMessage({ type: '__test_searchResultsReceived', results: message.results });
+        break;
+      case '__test_telemetryLogged':
+        console.log('[Rifler Webview] Telemetry logged', message);
         break;
       case '__test_setFileMask':
         fileMaskInput.value = message.value || '';

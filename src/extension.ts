@@ -9,6 +9,7 @@ import { RiflerSidebarProvider } from './sidebar/SidebarProvider';
 import { ViewManager } from './views/ViewManager';
 import { PanelManager } from './services/PanelManager';
 import { StateStore } from './state/StateStore';
+import { initTelemetry, disposeTelemetry, getTelemetryLogger, showTelemetryOutput } from './telemetry';
 import { registerCommands } from './commands';
 import { registerCommonHandlers } from './messaging/registerCommonHandlers';
 import {
@@ -247,7 +248,7 @@ function getLanguageIdFromFilename(fileName: string): string {
   return langMap[ext || ''] || 'file';
 }
 
-async function openLocation(
+export async function openLocation(
   uriString: string,
   line: number,
   character: number
@@ -276,6 +277,28 @@ export async function activate(context: vscode.ExtensionContext) {
   console.log('Rifler extension is now active');
 
   const extensionUri = context.extensionUri;
+
+  // Initialize telemetry (respects VS Code telemetry setting)
+  initTelemetry(context);
+
+  // One-time telemetry notice (only if VS Code telemetry is enabled).
+  // Fire-and-forget so it never blocks activation.
+  const telemetryNoticeShown = context.globalState.get<boolean>('rifler.telemetryNoticeShown', false);
+  if (!telemetryNoticeShown && vscode.env.isTelemetryEnabled) {
+    void (async () => {
+      const choice = await vscode.window.showInformationMessage(
+        'Rifler collects anonymous usage data to improve search. It follows the global VS Code telemetry setting.',
+        'View Telemetry',
+        'Open Telemetry Settings'
+      );
+      if (choice === 'View Telemetry') {
+        showTelemetryOutput();
+      } else if (choice === 'Open Telemetry Settings') {
+        await vscode.commands.executeCommand('workbench.action.openSettings', '@id:telemetry.telemetryLevel');
+      }
+      await context.globalState.update('rifler.telemetryNoticeShown', true);
+    })();
+  }
 
   // Load webview HTML template (async, cached)
   await loadWebviewTemplate(extensionUri);
@@ -655,12 +678,23 @@ export async function activate(context: vscode.ExtensionContext) {
   replaceToggleStatusBar.command = 'rifler.toggleReplace';
   context.subscriptions.push(replaceToggleStatusBar);
   replaceToggleStatusBar.show();
+
+  const telemetryLogger = getTelemetryLogger();
+  telemetryLogger?.logUsage('extension_activated', {
+    first_time: context.globalState.get<boolean>('rifler.telemetry.firstActivationLogged') !== true,
+    panel_location: vscode.workspace.getConfiguration('rifler').get<string>('panelLocation', 'sidebar'),
+    persistence_scope: vscode.workspace.getConfiguration('rifler').get<string>('persistenceScope', 'workspace'),
+  });
+  if (context.globalState.get<boolean>('rifler.telemetry.firstActivationLogged') !== true) {
+    await context.globalState.update('rifler.telemetry.firstActivationLogged', true);
+  }
 }
 
-export function deactivate() {
+export async function deactivate(): Promise<void> {
   if (panelManager) {
     panelManager.dispose();
   }
+  await disposeTelemetry();
 }
 
 // Export test helpers

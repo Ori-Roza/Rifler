@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { SearchOptions, SearchResult, EXCLUDE_DIRS } from './utils';
+import { getTelemetryLogger } from './telemetry';
 
 interface RipgrepSearchParams {
   query: string;
@@ -101,6 +102,10 @@ async function spawnWithFallback(
       return { child, command };
     } catch (error) {
       errors.push({ command, error });
+      getTelemetryLogger()?.logError(error instanceof Error ? error : new Error(String(error)), {
+        stage: 'rg_spawn',
+        command,
+      });
       if (isRetryableSpawnError(error)) {
         continue;
       }
@@ -116,7 +121,9 @@ async function spawnWithFallback(
     })
     .join('; ');
 
-  throw new Error(`Failed to spawn ripgrep. Attempts: ${detail}`);
+  const err = new Error(`Failed to spawn ripgrep. Attempts: ${detail}`);
+  getTelemetryLogger()?.logError(err, { stage: 'rg_spawn_all_failed' });
+  throw err;
 }
 
 function buildGlobArgs(fileMask: string, smartExcludesEnabled: boolean = true): string[] {
@@ -335,6 +342,7 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
       child.on('error', (err) => {
         if (done) return;
         cleanup();
+        getTelemetryLogger()?.logError(err, { stage: 'rg_child_error' });
         reject(err);
       });
 
@@ -353,7 +361,9 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
         if (code === 0 || code === 1) {
           resolve(results);
         } else {
-          reject(new Error(`ripgrep exited with code ${code}`));
+          const err = new Error(`ripgrep exited with code ${code}`);
+          getTelemetryLogger()?.logError(err, { stage: 'rg_exit', code });
+          reject(err);
         }
       });
     });

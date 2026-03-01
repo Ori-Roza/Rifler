@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { getRipgrepCommandCandidates } from '../rgSearch';
 
 describe('getRipgrepCommandCandidates', () => {
@@ -5,8 +6,7 @@ describe('getRipgrepCommandCandidates', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    const vscode = require('vscode');
-    vscode.extensions.getExtension.mockReturnValue({ extensionMode: vscode.ExtensionMode.Test });
+    (vscode.extensions.getExtension as jest.Mock).mockReturnValue({ extensionMode: vscode.ExtensionMode.Test });
   });
 
   afterAll(() => {
@@ -24,8 +24,7 @@ describe('getRipgrepCommandCandidates', () => {
 
   test('ignores override outside dev/test', () => {
     process.env.RIFLER_RG_PATH = '/tmp/fake-rg';
-    const vscode = require('vscode');
-    vscode.extensions.getExtension.mockReturnValue({ extensionMode: vscode.ExtensionMode.Production });
+    (vscode.extensions.getExtension as jest.Mock).mockReturnValue({ extensionMode: vscode.ExtensionMode.Production });
 
     const candidates = getRipgrepCommandCandidates();
 

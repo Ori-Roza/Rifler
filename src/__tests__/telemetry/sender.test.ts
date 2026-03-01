@@ -383,7 +383,7 @@ describe('TelemetrySender', () => {
 
       expect(mockedRequest).toHaveBeenCalled();
       const options = mockedRequest.mock.calls[0][0] as https.RequestOptions;
-      expect(options.hostname).toBe('oobnvndeizsbwyvbbgdq.supabase.co');
+      expect(options.hostname).toBe('gztgnkxawuplpnghyxso.supabase.co');
       expect(options.path).toBe('/functions/v1/rifler-telemetry');
     });
 

@@ -141,6 +141,7 @@ describe('TelemetrySender', () => {
       expect(channel.logError).toHaveBeenCalledWith('error', expect.objectContaining({
         event: 'error',
         message: 'test failure',
+        stack: expect.any(String),
         context: 'search',
         machine_id: 'test-machine',
       }));

@@ -193,14 +193,21 @@ export async function mapLocationsToSearchResults(
  * Attempts a quick definition lookup; if it resolves (even empty), LSP is available.
  */
 export async function checkLspAvailability(uri: vscode.Uri, position: vscode.Position): Promise<boolean> {
+  let timeoutId: NodeJS.Timeout | undefined;
   try {
     const result = await Promise.race([
       vscode.commands.executeCommand('vscode.executeDefinitionProvider', uri, position),
-      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 3000)),
+      new Promise<'timeout'>((resolve) => {
+        timeoutId = setTimeout(() => resolve('timeout'), 3000);
+      }),
     ]);
     return result !== 'timeout';
   } catch {
     return false;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 

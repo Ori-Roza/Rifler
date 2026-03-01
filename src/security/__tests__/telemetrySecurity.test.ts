@@ -203,6 +203,7 @@ describe('Telemetry Security', () => {
       // in the properties — callers should avoid passing PII through errors.
       const payload = JSON.parse(mockReq.write.mock.calls[0][0]);
       expect(payload.events[0].properties.message).toBe(errorWithPath.message);
+      expect(payload.events[0].properties.stack).toBe(errorWithPath.stack);
       expect(payload.events[0].is_error).toBe(true);
     });
   });

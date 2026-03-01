@@ -33,12 +33,17 @@ export function getRipgrepCommandCandidates(): string[] {
 
   // Test/diagnostic override. Allows E2E to simulate a broken/wrong-format rg.
   const override = process.env.RIFLER_RG_PATH?.trim();
+  const extension = vscode.extensions.getExtension('Ori-Roza.rifler');
+  const extensionMode = (extension as { extensionMode?: vscode.ExtensionMode } | undefined)?.extensionMode;
+  const allowOverride =
+    extensionMode === vscode.ExtensionMode.Development ||
+    extensionMode === vscode.ExtensionMode.Test;
 
   const appRoot = (vscode.env as unknown as { appRoot?: string } | undefined)?.appRoot;
 
   const candidates: string[] = [];
 
-  if (override) {
+  if (override && allowOverride) {
     candidates.push(override);
   }
 
@@ -274,6 +279,7 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
   }
 
   let child: ChildProcessWithoutNullStreams | undefined;
+  let rl: readline.Interface | undefined;
   let cancelled = false;
 
   const results: SearchResult[] = [];
@@ -286,6 +292,15 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
     proc.removeAllListeners();
     proc.stdout.removeAllListeners();
     proc.stderr.removeAllListeners();
+    if (rl) {
+      rl.removeAllListeners();
+      try {
+        rl.close();
+      } catch {
+        // ignore
+      }
+      rl = undefined;
+    }
   };
 
   const cancel = (): void => {
@@ -317,7 +332,7 @@ export function startRipgrepSearch(params: RipgrepSearchParams): { promise: Prom
         return;
       }
 
-      const rl = readline.createInterface({ input: child.stdout });
+      rl = readline.createInterface({ input: child.stdout });
 
       rl.on('line', (line: string) => {
         if (done) return;

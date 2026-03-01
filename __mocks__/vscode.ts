@@ -128,6 +128,12 @@ export const extensions = {
   getExtension: jest.fn(),
 };
 
+export const ExtensionMode = {
+  Production: 1,
+  Development: 2,
+  Test: 3,
+};
+
 export const ViewColumn = {
   One: 1,
   Beside: -2,

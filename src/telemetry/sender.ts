@@ -41,6 +41,9 @@ export function createTelemetrySender(
         timer = undefined;
         await flush();
       }, FLUSH_INTERVAL_MS);
+      if (typeof timer.unref === 'function') {
+        timer.unref();
+      }
     }
   };
 
@@ -133,7 +136,7 @@ export function createTelemetrySender(
       }
     },
     sendErrorData: (error, data) => {
-      const props = enrich({ message: error?.message, ...(data ?? {}) });
+      const props = enrich({ message: error?.message, stack: error?.stack, ...(data ?? {}) });
       channel.logError('error', { event: 'error', ...props });
       addToQueue({ event_name: 'error', properties: props, is_error: true });
     },

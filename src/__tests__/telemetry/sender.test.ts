@@ -141,6 +141,7 @@ describe('TelemetrySender', () => {
       expect(channel.logError).toHaveBeenCalledWith('error', expect.objectContaining({
         event: 'error',
         message: 'test failure',
+        stack: expect.any(String),
         context: 'search',
         machine_id: 'test-machine',
       }));
@@ -382,7 +383,7 @@ describe('TelemetrySender', () => {
 
       expect(mockedRequest).toHaveBeenCalled();
       const options = mockedRequest.mock.calls[0][0] as https.RequestOptions;
-      expect(options.hostname).toBe('oobnvndeizsbwyvbbgdq.supabase.co');
+      expect(options.hostname).toBe('gztgnkxawuplpnghyxso.supabase.co');
       expect(options.path).toBe('/functions/v1/rifler-telemetry');
     });
 

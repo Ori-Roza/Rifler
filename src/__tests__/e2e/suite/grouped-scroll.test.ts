@@ -67,6 +67,16 @@ suite('Rifler Grouped Results Scroll Persistence E2E', () => {
     const panel = testHelpers.getCurrentPanel();
     assert.ok(panel, 'Panel should be open');
 
+    // Ensure scope and context filters are reset for this test
+    panel!.webview.postMessage({ type: '__test_setScope', scope: 'project' });
+    panel!.webview.postMessage({
+      type: '__test_setContextFilters',
+      includeCode: true,
+      includeComments: true,
+      includeStrings: true,
+    });
+    await new Promise(res => setTimeout(res, 200));
+
     // Wait for search completion after setting input
     const searchDone = waitForMessage<any>(panel!.webview, '__test_searchCompleted');
     panel!.webview.postMessage({ type: '__test_setSearchInput', value: 'virtual_match' });

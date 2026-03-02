@@ -465,7 +465,7 @@ console.log('[Rifler] Webview script starting...');
   function isReplaceActionDisabled() {
     const queryValue = queryInput ? queryInput.value.trim() : '';
     const replaceValue = replaceInput ? replaceInput.value.trim() : '';
-    return queryValue.length === 0 && replaceValue.length === 0;
+    return queryValue.length < 2;
   }
 
   function updateReplaceActionState() {

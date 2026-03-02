@@ -131,6 +131,31 @@ suite('Rifler UI Visibility & Responsiveness E2E Tests', () => {
     
     status = await getUiStatus(panel.webview);
     assert.strictEqual(status.replaceVisible, true, 'Replace row should be visible after toggle');
+    assert.strictEqual(status.replaceButtonsDisabled, true, 'Replace should be disabled when inputs are empty');
+    assert.strictEqual(status.replaceAllButtonsDisabled, true, 'Replace all should be disabled when inputs are empty');
+
+    panel.webview.postMessage({ type: '__test_setSearchInput', value: 'v' });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    status = await getUiStatus(panel.webview);
+    assert.strictEqual(status.replaceButtonsDisabled, true, 'Replace should stay disabled for 1-char query');
+    assert.strictEqual(status.replaceAllButtonsDisabled, true, 'Replace all should stay disabled for 1-char query');
+
+    panel.webview.postMessage({ type: '__test_setSearchInput', value: 'visibility-check' });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    status = await getUiStatus(panel.webview);
+    assert.strictEqual(status.replaceButtonsDisabled, false, 'Replace should enable when search has input');
+    assert.strictEqual(status.replaceAllButtonsDisabled, false, 'Replace all should enable when search has input');
+
+    panel.webview.postMessage({ type: '__test_setReplaceInput', value: '' });
+    panel.webview.postMessage({ type: '__test_setSearchInput', value: '' });
+    panel.webview.postMessage({ type: '__test_setReplaceInput', value: 'swap' });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    status = await getUiStatus(panel.webview);
+    assert.strictEqual(status.replaceButtonsDisabled, true, 'Replace should stay disabled for 1-char query even with replace input');
+    assert.strictEqual(status.replaceAllButtonsDisabled, true, 'Replace all should stay disabled for 1-char query even with replace input');
 
     // Toggle back
     panel.webview.postMessage({ type: '__test_toggleReplace' });

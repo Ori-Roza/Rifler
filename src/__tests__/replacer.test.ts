@@ -190,6 +190,16 @@ describe('Replacer', () => {
       consoleSpy.mockRestore();
     });
 
+    test('should skip replace when query is empty', async () => {
+      const onRefresh = jest.fn();
+
+      await replaceAll('', 'replace', 'project', defaultOptions, undefined, undefined, onRefresh);
+
+      expect(search.performSearch).not.toHaveBeenCalled();
+      expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
+      expect(onRefresh).not.toHaveBeenCalled();
+    });
+
     test('should pass directory and module paths to performSearch', async () => {
       (search.performSearch as jest.Mock).mockResolvedValue([]);
       const onRefresh = jest.fn();

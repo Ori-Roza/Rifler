@@ -607,6 +607,19 @@ body.loaded {
   border-color: var(--rifler-border);
 }
 
+.replace-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--rifler-button-secondary-bg);
+  color: var(--rifler-button-secondary-fg);
+  border-color: var(--rifler-border);
+}
+
+.replace-actions button:disabled:hover {
+  background: var(--rifler-button-secondary-bg);
+  border-color: var(--rifler-border);
+}
+
 /* ===== Filters Section (Restructured for Issue #83) ===== */
 .filters-container {
   display: flex;

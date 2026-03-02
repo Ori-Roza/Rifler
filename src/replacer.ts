@@ -47,6 +47,10 @@ export async function replaceAll(
   onRefresh: () => Promise<void>
 ): Promise<void> {
   try {
+    if (!query.trim()) {
+      return;
+    }
+
     const results = await performSearch(query, scope, options, directoryPath, modulePath);
     if (results.length === 0) {
       vscode.window.showInformationMessage('No occurrences found to replace.');

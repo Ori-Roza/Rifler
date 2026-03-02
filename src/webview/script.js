@@ -460,6 +460,19 @@ console.log('[Rifler] Webview script starting...');
   
   // Initialize results count display
   clearResultsCountDisplay();
+  updateReplaceActionState();
+
+  function isReplaceActionDisabled() {
+    const queryValue = queryInput ? queryInput.value.trim() : '';
+    const replaceValue = replaceInput ? replaceInput.value.trim() : '';
+    return queryValue.length < 2;
+  }
+
+  function updateReplaceActionState() {
+    const shouldDisable = isReplaceActionDisabled();
+    if (replaceBtn) replaceBtn.disabled = shouldDisable;
+    if (replaceAllBtn) replaceAllBtn.disabled = shouldDisable;
+  }
 
   function toggleReplace(forceState) {
     if (replaceRow) {
@@ -480,6 +493,8 @@ console.log('[Rifler] Webview script starting...');
         queryInput.focus();
         queryInput.select();
       }
+
+      updateReplaceActionState();
       
       // Update highlights when replace mode changes
       if (isEditMode) {
@@ -551,6 +566,8 @@ console.log('[Rifler] Webview script starting...');
       vscode.postMessage({ type: 'minimize', state: {} });
 
       applyQueryRows(1, { skipSearch: true });
+
+      updateReplaceActionState();
     });
   }
 
@@ -654,6 +671,7 @@ console.log('[Rifler] Webview script starting...');
         : (state.options.multiline ? 2 : 1);
       applyQueryRows(inferredRows, { skipSearch: true });
       recomputeMultilineOption({ skipSearch: true });
+      updateReplaceActionState();
     }
 
     // Search history dropdown (triggered by magnifying glass)
@@ -847,6 +865,10 @@ console.log('[Rifler] Webview script starting...');
   }
   
   if (replaceInput) {
+    replaceInput.addEventListener('input', () => {
+      updateReplaceActionState();
+    });
+
     replaceInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         if (e.metaKey || e.ctrlKey) {
@@ -1670,6 +1692,8 @@ console.log('[Rifler] Webview script starting...');
     if (isEditMode) {
       exitEditMode(true);
     }
+
+    if (isReplaceActionDisabled()) return;
     
     if (state.activeIndex < 0 || state.activeIndex >= state.results.length) return;
     const result = state.results[state.activeIndex];
@@ -1750,6 +1774,8 @@ console.log('[Rifler] Webview script starting...');
     if (isEditMode) {
       exitEditMode(true);
     }
+
+    if (isReplaceActionDisabled()) return;
 
     if (state.searchMode === 'lsp') {
       const replaceText = replaceInput.value;
@@ -1848,6 +1874,7 @@ console.log('[Rifler] Webview script starting...');
     console.log('Input event triggered, value:', queryInput.value);
     clearTimeout(state.searchTimeout);
     recomputeMultilineOption({ skipSearch: true });
+    updateReplaceActionState();
     
     if (isEditMode) {
       exitEditMode(true);
@@ -1877,6 +1904,7 @@ console.log('[Rifler] Webview script starting...');
       }
       
       vscode.postMessage({ type: 'clearState' });
+      updateReplaceActionState();
       return;
     }
     
@@ -2571,6 +2599,7 @@ console.log('[Rifler] Webview script starting...');
           queryInput.focus();
           queryInput.select();
         }
+        updateReplaceActionState();
         break;
       case 'setSearchQuery':
         if (typeof message.query === 'string') {
@@ -2583,6 +2612,7 @@ console.log('[Rifler] Webview script starting...');
           if (message.query.length >= 2) {
             runSearch();
           }
+          updateReplaceActionState();
         }
         break;
       case 'config':
@@ -2630,6 +2660,7 @@ console.log('[Rifler] Webview script starting...');
         recomputeMultilineOption({ skipSearch: true });
         applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: false });
         handleSearchResults([], { skipAutoLoad: true });
+        updateReplaceActionState();
         break;
       case 'clearLspCache':
         // Invalidate LSP cache when code changes
@@ -2714,6 +2745,8 @@ console.log('[Rifler] Webview script starting...');
           } else {
             toggleReplace(false);
           }
+
+          updateReplaceActionState();
 
           // Restore LSP mode
           if (s.searchMode === 'lsp') {
@@ -2939,6 +2972,8 @@ console.log('[Rifler] Webview script starting...');
           summaryBarVisible: resultsSummaryBar ? getComputedStyle(resultsSummaryBar).display !== 'none' : false,
           filtersVisible: filtersContainer ? !filtersContainer.classList.contains('hidden') : false,
           replaceVisible: replaceRow ? replaceRow.classList.contains('visible') : false,
+          replaceButtonsDisabled: replaceBtn ? replaceBtn.disabled : false,
+          replaceAllButtonsDisabled: replaceAllBtn ? replaceAllBtn.disabled : false,
           localReplaceWidgetVisible: replaceWidget ? replaceWidget.classList.contains('visible') : false,
           localReplaceRowVisible: localReplaceRow ? !localReplaceRow.hidden : false,
           previewVisible: previewPanelContainer ? getComputedStyle(previewPanelContainer).display !== 'none' : false,
@@ -3207,6 +3242,13 @@ console.log('[Rifler] Webview script starting...');
           // Trigger search
           const searchEvent = new Event('input', { bubbles: true });
           queryInput.dispatchEvent(searchEvent);
+        }
+        break;
+      case '__test_setReplaceInput':
+        if (replaceInput && message.value !== undefined) {
+          replaceInput.value = message.value;
+          const replaceEvent = new Event('input', { bubbles: true });
+          replaceInput.dispatchEvent(replaceEvent);
         }
         break;
       case '__test_setContextFilters':

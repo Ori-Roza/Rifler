@@ -92,7 +92,12 @@ describe('Replacer', () => {
         }
       ];
 
-      (search.performSearch as jest.Mock).mockResolvedValue(mockResults);
+      (search.performSearch as jest.Mock).mockResolvedValue({
+        results: mockResults,
+        timedOut: false,
+        cancelled: false,
+        resultCapHit: false,
+      });
 
       await replaceAll(query, replaceText, scope, defaultOptions, undefined, undefined, onRefresh);
 
@@ -110,7 +115,12 @@ describe('Replacer', () => {
     });
 
     test('should show message if no results found', async () => {
-      (search.performSearch as jest.Mock).mockResolvedValue([]);
+      (search.performSearch as jest.Mock).mockResolvedValue({
+        results: [],
+        timedOut: false,
+        cancelled: false,
+        resultCapHit: false,
+      });
       const onRefresh = jest.fn();
 
       await replaceAll('query', 'replace', 'project', defaultOptions, undefined, undefined, onRefresh);
@@ -121,16 +131,21 @@ describe('Replacer', () => {
     });
 
     test('should handle applyEdit failure', async () => {
-      (search.performSearch as jest.Mock).mockResolvedValue([{
-        uri: 'file:///test.ts',
-        line: 0,
-        character: 0,
-        length: 1,
-        fileName: 'test.ts',
-        relativePath: 'test.ts',
-        preview: 'a',
-        previewMatchRange: { start: 0, end: 1 }
-      }]);
+      (search.performSearch as jest.Mock).mockResolvedValue({
+        results: [{
+          uri: 'file:///test.ts',
+          line: 0,
+          character: 0,
+          length: 1,
+          fileName: 'test.ts',
+          relativePath: 'test.ts',
+          preview: 'a',
+          previewMatchRange: { start: 0, end: 1 }
+        }],
+        timedOut: false,
+        cancelled: false,
+        resultCapHit: false,
+      });
       
       (vscode.workspace.applyEdit as unknown as jest.Mock).mockResolvedValue(false);
       const onRefresh = jest.fn();
@@ -155,7 +170,12 @@ describe('Replacer', () => {
         }
       ];
 
-      (search.performSearch as jest.Mock).mockResolvedValue(mockResults);
+      (search.performSearch as jest.Mock).mockResolvedValue({
+        results: mockResults,
+        timedOut: false,
+        cancelled: false,
+        resultCapHit: false,
+      });
       
       // Mock save to throw error
       const mockDocWithError = {
@@ -201,7 +221,12 @@ describe('Replacer', () => {
     });
 
     test('should pass directory and module paths to performSearch', async () => {
-      (search.performSearch as jest.Mock).mockResolvedValue([]);
+      (search.performSearch as jest.Mock).mockResolvedValue({
+        results: [],
+        timedOut: false,
+        cancelled: false,
+        resultCapHit: false,
+      });
       const onRefresh = jest.fn();
 
       await replaceAll('query', 'replace', 'directory', defaultOptions, '/test/dir', undefined, onRefresh);

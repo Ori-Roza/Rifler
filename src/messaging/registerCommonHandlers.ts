@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { MessageHandler } from './handler';
-import { performSearch } from '../search';
+import { performSearch, SearchOutcome } from '../search';
 import { replaceOne, replaceAll } from '../replacer';
 import { validateRegex, validateFileMask, SearchOptions, SearchScope, SearchResult } from '../utils';
 import { getTelemetryLogger } from '../telemetry';
@@ -40,6 +40,15 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       ? (msg.options.fileMask ? `${msg.options.fileMask},${msg.exclusionPatterns}` : msg.exclusionPatterns)
       : (msg.options.fileMask || '');
 
+    if (msg.scope === 'directory' && msg.query?.trim().length > 0 && msg.query.trim().length < 3) {
+      deps.postMessage({
+        type: 'error',
+        message: 'Directory scope requires at least 3 characters.'
+      });
+      deps.postMessage({ type: 'searchResults', results: [], maxResults: 10000 });
+      return;
+    }
+
     let directoryPath = msg.directoryPath;
     if (msg.scope === 'directory' && msg.directoryPath && vscode.workspace.workspaceFolders?.length) {
       try {
@@ -57,8 +66,9 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
 
     let results: SearchResult[] = [];
     let searchError: string | undefined;
+    let searchOutcome: SearchOutcome | undefined;
     try {
-      results = await performSearch(
+      searchOutcome = await performSearch(
         msg.query,
         msg.scope,
         { ...msg.options, fileMask: mergedFileMask },
@@ -67,12 +77,16 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
         10000,
         msg.smartExcludesEnabled ?? true
       );
+      results = searchOutcome.results;
       console.log('[Rifler] Search returned', results.length, 'results');
     } catch (error) {
       searchError = error instanceof Error ? error.message : String(error);
       throw error;
     } finally {
       const durationMs = Date.now() - startTime;
+      const timedOut = searchOutcome?.timedOut ?? false;
+      const cancelled = searchOutcome?.cancelled ?? false;
+      const resultCapHit = searchOutcome?.resultCapHit ?? false;
 
       telemetryLogger?.logUsage('search_completed', {
         duration_ms: durationMs,
@@ -92,6 +106,9 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
         file_mask_count: (mergedFileMask ? mergedFileMask.split(/[;,]+/).filter(Boolean).length : 0),
         has_exclusion_patterns: !!msg.exclusionPatterns,
         query_rows: (message as { queryRows?: number }).queryRows ?? 1,
+        timed_out: timedOut,
+        cancelled,
+        result_cap_hit: resultCapHit,
         error: searchError,
       });
 
@@ -114,6 +131,9 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
         file_mask_count: (mergedFileMask ? mergedFileMask.split(/[;,]+/).filter(Boolean).length : 0),
         has_exclusion_patterns: !!msg.exclusionPatterns,
         query_rows: (message as { queryRows?: number }).queryRows ?? 1,
+        timed_out: timedOut,
+        cancelled,
+        result_cap_hit: resultCapHit,
         error: searchError,
       };
     }
@@ -252,7 +272,7 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
           msg.directoryPath,
           msg.modulePath
         );
-        deps.postMessage({ type: 'searchResults', results, maxResults: 10000 });
+        deps.postMessage({ type: 'searchResults', results: results.results, maxResults: 10000 });
       }
     );
     const telemetryLogger = getTelemetryLogger();

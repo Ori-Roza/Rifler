@@ -464,7 +464,6 @@ console.log('[Rifler] Webview script starting...');
 
   function isReplaceActionDisabled() {
     const queryValue = queryInput ? queryInput.value.trim() : '';
-    const replaceValue = replaceInput ? replaceInput.value.trim() : '';
     return queryValue.length < 2;
   }
 
@@ -3550,6 +3549,12 @@ console.log('[Rifler] Webview script starting...');
       
       console.log('runSearch called, query:', query, 'length:', query.length, 'useRegex:', state.options.useRegex);
       
+      if (state.currentScope === 'directory' && query.trim().length > 0 && query.trim().length < 3) {
+        showPlaceholder('Directory scope needs at least 3 characters...');
+        clearResultsCountDisplay();
+        return;
+      }
+
       if (query.length < 2) {
         showPlaceholder('Type at least 2 characters...');
         clearResultsCountDisplay();

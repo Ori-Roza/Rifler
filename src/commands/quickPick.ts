@@ -74,10 +74,11 @@ export async function quickPickCommand(ctx: CommandContext): Promise<void> {
 
     try {
       const results = await performSearch(trimmed, 'project', options, undefined, undefined, MAX_ITEMS, true);
+      const searchResults = results.results;
       if (disposed || currentSearchId !== searchCounter) return;
 
-      const items = results.slice(0, MAX_ITEMS).map((result) => toQuickPickItem(result));
-      if (results.length >= MAX_ITEMS) {
+      const items = searchResults.slice(0, MAX_ITEMS).map((result) => toQuickPickItem(result));
+      if (searchResults.length >= MAX_ITEMS) {
         items.push({
           label: '$(link-external) Show all results in Rifler',
           description: '',

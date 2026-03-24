@@ -80,12 +80,12 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Perform search
-    const results = await performSearch(
+    const results = (await performSearch(
       'sidebarTest',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '*.ts' },
       testWorkspaceFolder.uri.fsPath
-    );
+    )).results;
 
     assert.ok(results.length > 0, 'Should find search results in project');
   });
@@ -98,12 +98,12 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Perform regex search
-    const results = await performSearch(
+    const results = (await performSearch(
       'sidebar.*Test',
       'project',
       { matchCase: false, wholeWord: false, useRegex: true, fileMask: '*.ts' },
       testWorkspaceFolder.uri.fsPath
-    );
+    )).results;
 
     assert.ok(results.length > 0, 'Should find results with regex pattern');
   });
@@ -116,12 +116,12 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Case-sensitive search
-    const results = await performSearch(
+    const results = (await performSearch(
       'SidebarTestClass',
       'project',
       { matchCase: true, wholeWord: false, useRegex: false, fileMask: '*.ts' },
       testWorkspaceFolder.uri.fsPath
-    );
+    )).results;
 
     assert.ok(results.length > 0, 'Should find exact case match');
   });
@@ -134,12 +134,12 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Search with file mask
-    const results = await performSearch(
+    const results = (await performSearch(
       'sidebar',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '*.ts' },
       testWorkspaceFolder.uri.fsPath
-    );
+    )).results;
 
     assert.ok(results.length > 0, 'Should respect file mask in sidebar');
   });
@@ -152,12 +152,12 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Whole word search
-    const results = await performSearch(
+    const results = (await performSearch(
       'sidebar',
       'project',
       { matchCase: false, wholeWord: true, useRegex: false, fileMask: '*.ts' },
       testWorkspaceFolder.uri.fsPath
-    );
+    )).results;
 
     assert.ok(results.length > 0, 'Should find whole word matches');
   });
@@ -743,11 +743,11 @@ const findMeSidebar = "unique_sidebar_search_term_12345";
     });
 
     // Trigger search by simulating the webview sending runSearch message
-    const results = await performSearch(
+    const results = (await performSearch(
       searchQuery,
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
-    );
+    )).results;
 
     assert.ok(results.length > 0, 'Search should return results');
 

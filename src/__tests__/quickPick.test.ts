@@ -38,7 +38,7 @@ describe('quickPickCommand', () => {
   });
 
   it('creates and shows a QuickPick with toggle buttons', async () => {
-    performSearchMock.mockResolvedValue([]);
+    performSearchMock.mockResolvedValue({ results: [], timedOut: false, cancelled: false, resultCapHit: false });
     await quickPickCommand(createContext());
 
     const created = (vscode.window.createQuickPick as jest.Mock).mock.results[0].value;
@@ -81,7 +81,7 @@ describe('quickPickCommand', () => {
       preview: 'const foo = 1;',
       previewMatchRange: { start: 6, end: 9 }
     };
-    performSearchMock.mockResolvedValue([result]);
+    performSearchMock.mockResolvedValue({ results: [result], timedOut: false, cancelled: false, resultCapHit: false });
 
     await quickPickCommand(createContext());
 
@@ -125,7 +125,7 @@ describe('quickPickCommand', () => {
       dispose: jest.fn()
     });
 
-    performSearchMock.mockResolvedValue([]);
+    performSearchMock.mockResolvedValue({ results: [], timedOut: false, cancelled: false, resultCapHit: false });
     await quickPickCommand(createContext());
 
     const created = (vscode.window.createQuickPick as jest.Mock).mock.results[0].value;
@@ -175,7 +175,12 @@ describe('quickPickCommand', () => {
       preview: 'const foo = 1;',
       previewMatchRange: { start: 6, end: 9 }
     };
-    performSearchMock.mockResolvedValue(Array.from({ length: 50 }, () => result));
+    performSearchMock.mockResolvedValue({
+      results: Array.from({ length: 50 }, () => result),
+      timedOut: false,
+      cancelled: false,
+      resultCapHit: true,
+    });
 
     const ctx = createContext();
     await quickPickCommand(ctx);
@@ -236,7 +241,12 @@ describe('quickPickCommand', () => {
       preview: 'const foo = 1;',
       previewMatchRange: { start: 6, end: 9 }
     };
-    performSearchMock.mockResolvedValue(Array.from({ length: 2 }, () => result));
+    performSearchMock.mockResolvedValue({
+      results: Array.from({ length: 2 }, () => result),
+      timedOut: false,
+      cancelled: false,
+      resultCapHit: false,
+    });
 
     await quickPickCommand(createContext());
 
@@ -296,7 +306,7 @@ describe('quickPickReplaceCommand', () => {
       preview: 'const foo = 1;',
       previewMatchRange: { start: 6, end: 9 }
     };
-    performSearchMock.mockResolvedValue([result]);
+    performSearchMock.mockResolvedValue({ results: [result], timedOut: false, cancelled: false, resultCapHit: false });
     (vscode.window.showInputBox as jest.Mock).mockResolvedValue('bar');
     (vscode.window.showQuickPick as jest.Mock).mockResolvedValue({ label: 'Replace One' });
 
@@ -351,7 +361,12 @@ describe('quickPickReplaceCommand', () => {
       preview: 'const foo = 1;',
       previewMatchRange: { start: 6, end: 9 }
     };
-    performSearchMock.mockResolvedValue(Array.from({ length: 50 }, () => result));
+    performSearchMock.mockResolvedValue({
+      results: Array.from({ length: 50 }, () => result),
+      timedOut: false,
+      cancelled: false,
+      resultCapHit: true,
+    });
 
     const ctx = createContext();
     await quickPickReplaceCommand(ctx);

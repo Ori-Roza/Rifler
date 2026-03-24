@@ -25,22 +25,27 @@ describe('Search', () => {
     describe('input validation', () => {
       test('should return empty array for empty query', async () => {
         const results = await performSearch('', 'project', defaultOptions);
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
       });
 
       test('should return empty array for whitespace-only query', async () => {
         const results = await performSearch('   ', 'project', defaultOptions);
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
       });
 
       test('should return empty array for query shorter than 2 characters', async () => {
         const results = await performSearch('a', 'project', defaultOptions);
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
       });
 
       test('should return empty array for invalid regex', async () => {
         const results = await performSearch('[invalid', 'project', { ...defaultOptions, useRegex: true });
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
+      });
+
+      test('should return empty array for directory scope queries shorter than 3 characters', async () => {
+        const results = await performSearch('ab', 'directory', defaultOptions, '/test/dir');
+        expect(results.results).toEqual([]);
       });
     });
 
@@ -62,8 +67,8 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'directory', defaultOptions, testDir);
 
-        expect(results.length).toBe(1);
-        expect(results[0].preview).toContain('test');
+        expect(results.results.length).toBe(1);
+        expect(results.results[0].preview).toContain('test');
       });
 
       test('should return empty for non-existent directory', async () => {
@@ -71,12 +76,12 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'directory', defaultOptions, '/nonexistent');
 
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
       });
 
       test('should return empty for empty directory path', async () => {
         const results = await performSearch('test', 'directory', defaultOptions, '');
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
       });
 
       test('should search file if directory path points to a file', async () => {
@@ -93,7 +98,7 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'directory', defaultOptions, testFilePath);
 
-        expect(results.length).toBe(1);
+        expect(results.results.length).toBe(1);
       });
     });
 
@@ -115,7 +120,7 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'module', defaultOptions, undefined, modulePath);
 
-        expect(results.length).toBe(1);
+        expect(results.results.length).toBe(1);
       });
 
       test('should return empty for non-existent module path', async () => {
@@ -123,12 +128,12 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'module', defaultOptions, undefined, '/nonexistent/module');
 
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
       });
 
       test('should return empty for module scope without modulePath', async () => {
         const results = await performSearch('test', 'module', defaultOptions);
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
       });
     });
 
@@ -147,7 +152,7 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'project', defaultOptions);
 
-        expect(results.length).toBe(1);
+        expect(results.results.length).toBe(1);
       });
 
       test('should return empty when no workspace folders', async () => {
@@ -155,7 +160,7 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'project', defaultOptions);
 
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
       });
     });
 
@@ -264,7 +269,7 @@ describe('Search', () => {
         const results = await performSearch('test', 'project', defaultOptions);
 
         expect(mockWorkspaceFs.readFile).not.toHaveBeenCalled();
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
       });
 
       test('should respect file mask filter', async () => {
@@ -331,8 +336,8 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'project', defaultOptions);
 
-        expect(results.length).toBe(1);
-        expect(results[0].preview).toContain('test');
+        expect(results.results.length).toBe(1);
+        expect(results.results[0].preview).toContain('test');
       });
     });
 
@@ -354,8 +359,8 @@ describe('Search', () => {
         const results = await performSearch('test', 'project', defaultOptions);
 
         // Should have many results but not exceed reasonable limits
-        expect(results.length).toBeGreaterThan(0);
-        expect(results.length).toBeLessThanOrEqual(5000);
+        expect(results.results.length).toBeGreaterThan(0);
+        expect(results.results.length).toBeLessThanOrEqual(5000);
       });
     });
 
@@ -374,8 +379,8 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'project', defaultOptions);
 
-        expect(results.length).toBe(1);
-        expect(results[0]).toMatchObject({
+        expect(results.results.length).toBe(1);
+        expect(results.results[0]).toMatchObject({
           fileName: 'file.ts',
           relativePath: 'file.ts',
           line: 0,
@@ -383,8 +388,8 @@ describe('Search', () => {
           length: 4,
           preview: 'const test = "hello";' // trimmed preview
         });
-        expect(results[0].uri).toContain('file.ts');
-        expect(results[0].previewMatchRange).toBeDefined();
+        expect(results.results[0].uri).toContain('file.ts');
+        expect(results.results[0].previewMatchRange).toBeDefined();
       });
 
       test('should handle multiple matches on same line', async () => {
@@ -401,8 +406,8 @@ describe('Search', () => {
 
         const results = await performSearch('test', 'project', defaultOptions);
 
-        expect(results.length).toBe(1);
-        expect(results[0].previewMatchRanges).toHaveLength(3);
+        expect(results.results.length).toBe(1);
+        expect(results.results[0].previewMatchRanges).toHaveLength(3);
       });
     });
 
@@ -417,7 +422,7 @@ describe('Search', () => {
         const results = await performSearch('test', 'project', defaultOptions);
 
         // Should not throw, just return empty results
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
         // The readDirectory should have been called
         expect(mockWorkspaceFs.readDirectory).toHaveBeenCalled();
       });
@@ -435,7 +440,7 @@ describe('Search', () => {
         const results = await performSearch('test', 'project', defaultOptions);
 
         // Should not throw, just return empty results
-        expect(results).toEqual([]);
+        expect(results.results).toEqual([]);
         expect(mockWorkspaceFs.readFile).toHaveBeenCalled();
       });
     });
@@ -458,7 +463,7 @@ describe('Search', () => {
 
       const results = await performSearch('test', 'project', defaultOptions, undefined, undefined, 10);
 
-      expect(results.length).toBe(10);
+      expect(results.results.length).toBe(10);
     });
 
     test('should return all results when under maxResults limit', async () => {
@@ -475,7 +480,7 @@ describe('Search', () => {
 
       const results = await performSearch('test', 'project', defaultOptions, undefined, undefined, 1000);
 
-      expect(results.length).toBe(2);
+      expect(results.results.length).toBe(2);
     });
 
     test('should use default maxResults of 10000 when not specified', async () => {
@@ -493,7 +498,7 @@ describe('Search', () => {
       // Just verify it doesn't throw and returns results
       const results = await performSearch('test', 'project', defaultOptions);
 
-      expect(results.length).toBe(1);
+      expect(results.results.length).toBe(1);
     });
 
     test('should handle maxResults of 0 or negative by using default', async () => {
@@ -512,7 +517,7 @@ describe('Search', () => {
       // With maxResults = 0, should still return results (uses default)
       const results = await performSearch('test', 'project', defaultOptions, undefined, undefined, 0);
 
-      expect(results.length).toBe(10);
+      expect(results.results.length).toBe(10);
     });
   });
 });

@@ -8,7 +8,7 @@ import {
   getOpenKeybindingHint
 } from '../utils';
 import { IncomingMessage } from '../messaging/types';
-import { performSearch } from '../search';
+import { performSearch, SearchOutcome } from '../search';
 import { replaceAll } from '../replacer';
 import { getWebviewHtml } from '../webview/webviewUtils';
 import { MessageHandler } from '../messaging/handler';
@@ -355,12 +355,22 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (message.scope === 'directory' && message.query.trim().length > 0 && message.query.trim().length < 3) {
+      this._view?.webview.postMessage({
+        type: 'error',
+        message: 'Directory scope requires at least 3 characters.'
+      });
+      this._view?.webview.postMessage({ type: 'searchResults', results: [], activeIndex: -1 });
+      return;
+    }
+
     const startTime = Date.now();
     let results: SearchResult[] = [];
     let searchError: string | undefined;
+    let searchOutcome: SearchOutcome | undefined;
 
     try {
-      results = await performSearch(
+      searchOutcome = await performSearch(
         message.query,
         message.scope as SearchScope,
         message.options,
@@ -369,12 +379,16 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         10000,
         message.smartExcludesEnabled ?? true
       );
+      results = searchOutcome.results;
     } catch (error) {
       searchError = error instanceof Error ? error.message : String(error);
       throw error;
     } finally {
       const durationMs = Date.now() - startTime;
       const telemetryLogger = getTelemetryLogger();
+      const timedOut = searchOutcome?.timedOut ?? false;
+      const cancelled = searchOutcome?.cancelled ?? false;
+      const resultCapHit = searchOutcome?.resultCapHit ?? false;
       telemetryLogger?.logUsage('search_completed', {
         duration_ms: durationMs,
         results_count: results.length,
@@ -392,6 +406,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         include_strings: message.options.includeStrings ?? true,
         file_mask_count: (message.options.fileMask ? message.options.fileMask.split(/[;,]+/).filter(Boolean).length : 0),
         query_rows: message.queryRows ?? 1,
+        timed_out: timedOut,
+        cancelled,
+        result_cap_hit: resultCapHit,
         error: searchError,
       });
     }

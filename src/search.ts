@@ -73,6 +73,16 @@ function filterResultsToRoots(results: SearchResult[], roots: RootSpec[]): Searc
   });
 }
 
+export interface SearchOutcome {
+  results: SearchResult[];
+  timedOut: boolean;
+  cancelled: boolean;
+  resultCapHit: boolean;
+}
+
+const SEARCH_TIMEOUT_MS = 5000;
+const DIRECTORY_SCOPE_MIN_QUERY_LENGTH = 3;
+
 export async function performSearch(
   query: string,
   scope: SearchScope,
@@ -81,9 +91,13 @@ export async function performSearch(
   modulePath?: string,
   maxResults: number = 10000,
   smartExcludesEnabled: boolean = true
-): Promise<SearchResult[]> {
+): Promise<SearchOutcome> {
   if (!query.trim() || query.length < 2) {
-    return [];
+    return { results: [], timedOut: false, cancelled: false, resultCapHit: false };
+  }
+
+  if (scope === 'directory' && query.trim().length < DIRECTORY_SCOPE_MIN_QUERY_LENGTH) {
+    return { results: [], timedOut: false, cancelled: false, resultCapHit: false };
   }
 
   options.multiline = !!options.multiline;
@@ -91,16 +105,16 @@ export async function performSearch(
   const regexValidation = validateRegex(query, options.useRegex, !!options.multiline);
   if (!regexValidation.isValid) {
     console.error('Invalid regex:', regexValidation.error);
-    return [];
+    return { results: [], timedOut: false, cancelled: false, resultCapHit: false };
   }
 
   if (options.useRegex && !isSafeRegex(query)) {
     console.warn('Rejected potentially unsafe regex pattern');
-    return [];
+    return { results: [], timedOut: false, cancelled: false, resultCapHit: false };
   }
 
   if (!buildSearchRegex(query, options)) {
-    return [];
+    return { results: [], timedOut: false, cancelled: false, resultCapHit: false };
   }
 
   const maskValidation = validateFileMask(options.fileMask);
@@ -112,9 +126,13 @@ export async function performSearch(
   const effectiveMaxResults = Math.max(1, Math.floor(maxResults || 10000));
   const rootSpecs = await resolveSearchRoots(scope, directoryPath, modulePath);
   if (rootSpecs.length === 0) {
-    return [];
+    return { results: [], timedOut: false, cancelled: false, resultCapHit: false };
   }
   const roots = rootSpecs.map((r) => r.fsPath);
+
+  let timedOut = false;
+  let cancelled = false;
+  let resultCapHit = false;
 
   cancelActiveSearch();
   const { promise, cancel } = startRipgrepSearch({
@@ -127,18 +145,30 @@ export async function performSearch(
     smartExcludesEnabled
   });
 
-  activeSearchCancel = cancel;
+  const cancelForNewSearch = (): void => {
+    cancelled = true;
+    cancel();
+  };
+
+  activeSearchCancel = cancelForNewSearch;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    cancel();
+  }, SEARCH_TIMEOUT_MS);
 
   try {
     const rawResults = await promise;
+    clearTimeout(timeoutId);
     const results = filterResultsToRoots(rawResults, rootSpecs);
     const filteredResults = await filterResultsByCodeContext(results, options);
-    if (activeSearchCancel === cancel) {
+    resultCapHit = rawResults.length >= effectiveMaxResults;
+    if (activeSearchCancel === cancelForNewSearch) {
       activeSearchCancel = undefined;
     }
-    return filteredResults;
+    return { results: filteredResults, timedOut, cancelled, resultCapHit };
   } catch (error) {
-    if (activeSearchCancel === cancel) {
+    clearTimeout(timeoutId);
+    if (activeSearchCancel === cancelForNewSearch) {
       activeSearchCancel = undefined;
     }
     console.error('Error during ripgrep search:', error);
@@ -149,7 +179,7 @@ export async function performSearch(
     try {
       const results: SearchResult[] = [];
       const regex = buildSearchRegex(query, options);
-      if (!regex) return [];
+      if (!regex) return { results: [], timedOut, cancelled, resultCapHit: false };
       const limiter = new Limiter(100);
       const perFileTimeBudgetMs = 2500;
 
@@ -163,12 +193,18 @@ export async function performSearch(
         if (results.length >= effectiveMaxResults) break;
       }
       const rootFiltered = filterResultsToRoots(results, rootSpecs);
-      return await filterResultsByCodeContext(rootFiltered, options);
+      resultCapHit = results.length >= effectiveMaxResults;
+      return {
+        results: await filterResultsByCodeContext(rootFiltered, options),
+        timedOut,
+        cancelled,
+        resultCapHit,
+      };
     } catch (fallbackError) {
       getTelemetryLogger()?.logError(fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)), {
         stage: 'fallback',
       });
-      return [];
+      return { results: [], timedOut, cancelled, resultCapHit: false };
     }
   }
 }

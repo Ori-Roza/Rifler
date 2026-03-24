@@ -51,7 +51,7 @@ suite('Ripgrep Environment Mismatch', () => {
       fileMask: ''
     };
 
-    const results = await performSearch('updated', 'project', options, undefined, undefined, 200);
+    const results = (await performSearch('updated', 'project', options, undefined, undefined, 200)).results;
 
     // The fixture workspace contains this token in test.js, so search should succeed.
     assert.ok(results.length > 0, 'Expected results via fallback from bad rg override');

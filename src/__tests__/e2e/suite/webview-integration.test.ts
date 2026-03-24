@@ -89,16 +89,17 @@ const findMe = "unique_search_term_12345";
     while (Date.now() - start < timeout) {
       attempts++;
       const results = await performSearch(query, scope, options, directoryPath, modulePath);
-      if (results.length >= expectedCount) {
+      const searchResults = results.results;
+      if (searchResults.length >= expectedCount) {
         if (attempts > 1) {
           log(`   ⏳ Found after ${attempts} attempts (${Date.now() - start}ms)`);
         }
-        return results;
+        return searchResults;
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     log(`   ❌ Failed after ${attempts} attempts (${Date.now() - start}ms)`);
-    return await performSearch(query, scope, options, directoryPath, modulePath);
+    return (await performSearch(query, scope, options, directoryPath, modulePath)).results;
   }
 
   after(async () => {
@@ -177,22 +178,22 @@ const findMe = "unique_search_term_12345";
     log(`   📁 File: ${testFilePath}`);
     log('   🔍 Query: "TestClass" (matchCase: true)');
 
-    const caseSensitiveResults = await performSearch(
+    const caseSensitiveResults = (await performSearch(
       'TestClass',
       'project',
       { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' }
-    );
+    )).results;
 
     log(`   📊 Found ${caseSensitiveResults.length} result(s)`);
 
     await step('Searching for "testclass" (wrong case) with case sensitivity');
     log('   🔍 Query: "testclass" (matchCase: true)');
 
-    const wrongCaseResults = await performSearch(
+    const wrongCaseResults = (await performSearch(
       'testclass',
       'project',
       { matchCase: true, wholeWord: false, useRegex: false, fileMask: '' }
-    );
+    )).results;
 
     log(`   📊 Found ${wrongCaseResults.length} result(s)`);
 
@@ -232,11 +233,11 @@ const findMe = "unique_search_term_12345";
     log(`   📁 File: ${testFilePath}`);
     log('   🔍 Query: "this_text_definitely_does_not_exist_xyz789"');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       'this_text_definitely_does_not_exist_xyz789',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
-    );
+    )).results;
 
     log(`   📊 Found ${results.length} result(s)`);
     assert.strictEqual(results.length, 0, 'Should return empty array for non-existent text');
@@ -552,11 +553,11 @@ const c = "word_to_replace";`;
     await step('Searching with empty query');
     log('   🔍 Query: "" (empty string)');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       '',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
-    );
+    )).results;
 
     log(`   📊 Results: ${results.length}`);
     assert.strictEqual(results.length, 0, 'Empty query should return no results');
@@ -569,11 +570,11 @@ const c = "word_to_replace";`;
     await step('Searching with single character query');
     log('   🔍 Query: "a" (single character)');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       'a',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '' }
-    );
+    )).results;
 
     log(`   📊 Results: ${results.length}`);
     assert.strictEqual(results.length, 0, 'Single character query should return no results');
@@ -586,11 +587,11 @@ const c = "word_to_replace";`;
     await step('Searching with invalid regex pattern');
     log('   🔍 Query: "[invalid(regex" (invalid regex)');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       '[invalid(regex',
       'project',
       { matchCase: false, wholeWord: false, useRegex: true, fileMask: '' }
-    );
+    )).results;
 
     log(`   📊 Results: ${results.length}`);
     assert.strictEqual(results.length, 0, 'Invalid regex should return no results without crashing');

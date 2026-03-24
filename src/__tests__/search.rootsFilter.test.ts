@@ -63,7 +63,7 @@ describe('Search roots filtering', () => {
 
     const results = await performSearch('test', 'directory', defaultOptions, rootDir);
 
-    expect(results).toHaveLength(1);
-    expect(results[0].uri).toBe('/workspace/src/in.ts');
+    expect(results.results).toHaveLength(1);
+    expect(results.results[0].uri).toBe('/workspace/src/in.ts');
   });
 });

@@ -12,9 +12,23 @@ import * as vscode from 'vscode';
 
 // Mock performSearch to avoid real file system access
 jest.mock('../../search', () => ({
-  performSearch: jest.fn().mockResolvedValue([
-    { uri: 'file:///test.ts', line: 1, character: 0, length: 3, preview: 'foo', fileName: 'test.ts' },
-  ]),
+  performSearch: jest.fn().mockResolvedValue({
+    results: [
+      {
+        uri: 'file:///test.ts',
+        line: 1,
+        character: 0,
+        length: 3,
+        preview: 'foo',
+        fileName: 'test.ts',
+        relativePath: 'test.ts',
+        previewMatchRange: { start: 0, end: 3 },
+      },
+    ],
+    timedOut: false,
+    cancelled: false,
+    resultCapHit: false,
+  }),
 }));
 
 // Mock telemetry module so we can spy on getTelemetryLogger
@@ -122,6 +136,9 @@ describe('search_completed telemetry integration', () => {
         match_case: false,
         whole_word: false,
         multiline: false,
+        timed_out: false,
+        cancelled: false,
+        result_cap_hit: false,
       }));
 
       // duration_ms should be a non-negative number
@@ -129,6 +146,39 @@ describe('search_completed telemetry integration', () => {
         (c: unknown[]) => c[0] === 'search_completed'
       )!;
       expect(call[1].duration_ms).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should include timeout/cancel/result cap flags when search completes', async () => {
+      performSearchMock.mockResolvedValueOnce({
+        results: [
+          {
+            uri: 'file:///test.ts',
+            line: 1,
+            character: 0,
+            length: 3,
+            preview: 'foo',
+            fileName: 'test.ts',
+            relativePath: 'test.ts',
+            previewMatchRange: { start: 0, end: 3 },
+          },
+        ],
+        timedOut: true,
+        cancelled: true,
+        resultCapHit: true,
+      });
+
+      await handler.handle({
+        type: 'runSearch',
+        query: 'test',
+        scope: 'project',
+        options: { matchCase: false, wholeWord: false, useRegex: false, multiline: false, fileMask: '' },
+      });
+
+      expect(mockLogUsage).toHaveBeenCalledWith('search_completed', expect.objectContaining({
+        timed_out: true,
+        cancelled: true,
+        result_cap_hit: true,
+      }));
     });
 
     it('should include query_length in telemetry', async () => {
@@ -170,6 +220,9 @@ describe('search_completed telemetry integration', () => {
         include_comments: false,
         include_strings: false,
         file_mask_count: 2,
+        timed_out: false,
+        cancelled: false,
+        result_cap_hit: false,
       }));
     });
 
@@ -197,6 +250,9 @@ describe('search_completed telemetry integration', () => {
       expect(mockLogUsage).toHaveBeenCalledWith('search_completed', expect.objectContaining({
         error: 'search failed',
         results_count: 0,
+        timed_out: false,
+        cancelled: false,
+        result_cap_hit: false,
       }));
     });
 

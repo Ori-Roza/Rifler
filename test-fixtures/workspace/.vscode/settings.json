@@ -3,5 +3,8 @@
   "editor.minimap.enabled": false,
   "rifler.viewMode": "tab",
   "rifler.results.showCollapsed": true,
-  "rifler.openKeybindingHint": "cmd+alt+f"
+  "rifler.openKeybindingHint": "cmd+alt+f",
+  "rifler.panelLocation": "window",
+  "rifler.persistSearchState": true,
+  "rifler.persistenceScope": "off"
 }

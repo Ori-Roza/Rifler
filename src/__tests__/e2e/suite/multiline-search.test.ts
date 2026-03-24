@@ -84,11 +84,11 @@ Final section.
     log('\n🔹 Testing multiline search with empty line pattern');
     log('   🔍 Query: "npm test\\n\\n# Run"');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       'npm test\n\n# Run',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '', multiline: true }
-    );
+    )).results;
 
     log(`   📊 Found ${results.length} result(s)`);
     assert.ok(results.length >= 1, 'Should find multiline pattern with empty line');
@@ -101,11 +101,11 @@ Final section.
     log('\n🔹 Testing multiline search without empty line');
     log('   🔍 Query: "function hello() {\\n  console.log"');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       'function hello() {\n  console.log',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '', multiline: true }
-    );
+    )).results;
 
     log(`   📊 Found ${results.length} result(s)`);
     assert.ok(results.length >= 1, 'Should find multiline pattern without empty line');
@@ -118,11 +118,11 @@ Final section.
     log('\n🔹 Testing multiple multiline matches');
     log('   🔍 Query: "test\\n\\n#" (pattern appears twice)');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       'test\n\n#',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '', multiline: true }
-    );
+    )).results;
 
     log(`   📊 Found ${results.length} result(s)`);
     // The pattern "test\n\n#" appears twice in our test file
@@ -136,11 +136,11 @@ Final section.
     log('\n🔹 Testing multiline regex search');
     log('   🔍 Query: "npm test\\n\\n# .*" (regex)');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       'npm test\n\n# .*',
       'project',
       { matchCase: false, wholeWord: false, useRegex: true, fileMask: '', multiline: true }
-    );
+    )).results;
 
     log(`   📊 Found ${results.length} result(s)`);
     assert.ok(results.length >= 1, 'Should find multiline regex pattern');
@@ -153,13 +153,13 @@ Final section.
     log('\n🔹 Testing line numbers in multiline results');
     log('   🔍 Query: "npm test\\n\\n# Run"');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       'npm test\n\n# Run',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '', multiline: true },
       undefined,
       undefined
-    );
+    )).results;
 
     if (results.length > 0) {
       log(`   📊 First match at line ${results[0].line}`);
@@ -177,11 +177,11 @@ Final section.
     log('\n🔹 Testing non-matching multiline pattern');
     log('   🔍 Query: "npm test\\n\\n\\n# Run" (extra empty line)');
 
-    const results = await performSearch(
+    const results = (await performSearch(
       'npm test\n\n\n# Run',
       'project',
       { matchCase: false, wholeWord: false, useRegex: false, fileMask: '', multiline: true }
-    );
+    )).results;
 
     log(`   📊 Found ${results.length} result(s)`);
     assert.strictEqual(results.length, 0, 'Should not find pattern with incorrect line count');
@@ -196,11 +196,11 @@ Final section.
 
     // This pattern uses .* which should NOT match newlines
     // If dotall was enabled, this would incorrectly match functions with console on different lines
-    const results = await performSearch(
+    const results = (await performSearch(
       'function.*console',
       'project',
       { matchCase: false, wholeWord: false, useRegex: true, fileMask: 'multiline-test-file.md', multiline: true }
-    );
+    )).results;
 
     log(`   📊 Found ${results.length} result(s)`);
     // The test file has "function hello() {" on one line and "console.log" on the next
@@ -216,11 +216,11 @@ Final section.
     log('   🔍 Query: "function hello\\(\\) \\{\\n  console" (regex with explicit newline)');
 
     // This pattern uses explicit \n to match across lines
-    const results = await performSearch(
+    const results = (await performSearch(
       'function hello\\(\\) \\{\n  console',
       'project',
       { matchCase: false, wholeWord: false, useRegex: true, fileMask: 'multiline-test-file.md', multiline: true }
-    );
+    )).results;
 
     log(`   📊 Found ${results.length} result(s)`);
     assert.ok(results.length >= 1, 'Should find pattern with explicit newline');

@@ -52,7 +52,8 @@ export async function replaceAll(
     }
 
     const results = await performSearch(query, scope, options, directoryPath, modulePath);
-    if (results.length === 0) {
+    const searchResults = results.results;
+    if (searchResults.length === 0) {
       vscode.window.showInformationMessage('No occurrences found to replace.');
       return;
     }
@@ -61,7 +62,7 @@ export async function replaceAll(
     // Only enforce validation if workspace folders exist (skip in tests/edge cases)
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length > 0) {
-      for (const result of results) {
+      for (const result of searchResults) {
         if (!validateUriString(result.uri)) {
           throw new Error('Security: All URIs must be within workspace');
         }
@@ -71,7 +72,7 @@ export async function replaceAll(
     const edit = new vscode.WorkspaceEdit();
     const affectedUris = new Set<string>();
     
-    for (const result of results) {
+    for (const result of searchResults) {
       const uri = vscode.Uri.parse(result.uri);
       const range = new vscode.Range(result.line, result.character, result.line, result.character + result.length);
       edit.replace(uri, range, replaceText);
@@ -91,7 +92,7 @@ export async function replaceAll(
         }
       }
 
-      vscode.window.showInformationMessage(`Replaced ${results.length} occurrences.`);
+      vscode.window.showInformationMessage(`Replaced ${searchResults.length} occurrences.`);
       // Re-run search to update UI
       await onRefresh();
     } else {

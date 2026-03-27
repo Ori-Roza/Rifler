@@ -59,6 +59,36 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   private _suppressSideEffectsUntil = 0;
   private _shouldSaveOnNextHide = false;
   private _lastVisibility?: boolean;
+  private _lastRestoreAt = 0;
+  private _didInitialRestore = false;
+
+  private _sanitizeStateForPersistence(state: Record<string, unknown> | undefined): SidebarState | undefined {
+    if (!state) {
+      return undefined;
+    }
+
+    const sanitized = { ...state } as Record<string, unknown>;
+    if (typeof sanitized['query'] === 'string' && (sanitized['query'] as string).length > 2000) {
+      sanitized['query'] = (sanitized['query'] as string).slice(0, 2000);
+    }
+    if (typeof sanitized['replaceText'] === 'string' && (sanitized['replaceText'] as string).length > 2000) {
+      sanitized['replaceText'] = (sanitized['replaceText'] as string).slice(0, 2000);
+    }
+    delete sanitized.results;
+    delete sanitized.lastPreview;
+    delete sanitized.lspResultsCache;
+
+    return sanitized as unknown as SidebarState;
+  }
+
+  private _stateNeedsSanitizing(state: Record<string, unknown> | undefined): boolean {
+    if (!state) {
+      return false;
+    }
+    return Object.prototype.hasOwnProperty.call(state, 'results')
+      || Object.prototype.hasOwnProperty.call(state, 'lastPreview')
+      || Object.prototype.hasOwnProperty.call(state, 'lspResultsCache');
+  }
 
   public readonly viewType: string;
   private readonly _stateKey: string;
@@ -99,6 +129,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   ): void | Thenable<void> {
     this._view = webviewView;
     this._webviewReady = false;
+    this._didInitialRestore = false;
     console.log(`Rifler ${this._logLabel} WebviewView resolved`);
 
     this._updateViewTitle();
@@ -165,7 +196,8 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           });
         } else {
           // No selection: restore state and focus search input
-          if (!this._pendingInitOptions?.initialQuery) {
+          const now = Date.now();
+          if (this._webviewReady && !this._pendingInitOptions?.initialQuery && now - this._lastRestoreAt > 250) {
             this._restoreState();
           }
           webviewView.webview.postMessage({ type: 'focusSearch' });
@@ -200,10 +232,7 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       })
     );
 
-    // Initial state restore if visible
-    if (webviewView.visible) {
-      this._restoreState();
-    }
+    // Initial state restore is handled on 'webviewReady' to avoid duplicate restore->search runs.
   }
 
   private _getSelectedText(): string | undefined {
@@ -278,14 +307,27 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     switch (message.type) {
       case 'runSearch': {
         // Handle search locally to persist state after each search
-        const searchMessage = message as unknown as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number; smartExcludesEnabled?: boolean };
+        const searchMessage = message as unknown as {
+          query: string;
+          scope: SearchScope;
+          options: SearchOptions;
+          maxResults?: number;
+          directoryPath?: string;
+          modulePath?: string;
+          activeIndex?: number;
+          smartExcludesEnabled?: boolean;
+          requestId?: string;
+        };
         await this._runSearch(searchMessage);
         break;
       }
       case 'webviewReady': {
         this._webviewReady = true;
         // Restore persisted sidebar state first
-        this._restoreState();
+        if (!this._didInitialRestore) {
+          this._restoreState();
+          this._didInitialRestore = true;
+        }
         // Then apply pending initialization options (e.g. selection query) so they win over restored state
         if (this._pendingInitOptions) {
           const { initialQuery, showReplace } = this._pendingInitOptions;
@@ -327,8 +369,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
           const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
           const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
+          const sanitizedState = this._sanitizeStateForPersistence(message.state as Record<string, unknown>);
           if (persist) {
-            await store.update(this._stateKey, message.state as unknown as SidebarState);
+            await store.update(this._stateKey, sanitizedState);
             console.log(`${this._logLabel}: state saved to ${this._stateKey}`);
           }
           // Resolve any pending save promise
@@ -338,29 +381,46 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
           }
         }
         break;
-      case 'clearState':
-        // Clear saved state when search is cleared
-        {
-          const cfg = vscode.workspace.getConfiguration('rifler');
-          const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
-          const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
-          await store.update(this._stateKey, undefined);
+      case 'clearState': {
+        // Avoid persistence clear churn right after restore/visibility transitions.
+        if (Date.now() - this._lastRestoreAt < 500) {
+          break;
         }
+        const cfg = vscode.workspace.getConfiguration('rifler');
+        const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
+        const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
+        await store.update(this._stateKey, undefined);
         break;
+      }
     }
   }
 
-  private async _runSearch(message: { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; activeIndex?: number; smartExcludesEnabled?: boolean; queryRows?: number }): Promise<void> {
+  private async _runSearch(message: {
+    query: string;
+    scope: SearchScope;
+    options: SearchOptions;
+    directoryPath?: string;
+    modulePath?: string;
+    activeIndex?: number;
+    smartExcludesEnabled?: boolean;
+    queryRows?: number;
+    requestId?: string;
+    maxResults?: number;
+  }): Promise<void> {
     if (!message.query || !message.scope || !message.options) {
       return;
     }
+
+    const cfg = vscode.workspace.getConfiguration('rifler');
+    const configuredMaxResults = cfg.get<number>('maxResults', 10000);
+    const effectiveMaxResults = Math.max(1, Math.floor(message.maxResults ?? configuredMaxResults));
 
     if (message.scope === 'directory' && message.query.trim().length > 0 && message.query.trim().length < 3) {
       this._view?.webview.postMessage({
         type: 'error',
         message: 'Directory scope requires at least 3 characters.'
       });
-      this._view?.webview.postMessage({ type: 'searchResults', results: [], activeIndex: -1 });
+      this._view?.webview.postMessage({ type: 'searchResults', results: [], activeIndex: -1, maxResults: effectiveMaxResults });
       return;
     }
 
@@ -376,8 +436,9 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         message.options,
         message.directoryPath,
         message.modulePath,
-        10000,
-        message.smartExcludesEnabled ?? true
+        effectiveMaxResults,
+        message.smartExcludesEnabled ?? true,
+        message.requestId
       );
       results = searchOutcome.results;
     } catch (error) {
@@ -406,9 +467,16 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         include_strings: message.options.includeStrings ?? true,
         file_mask_count: (message.options.fileMask ? message.options.fileMask.split(/[;,]+/).filter(Boolean).length : 0),
         query_rows: message.queryRows ?? 1,
+        max_results: effectiveMaxResults,
         timed_out: timedOut,
         cancelled,
         result_cap_hit: resultCapHit,
+        request_id: message.requestId,
+        phase_resolve_roots_ms: searchOutcome?.profile?.durationsMs.resolveRoots,
+        phase_rg_ms: searchOutcome?.profile?.durationsMs.rgSearch,
+        phase_root_filter_ms: searchOutcome?.profile?.durationsMs.rootFilter,
+        phase_context_filter_ms: searchOutcome?.profile?.durationsMs.contextFilter,
+        payload_bytes_estimate: searchOutcome?.profile?.serializedBytes,
         error: searchError,
       });
     }
@@ -418,7 +486,10 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({
       type: 'searchResults',
       results,
-      activeIndex
+      activeIndex,
+      maxResults: effectiveMaxResults,
+      requestId: message.requestId,
+      profile: searchOutcome?.profile,
     });
 
     if (this.stateStore) {
@@ -446,21 +517,19 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     // Save search state for persistence
-    const cfg = vscode.workspace.getConfiguration('rifler');
     const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
     const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
     const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
     if (persist) {
-      await store.update(this._stateKey, {
+      await store.update(this._stateKey, this._sanitizeStateForPersistence({
         query: message.query,
         scope: message.scope,
         options: message.options,
         queryRows: message.queryRows,
         directoryPath: message.directoryPath,
         modulePath: message.modulePath,
-        results: results,
         activeIndex
-      });
+      }));
     }
   }
 
@@ -704,7 +773,6 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
       if (persist) {
         await store.update(this._stateKey, {
           ...existing,
-          lastPreview: payload,
           activeIndex: activeIndex ?? existing.activeIndex ?? 0
         });
       }
@@ -886,15 +954,22 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
     const cfg = vscode.workspace.getConfiguration('rifler');
     const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
     const store = scope === 'global' ? this._context.globalState : this._context.workspaceState;
-    const state = store.get(this._stateKey);
+    const state = store.get(this._stateKey) as SidebarState | undefined;
+    const shouldSanitize = this._stateNeedsSanitizing(state as unknown as Record<string, unknown> | undefined);
+    const sanitizedState = this._sanitizeStateForPersistence(state as unknown as Record<string, unknown> | undefined);
+    if (shouldSanitize) {
+      void store.update(this._stateKey, sanitizedState);
+    }
 
     this._updateViewTitle();
 
     if (this._view) {
+      this._lastRestoreAt = Date.now();
       // Send configuration to webview
       const replaceKeybinding = cfg.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
       const maxResults = cfg.get<number>('maxResults', 10000);
       const resultsShowCollapsed = cfg.get<boolean>('results.showCollapsed', false);
+      const profileSearch = cfg.get<boolean>('debug.profileSearch', false);
       const contextDefaults = {
         includeCode: cfg.get<boolean>('searchContext.includeCode', true),
         includeComments: cfg.get<boolean>('searchContext.includeComments', true),
@@ -906,15 +981,16 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
         replaceKeybinding,
         maxResults,
         resultsShowCollapsed,
+        profileSearch,
         contextDefaults
       });
 
-      console.log(`${this._logLabel}._restoreState: state =`, state ? 'exists' : 'undefined', state);
-      if (state) {
+      console.log(`${this._logLabel}._restoreState: state =`, sanitizedState ? 'exists' : 'undefined', sanitizedState);
+      if (sanitizedState) {
         console.log(`${this._logLabel}._restoreState: sending restoreState message`);
         this._view.webview.postMessage({
           type: 'restoreState',
-          state
+          state: sanitizedState
         });
       } else {
         console.log(`${this._logLabel}._restoreState: no state to restore, sending clearState`);
@@ -1034,9 +1110,12 @@ export class RiflerSidebarProvider implements vscode.WebviewViewProvider {
   public sendConfigUpdate(resultsShowCollapsed: boolean): void {
     this._updateViewTitle();
     if (this._view) {
+      const cfg = vscode.workspace.getConfiguration('rifler');
+      const profileSearch = cfg.get<boolean>('debug.profileSearch', false);
       this._view.webview.postMessage({
         type: 'config',
-        resultsShowCollapsed
+        resultsShowCollapsed,
+        profileSearch
       });
     }
   }

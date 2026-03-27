@@ -24,6 +24,7 @@ export interface SearchResult {
   character: number;
   length: number;
   preview: string;
+  matchCount?: number;
   previewMatchRange: {
     start: number;
     end: number;

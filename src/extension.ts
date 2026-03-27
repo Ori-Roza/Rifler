@@ -306,6 +306,29 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize StateStore
   stateStore = new StateStore(context);
 
+  // One-time migration cleanup for legacy heavy global state payloads.
+  try {
+    const globalSidebarState = context.globalState.get('rifler.sidebarState') as Record<string, unknown> | undefined;
+    const globalPersistedState = context.globalState.get('rifler.persistedSearchState') as Record<string, unknown> | undefined;
+    const hasLargeGlobalSidebarState = !!globalSidebarState && (
+      Object.prototype.hasOwnProperty.call(globalSidebarState, 'results')
+      || Object.prototype.hasOwnProperty.call(globalSidebarState, 'lastPreview')
+      || Object.prototype.hasOwnProperty.call(globalSidebarState, 'lspResultsCache')
+    );
+    const hasLargeGlobalPersistedState = !!globalPersistedState && (
+      Object.prototype.hasOwnProperty.call(globalPersistedState, 'results')
+      || Object.prototype.hasOwnProperty.call(globalPersistedState, 'lastPreview')
+      || Object.prototype.hasOwnProperty.call(globalPersistedState, 'lspResultsCache')
+    );
+    if (hasLargeGlobalSidebarState || hasLargeGlobalPersistedState) {
+      void context.globalState.update('rifler.sidebarState', undefined);
+      void context.globalState.update('rifler.persistedSearchState', undefined);
+      console.log('[Rifler] Cleared legacy heavy global persisted state payloads');
+    }
+  } catch (error) {
+    console.warn('[Rifler] Failed to run persisted-state cleanup migration:', error);
+  }
+
   // Detect workspace change to clear state if needed for "fresh search" on project change
   try {
     const lastWorkspaceFolders = context.globalState.get<string[]>('rifler.lastWorkspaceFolders');
@@ -562,12 +585,14 @@ export async function activate(context: vscode.ExtensionContext) {
       if (e.affectsConfiguration('rifler')) {
         const config = vscode.workspace.getConfiguration('rifler');
         const resultsShowCollapsed = config.get<boolean>('results.showCollapsed', false);
+        const profileSearch = config.get<boolean>('debug.profileSearch', false);
         
         // Send updated config to panel webview if visible
         if (panelManager.panel?.visible) {
           panelManager.panel.webview.postMessage({
             type: 'config',
-            resultsShowCollapsed
+            resultsShowCollapsed,
+            profileSearch
           });
         }
 

@@ -45,9 +45,11 @@ export interface GetWorkspaceInfoMessage {
 
 export interface RunSearchMessage {
   type: 'runSearch';
+  requestId?: string;
   query: string;
   scope: SearchScope;
   options: SearchOptions;
+  maxResults?: number;
   queryRows?: number;
   directoryPath?: string;
   modulePath?: string;
@@ -235,6 +237,8 @@ export interface SearchResultsMessage {
   results: SearchResult[];
   activeIndex?: number;
   maxResults?: number;
+  requestId?: string;
+  profile?: unknown;
   lspMode?: LspSearchMode;
   lspInfo?: LspSearchInfo;
 }
@@ -276,8 +280,10 @@ export interface ValidationResultMessage {
 
 export interface ConfigMessage {
   type: 'config';
-  replaceKeybinding: string;
-  maxResults: number;
+  replaceKeybinding?: string;
+  maxResults?: number;
+  resultsShowCollapsed?: boolean;
+  profileSearch?: boolean;
 }
 
 export interface ShowReplaceMessage {

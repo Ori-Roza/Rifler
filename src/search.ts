@@ -78,10 +78,44 @@ export interface SearchOutcome {
   timedOut: boolean;
   cancelled: boolean;
   resultCapHit: boolean;
+  profile?: SearchProfile;
+}
+
+export interface SearchProfile {
+  requestId?: string;
+  scope: SearchScope;
+  queryLength: number;
+  rootCount: number;
+  serializedBytes: number;
+  resultsBeforeContextFilter: number;
+  resultsAfterContextFilter: number;
+  durationsMs: {
+    resolveRoots: number;
+    rgSearch: number;
+    rootFilter: number;
+    contextFilter: number;
+    total: number;
+  };
 }
 
 const SEARCH_TIMEOUT_MS = 5000;
 const DIRECTORY_SCOPE_MIN_QUERY_LENGTH = 3;
+
+function estimateSearchPayloadBytes(results: SearchResult[]): number {
+  let bytes = 0;
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    bytes += (r.uri?.length || 0) + (r.fileName?.length || 0) + (r.relativePath?.length || 0) + (r.preview?.length || 0);
+    bytes += 48;
+    if (Array.isArray(r.matchRanges)) {
+      bytes += r.matchRanges.length * 16;
+    }
+    if (Array.isArray(r.previewMatchRanges)) {
+      bytes += r.previewMatchRanges.length * 16;
+    }
+  }
+  return bytes;
+}
 
 export async function performSearch(
   query: string,
@@ -90,8 +124,10 @@ export async function performSearch(
   directoryPath?: string,
   modulePath?: string,
   maxResults: number = 10000,
-  smartExcludesEnabled: boolean = true
+  smartExcludesEnabled: boolean = true,
+  requestId?: string
 ): Promise<SearchOutcome> {
+  const searchStartedAt = Date.now();
   if (!query.trim() || query.length < 2) {
     return { results: [], timedOut: false, cancelled: false, resultCapHit: false };
   }
@@ -124,7 +160,9 @@ export async function performSearch(
   }
 
   const effectiveMaxResults = Math.max(1, Math.floor(maxResults || 10000));
+  const resolveRootsStartedAt = Date.now();
   const rootSpecs = await resolveSearchRoots(scope, directoryPath, modulePath);
+  const resolveRootsDurationMs = Date.now() - resolveRootsStartedAt;
   if (rootSpecs.length === 0) {
     return { results: [], timedOut: false, cancelled: false, resultCapHit: false };
   }
@@ -157,15 +195,40 @@ export async function performSearch(
   }, SEARCH_TIMEOUT_MS);
 
   try {
+    const rgStartedAt = Date.now();
     const rawResults = await promise;
+    const rgDurationMs = Date.now() - rgStartedAt;
     clearTimeout(timeoutId);
+
+    const rootFilterStartedAt = Date.now();
     const results = filterResultsToRoots(rawResults, rootSpecs);
+    const rootFilterDurationMs = Date.now() - rootFilterStartedAt;
+
+    const contextFilterStartedAt = Date.now();
     const filteredResults = await filterResultsByCodeContext(results, options);
+    const contextFilterDurationMs = Date.now() - contextFilterStartedAt;
+
     resultCapHit = rawResults.length >= effectiveMaxResults;
     if (activeSearchCancel === cancelForNewSearch) {
       activeSearchCancel = undefined;
     }
-    return { results: filteredResults, timedOut, cancelled, resultCapHit };
+    const profile: SearchProfile = {
+      requestId,
+      scope,
+      queryLength: query.length,
+      rootCount: rootSpecs.length,
+      serializedBytes: estimateSearchPayloadBytes(filteredResults),
+      resultsBeforeContextFilter: results.length,
+      resultsAfterContextFilter: filteredResults.length,
+      durationsMs: {
+        resolveRoots: resolveRootsDurationMs,
+        rgSearch: rgDurationMs,
+        rootFilter: rootFilterDurationMs,
+        contextFilter: contextFilterDurationMs,
+        total: Date.now() - searchStartedAt,
+      },
+    };
+    return { results: filteredResults, timedOut, cancelled, resultCapHit, profile };
   } catch (error) {
     clearTimeout(timeoutId);
     if (activeSearchCancel === cancelForNewSearch) {

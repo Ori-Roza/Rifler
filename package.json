@@ -255,7 +255,7 @@
           "type": "number",
           "default": 10000,
           "minimum": 100,
-          "markdownDescription": "Maximum number of search results to collect. With virtualized rendering, higher values are handled efficiently.",
+          "markdownDescription": "Maximum number of search results to collect. Set higher for broader result sets; very high values can still increase UI work depending on query breadth.",
           "order": 5
         },
         "rifler.results.showCollapsed": {
@@ -288,6 +288,12 @@
           "default": true,
           "markdownDescription": "Include string literal matches by default when running a search.",
           "order": 14
+        },
+        "rifler.debug.profileSearch": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Enable local search pipeline profiling logs in the webview/extension output. Intended for local debugging.",
+          "order": 99
         }
         
       }

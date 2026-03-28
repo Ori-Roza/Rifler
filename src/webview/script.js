@@ -77,7 +77,17 @@ console.log('[Rifler] Webview script starting...');
     lspSubMode: 'references', // 'references' | 'definitions' | 'implementations' | 'typeDefinitions'
     lspInfo: null, // { languageId, symbolName, confidence }
     lspResultsCache: {}, // Cache results per LSP type: { references: {...}, definitions: {...}, ... }
-    lastTextQuery: ''
+    lastTextQuery: '',
+    searchRequestSeq: 0,
+    lastSentRequestId: null,
+    lastHandledRequestId: null,
+    inFlightSearches: new Set(),
+    profilingEnabled: false,
+    lastSearchProfile: null,
+    testMode: false,
+    pendingSearchResultsMessage: null,
+    resultsProcessScheduled: false,
+    previewWindows: Object.create(null)
   };
 
     let pendingTestHistoryEcho = false;
@@ -1870,7 +1880,9 @@ console.log('[Rifler] Webview script starting...');
   }
 
   queryInput.addEventListener('input', () => {
-    console.log('Input event triggered, value:', queryInput.value);
+    if (state.profilingEnabled) {
+      console.log('Input event triggered, value:', queryInput.value);
+    }
     clearTimeout(state.searchTimeout);
     recomputeMultilineOption({ skipSearch: true });
     updateReplaceActionState();
@@ -1913,10 +1925,14 @@ console.log('[Rifler] Webview script starting...');
     }, 300);
 
     state.searchTimeout = setTimeout(() => {
-      console.log('Timeout fired, calling runSearch()');
+      if (state.profilingEnabled) {
+        console.log('Timeout fired, calling runSearch()');
+      }
       runSearch();
     }, 300);
-    console.log('Timeout set, id:', state.searchTimeout);
+    if (state.profilingEnabled) {
+      console.log('Timeout set, id:', state.searchTimeout);
+    }
   });
 
   if (matchCaseToggle) {
@@ -2061,12 +2077,9 @@ console.log('[Rifler] Webview script starting...');
         queryRows: state.queryRows,
         showReplace: replaceRow.classList.contains('visible'),
         smartExcludesEnabled: state.smartExcludesEnabled,
-        results: state.results,
         activeIndex: state.activeIndex,
-        lastPreview: state.lastPreview,
         searchMode: state.searchMode,
-        lspSubMode: state.lspSubMode,
-        lspResultsCache: state.lspResultsCache
+        lspSubMode: state.lspSubMode
       }
     });
   }
@@ -2523,7 +2536,18 @@ console.log('[Rifler] Webview script starting...');
     }
     
     const message = event.data;
-    console.log('Webview received message:', message.type, message);
+    if (message && typeof message.type === 'string' && message.type.startsWith('__test_')) {
+      state.testMode = true;
+    }
+    if (message.type === 'searchResults') {
+      const count = Array.isArray(message.results) ? message.results.length : 0;
+      const occurrences = Array.isArray(message.results)
+        ? message.results.reduce((sum, r) => sum + getResultOccurrenceCount(r), 0)
+        : 0;
+      console.log('Webview received message: searchResults', { requestId: message.requestId, count, occurrences });
+    } else {
+      console.log('Webview received message:', message.type);
+    }
     switch (message.type) {
       case 'searchHistory':
         console.log('[Rifler] Received searchHistory update:', message.entries);
@@ -2545,8 +2569,8 @@ console.log('[Rifler] Webview script starting...');
           // Ignore late LSP results after switching back to text mode
           break;
         }
-        if (message.maxResults) {
-          state.maxResultsCap = message.maxResults;
+        if (typeof message.maxResults === 'number' && Number.isFinite(message.maxResults)) {
+          state.maxResultsCap = Math.max(1, Math.floor(message.maxResults));
         }
         if (message.lspInfo) {
           // Check if symbol changed - if so, clear cache
@@ -2571,7 +2595,7 @@ console.log('[Rifler] Webview script starting...');
             console.log('[Rifler] Cached LSP results for', state.lspSubMode, 'symbol:', message.lspInfo.symbolName);
           }
         }
-        handleSearchResults(message.results, { skipAutoLoad: false, activeIndex: message.activeIndex });
+        handleSearchResultsMessage(message);
         break;
       case 'modulesList':
         handleModulesList(message.modules);
@@ -2618,8 +2642,8 @@ console.log('[Rifler] Webview script starting...');
         if (message.replaceKeybinding) {
           state.replaceKeybinding = message.replaceKeybinding;
         }
-        if (message.maxResults) {
-          state.maxResultsCap = message.maxResults;
+        if (typeof message.maxResults === 'number' && Number.isFinite(message.maxResults)) {
+          state.maxResultsCap = Math.max(1, Math.floor(message.maxResults));
         }
         if (typeof message.resultsShowCollapsed === 'boolean') {
           state.resultsShowCollapsed = message.resultsShowCollapsed;
@@ -2634,6 +2658,9 @@ console.log('[Rifler] Webview script starting...');
             state.options.includeStrings = state.contextDefaults.includeStrings;
           }
           applyContextDefaults();
+        }
+        if (typeof message.profileSearch === 'boolean') {
+          state.profilingEnabled = message.profileSearch;
         }
         break;
       case 'focusSearch':
@@ -3343,6 +3370,9 @@ console.log('[Rifler] Webview script starting...');
 
     const patterns = [];
     state.projectExclusions.forEach(project => {
+      if (project && project.enabled === false) {
+        return;
+      }
       patterns.push(...project.excludePatterns);
     });
 
@@ -3363,6 +3393,20 @@ console.log('[Rifler] Webview script starting...');
   }
 
   // Helper function to update results count display
+  function getResultOccurrenceCount(result) {
+    if (!result) return 0;
+    if (typeof result.matchCount === 'number' && Number.isFinite(result.matchCount)) {
+      return Math.max(1, Math.floor(result.matchCount));
+    }
+    if (Array.isArray(result.matchRanges) && result.matchRanges.length > 0) {
+      return result.matchRanges.length;
+    }
+    if (Array.isArray(result.previewMatchRanges) && result.previewMatchRanges.length > 0) {
+      return result.previewMatchRanges.length;
+    }
+    return 1;
+  }
+
   function updateResultsCountDisplay(results) {
     if (!resultsCountText) return;
     
@@ -3377,9 +3421,10 @@ console.log('[Rifler] Webview script starting...');
       resultsCountText.textContent = 'No results found';
     } else {
       const uniqueFiles = new Set(results.map(r => r.uri)).size;
-      const isCapped = state.maxResultsCap && results.length >= state.maxResultsCap;
+      const totalOccurrences = results.reduce((sum, r) => sum + getResultOccurrenceCount(r), 0);
+      const isCapped = state.maxResultsCap && totalOccurrences >= state.maxResultsCap;
       const suffix = isCapped ? '+' : '';
-      let text = `${results.length}${suffix} result${results.length !== 1 ? 's' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`;
+      let text = `${totalOccurrences}${suffix} result${totalOccurrences !== 1 ? 's' : ''} in ${uniqueFiles} file${uniqueFiles !== 1 ? 's' : ''}`;
       
       if (state.lastSearchDuration > 0) {
         text += ` (${state.lastSearchDuration.toFixed(2)}s)`;
@@ -3395,6 +3440,35 @@ console.log('[Rifler] Webview script starting...');
       resultsCountText.textContent = 'Type to search...';
       resultsCountText.style.opacity = '1';
     }
+  }
+
+  function getPreviewWindowForUri(uri, lineCount, activeLineStart, activeLineEnd) {
+    const DEFAULT_RADIUS = 120;
+    const prev = state.previewWindows && uri ? state.previewWindows[uri] : null;
+    const radius = prev && typeof prev.radius === 'number' ? prev.radius : DEFAULT_RADIUS;
+
+    const clampedStart = Math.max(0, Math.min(lineCount - 1, activeLineStart));
+    const clampedEnd = Math.max(clampedStart, Math.min(lineCount - 1, activeLineEnd));
+
+    const start = Math.max(0, clampedStart - radius);
+    const end = Math.min(lineCount - 1, clampedEnd + radius);
+
+    return {
+      start,
+      end,
+      radius,
+      hasTopMore: start > 0,
+      hasBottomMore: end < lineCount - 1,
+    };
+  }
+
+  function setPreviewWindowRadius(uri, radius) {
+    if (!uri) return;
+    if (!state.previewWindows) {
+      state.previewWindows = Object.create(null);
+    }
+    const current = state.previewWindows[uri] || { radius: 120 };
+    state.previewWindows[uri] = { ...current, radius: Math.max(120, radius) };
   }
 
   function scheduleVirtualRender() {
@@ -3547,7 +3621,9 @@ console.log('[Rifler] Webview script starting...');
         : queryInput.value.trim();
       state.currentQuery = query;
       
-      console.log('runSearch called, query:', query, 'length:', query.length, 'useRegex:', state.options.useRegex);
+      if (state.profilingEnabled) {
+        console.log('runSearch called, query:', query, 'length:', query.length, 'useRegex:', state.options.useRegex);
+      }
       
       if (state.currentScope === 'directory' && query.trim().length > 0 && query.trim().length < 3) {
         showPlaceholder('Directory scope needs at least 3 characters...');
@@ -3574,24 +3650,31 @@ console.log('[Rifler] Webview script starting...');
       showPlaceholder('Searching...');
       clearResultsCountDisplay();
       state.searchStartTime = performance.now();
+      const requestId = 's-' + Date.now() + '-' + (++state.searchRequestSeq);
+      state.lastSentRequestId = requestId;
+      state.inFlightSearches.add(requestId);
 
       const message = {
         type: 'runSearch',
+        requestId,
         query: query,
         scope: state.currentScope,
+        maxResults: state.maxResultsCap,
         options: { ...state.options },
         queryRows: state.queryRows,
         smartExcludesEnabled: state.smartExcludesEnabled,
         exclusionPatterns: getActiveExcludePatterns()
       };
 
-      console.log('[Rifler Webview] Search state:', {
-        query,
-        queryRows: state.queryRows,
-        multiline: state.options.multiline,
-        hasNewline: query.includes('\n'),
-        lineCount: query.split('\n').length
-      });
+      if (state.profilingEnabled) {
+        console.log('[Rifler Webview] Search state:', {
+          query,
+          queryRows: state.queryRows,
+          multiline: state.options.multiline,
+          hasNewline: query.includes('\n'),
+          lineCount: query.split('\n').length
+        });
+      }
 
       if (state.currentScope === 'directory') {
         message.directoryPath = directoryInput.value.trim();
@@ -3600,8 +3683,9 @@ console.log('[Rifler] Webview script starting...');
         message.modulePath = moduleSelect.value;
       }
 
-      console.log('Sending search message:', message);
-      console.log('[Rifler Webview] Search payload:', JSON.stringify(message));
+      if (state.profilingEnabled) {
+        console.log('Sending search message:', { requestId, queryLength: query.length, scope: state.currentScope, maxResults: state.maxResultsCap });
+      }
       vscode.postMessage(message);
     } catch (error) {
       console.error('Error in runSearch:', error);
@@ -3635,17 +3719,23 @@ console.log('[Rifler] Webview script starting...');
     }
 
     // Group results by file
-    const groups = [];
-    const fileMap = new Map();
-    results.forEach((result, index) => {
-      const path = result.relativePath || result.fileName;
-      if (!fileMap.has(path)) {
-        const group = { path, fileName: path.split(/[\\/]/).pop(), matches: [] };
-        fileMap.set(path, group);
-        groups.push(group);
-      }
-      fileMap.get(path).matches.push({ ...result, originalIndex: index });
-    });
+      const groups = [];
+      const fileMap = new Map();
+      const indexByPath = new Map();
+      results.forEach((result, index) => {
+        const path = result.relativePath || result.fileName;
+        if (!fileMap.has(path)) {
+          const group = { path, fileName: path.split(/[\\/]/).pop(), matchIndexes: [], occurrenceCount: 0 };
+          fileMap.set(path, group);
+          indexByPath.set(path, groups.length);
+          groups.push(group);
+        }
+        const groupIdx = indexByPath.get(path);
+        if (groupIdx !== undefined) {
+          groups[groupIdx].matchIndexes.push(index);
+          groups[groupIdx].occurrenceCount += getResultOccurrenceCount(result);
+        }
+      });
 
     state.renderItems = [];
     let cumulativeTop = 0;
@@ -3669,7 +3759,7 @@ console.log('[Rifler] Webview script starting...');
         type: 'fileHeader',
         path: group.path,
         fileName: group.fileName,
-        matchCount: group.matches.length,
+        matchCount: group.occurrenceCount,
         isCollapsed: isCollapsed,
         top: cumulativeTop,
         height: 40
@@ -3678,23 +3768,23 @@ console.log('[Rifler] Webview script starting...');
       
       if (!isCollapsed) {
         // For files with more than 5 results, use a scrollable group container
-        if (group.matches.length > 5) {
+        if (group.matchIndexes.length > 5) {
           state.renderItems.push({
             type: 'matchesGroup',
             path: group.path,
-            matches: group.matches,
+            matchIndexes: group.matchIndexes,
             top: cumulativeTop,
             height: 150
           });
           cumulativeTop += 150;
         } else {
-          group.matches.forEach((match, matchIdx) => {
+          group.matchIndexes.forEach((originalIndex, matchIdx) => {
             state.renderItems.push({
               type: 'match',
-              ...match,
+              originalIndex,
               isFirstInGroup: matchIdx === 0,
-              isLastInGroup: matchIdx === group.matches.length - 1,
-              groupSize: group.matches.length,
+              isLastInGroup: matchIdx === group.matchIndexes.length - 1,
+              groupSize: group.matchIndexes.length,
               groupPath: group.path,
               top: cumulativeTop,
               height: 28
@@ -3720,7 +3810,9 @@ console.log('[Rifler] Webview script starting...');
       virtualContent.style.height = totalHeight;
     }
 
-    console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
+    if (state.profilingEnabled) {
+      console.log('[Rifler] renderItems populated:', state.renderItems.length, 'items');
+    }
     updateResultsCountDisplay(results);
     if (collapseAllBtn) {
       collapseAllBtn.style.display = results.length > 0 ? 'flex' : 'none';
@@ -3729,7 +3821,9 @@ console.log('[Rifler] Webview script starting...');
       }
     }
 
-    vscode.postMessage({ type: '__test_searchCompleted', results: results });
+    if (state.testMode) {
+      vscode.postMessage({ type: '__test_searchCompleted', results: results });
+    }
 
     if (results.length === 0) {
       showPlaceholder('No results found');
@@ -3743,12 +3837,14 @@ console.log('[Rifler] Webview script starting...');
 
     hidePlaceholder();
 
-    // Auto-load first result if available
-    if (hasResults && state.activeIndex < 0) {
+    const shouldAutoLoadPreview = hasResults && !options.skipAutoLoad && results.length <= 1200;
+
+    // Auto-load first result only for manageable result sets
+    if (shouldAutoLoadPreview && state.activeIndex < 0) {
       state.activeIndex = 0;
       applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: true });
       setActiveIndex(0, { skipLoad: false });
-    } else if (hasResults && state.activeIndex >= 0) {
+    } else if (shouldAutoLoadPreview && state.activeIndex >= 0) {
       applyPreviewHeight(previewHeight || getDefaultPreviewHeight(), { updateLastExpanded: false, persist: false, visible: true });
       setActiveIndex(state.activeIndex, { skipLoad: !!options.skipAutoLoad });
     } else {
@@ -3766,6 +3862,59 @@ console.log('[Rifler] Webview script starting...');
     }
   }
 
+  function handleSearchResultsMessage(message) {
+    const requestId = typeof message.requestId === 'string' ? message.requestId : null;
+    if (requestId) {
+      state.inFlightSearches.delete(requestId);
+    }
+
+    if (requestId && state.lastSentRequestId && requestId !== state.lastSentRequestId) {
+      if (state.profilingEnabled) {
+        console.log('[Rifler][Profile] Dropping stale search response', {
+          requestId,
+          expected: state.lastSentRequestId,
+          results: Array.isArray(message.results) ? message.results.length : 0,
+        });
+      }
+      return;
+    }
+
+    state.lastHandledRequestId = requestId;
+    state.pendingSearchResultsMessage = message;
+
+    if (state.resultsProcessScheduled) {
+      return;
+    }
+
+    state.resultsProcessScheduled = true;
+    requestAnimationFrame(() => {
+      state.resultsProcessScheduled = false;
+      const pending = state.pendingSearchResultsMessage;
+      state.pendingSearchResultsMessage = null;
+      if (!pending) {
+        return;
+      }
+
+      const startedAt = performance.now();
+      handleSearchResults(pending.results || [], { skipAutoLoad: false, activeIndex: pending.activeIndex });
+      const renderMs = performance.now() - startedAt;
+
+      const profile = pending.profile;
+      state.lastSearchProfile = profile || null;
+    if (state.profilingEnabled) {
+      console.log('[Rifler][Profile] Search pipeline', {
+        requestId: pending.requestId,
+        queryLength: profile?.queryLength,
+        roots: profile?.rootCount,
+        resultCount: (pending.results || []).length,
+        payloadBytesEstimate: profile?.serializedBytes,
+        backend: profile?.durationsMs,
+        webviewRenderMs: Number(renderMs.toFixed(2)),
+      });
+    }
+    });
+  }
+
   // ========================================================================
   // Incremental expand/collapse — patch renderItems in-place
   // ========================================================================
@@ -3775,32 +3924,35 @@ console.log('[Rifler] Webview script starting...');
    * Uses the same logic as handleSearchResults but for a single group.
    */
   function buildMatchItemsForPath(filePath) {
-    const matches = [];
+    const matchIndexes = [];
+    let occurrenceCount = 0;
     state.results.forEach((r, idx) => {
       const p = r.relativePath || r.fileName;
       if (p === filePath) {
-        matches.push({ ...r, originalIndex: idx });
+        matchIndexes.push(idx);
+        occurrenceCount += getResultOccurrenceCount(r);
       }
     });
-    if (matches.length === 0) return [];
+    if (matchIndexes.length === 0) return [];
 
     const items = [];
-    if (matches.length > 5) {
+    if (matchIndexes.length > 5) {
       items.push({
         type: 'matchesGroup',
         path: filePath,
-        matches: matches,
+        matchIndexes,
+        matchCount: occurrenceCount,
         top: 0,
         height: 150
       });
     } else {
-      matches.forEach((match, matchIdx) => {
+      matchIndexes.forEach((originalIndex, matchIdx) => {
         items.push({
           type: 'match',
-          ...match,
+          originalIndex,
           isFirstInGroup: matchIdx === 0,
-          isLastInGroup: matchIdx === matches.length - 1,
-          groupSize: matches.length,
+          isLastInGroup: matchIdx === matchIndexes.length - 1,
+          groupSize: matchIndexes.length,
           groupPath: filePath,
           top: 0,
           height: 28
@@ -4115,13 +4267,15 @@ console.log('[Rifler] Webview script starting...');
         if (target && target.classList.contains('file-name')) {
           e.stopPropagation();
           // Find the first match for this file and open it in the editor
-          const resultIndex = state.results.findIndex((r) => {
-            const path = r.relativePath || r.fileName;
-            return path === itemData.path;
-          });
-          if (resultIndex !== -1) {
-            setActiveIndex(resultIndex);
-            openResultInEditor(resultIndex);
+          const firstIndex = Array.isArray(itemData.matchIndexes) && itemData.matchIndexes.length > 0
+            ? itemData.matchIndexes[0]
+            : state.results.findIndex((r) => {
+              const path = r.relativePath || r.fileName;
+              return path === itemData.path;
+            });
+          if (firstIndex !== -1) {
+            setActiveIndex(firstIndex);
+            openResultInEditor(firstIndex);
           }
           return;
         }
@@ -4156,8 +4310,8 @@ console.log('[Rifler] Webview script starting...');
       groupContainer.style.position = 'relative';
 
       const MATCH_HEIGHT = 28;
-      const matches = itemData.matches;
-      const totalGroupHeight = matches.length * MATCH_HEIGHT;
+      const matchIndexes = itemData.matchIndexes || [];
+      const totalGroupHeight = matchIndexes.length * MATCH_HEIGHT;
 
       // Spacer element to maintain scrollable height
       const spacer = document.createElement('div');
@@ -4173,7 +4327,7 @@ console.log('[Rifler] Webview script starting...');
         const scrollTop = groupContainer.scrollTop;
         const containerHeight = groupContainer.clientHeight || 150;
         const firstIdx = Math.max(0, Math.floor(scrollTop / MATCH_HEIGHT) - GROUP_OVERSCAN);
-        const lastIdx = Math.min(matches.length - 1, Math.ceil((scrollTop + containerHeight) / MATCH_HEIGHT) + GROUP_OVERSCAN);
+        const lastIdx = Math.min(matchIndexes.length - 1, Math.ceil((scrollTop + containerHeight) / MATCH_HEIGHT) + GROUP_OVERSCAN);
 
         // Build set of indices that should be visible
         const wantedIndices = new Set();
@@ -4194,19 +4348,21 @@ console.log('[Rifler] Webview script starting...');
 
         // Add or update visible elements
         for (let idx = firstIdx; idx <= lastIdx; idx++) {
-          const match = matches[idx];
+          const matchIndex = matchIndexes[idx];
+          const match = state.results[matchIndex];
+          if (!match) continue;
           const existingEl = existing.get(idx);
           if (existingEl) {
             // Update active state only
-            const isActive = match.originalIndex === state.activeIndex;
+            const isActive = matchIndex === state.activeIndex;
             existingEl.classList.toggle('active', isActive);
             continue;
           }
 
           const matchEl = document.createElement('div');
-          const isActive = match.originalIndex === state.activeIndex;
+          const isActive = matchIndex === state.activeIndex;
           matchEl.className = 'result-item' + (isActive ? ' active' : '');
-          matchEl.dataset.index = String(match.originalIndex);
+          matchEl.dataset.index = String(matchIndex);
           matchEl.dataset.localIndex = String(idx);
           matchEl.title = match.relativePath || match.fileName;
           matchEl.style.position = 'absolute';
@@ -4231,7 +4387,7 @@ console.log('[Rifler] Webview script starting...');
 
           matchEl.addEventListener('click', () => {
             // Single click selects/loads preview (no show/hide toggle)
-            if (match.originalIndex === state.activeIndex) {
+            if (matchIndex === state.activeIndex) {
               const active = state.results?.[state.activeIndex];
               if (active && (!state.fileContent || state.fileContent.uri !== active.uri)) {
                 loadFileContent(active);
@@ -4240,7 +4396,7 @@ console.log('[Rifler] Webview script starting...');
             }
             if (!state.groupScrollTops) state.groupScrollTops = {};
             state.groupScrollTops[itemData.path] = groupContainer.scrollTop;
-            setActiveIndex(match.originalIndex);
+            setActiveIndex(matchIndex);
           });
 
           matchEl.addEventListener('dblclick', () => {
@@ -4250,7 +4406,7 @@ console.log('[Rifler] Webview script starting...');
 
           matchEl.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            showContextMenu(e, match.originalIndex);
+            showContextMenu(e, matchIndex);
           });
 
           spacer.appendChild(matchEl);
@@ -4303,21 +4459,26 @@ console.log('[Rifler] Webview script starting...');
     }
 
     // Match row
+    const rowResult = state.results[itemData.originalIndex];
+    if (!rowResult) {
+      return item;
+    }
+
     const isActive = itemData.originalIndex === state.activeIndex;
     item.className = 'result-item' + (isActive ? ' active' : '');
     item.dataset.index = String(itemData.originalIndex);
-    item.title = itemData.relativePath || itemData.fileName;
+    item.title = rowResult.relativePath || rowResult.fileName;
 
-    const language = getLanguageFromFilename(itemData.fileName);
+    const language = getLanguageFromFilename(rowResult.fileName);
     const previewHtml = highlightMatchSafe(
-      itemData.preview,
-      itemData.previewMatchRanges || [itemData.previewMatchRange],
+      rowResult.preview,
+      rowResult.previewMatchRanges || [rowResult.previewMatchRange],
       language
     );
 
     item.innerHTML = 
       '<div class="result-meta">' +
-        '<span class="result-line-number">' + (itemData.line + 1) + '</span>' +
+        '<span class="result-line-number">' + (rowResult.line + 1) + '</span>' +
       '</div>' +
       '<div class="result-preview hljs">' + previewHtml + '</div>';
 
@@ -4536,9 +4697,7 @@ console.log('[Rifler] Webview script starting...');
       'swift': 'swift',
       'kt': 'kotlin'
     };
-    const lang = map[ext] || null;
-    console.log(`[Rifler] getLanguageFromFilename: ${fileName} -> ${lang}`);
-    return lang;
+    return map[ext] || null;
   }
 
   function ensureActiveVisible() {
@@ -4552,7 +4711,7 @@ console.log('[Rifler] Webview script starting...');
     if (renderIndex === -1) {
       renderIndex = state.renderItems.findIndex(item => 
         item.type === 'matchesGroup' && 
-        item.matches.some(m => m.originalIndex === state.activeIndex)
+        Array.isArray(item.matchIndexes) && item.matchIndexes.includes(state.activeIndex)
       );
     }
     
@@ -4665,7 +4824,9 @@ console.log('[Rifler] Webview script starting...');
       updateLocalMatches();
       updateHighlights();
     } else {
-      console.log('[Rifler] handleFileContent: rendering preview');
+      if (state.profilingEnabled) {
+        console.log('[Rifler] handleFileContent: rendering preview');
+      }
       // Ensure editor is hidden when in preview mode
       if (editorContainer) editorContainer.classList.remove('visible');
       if (previewContent) previewContent.style.display = 'block';
@@ -4869,15 +5030,24 @@ console.log('[Rifler] Webview script starting...');
     }
 
     const lines = fileData.content.split('\n');
+    const totalLines = lines.length;
 
-    console.log('[Rifler] renderFilePreview: Rendering', lines.length, 'lines. Total matches:', fileData.matches ? fileData.matches.length : 0);
-    console.log('[Rifler] Active line range:', activeLineStart, 'to', activeLineEnd, '(queryLineCount:', queryLineCount, 'queryHasNewlines:', queryHasNewlines, ')');
-    if (fileData.matches && fileData.matches.length > 0) {
-      console.log('[Rifler] Sample matches:', fileData.matches.slice(0, 5));
+    if (state.profilingEnabled) {
+      console.log('[Rifler] renderFilePreview: Rendering', totalLines, 'lines. Total matches:', fileData.matches ? fileData.matches.length : 0);
+      console.log('[Rifler] Active line range:', activeLineStart, 'to', activeLineEnd, '(queryLineCount:', queryLineCount, 'queryHasNewlines:', queryHasNewlines, ')');
+      if (fileData.matches && fileData.matches.length > 0) {
+        console.log('[Rifler] Sample matches:', fileData.matches.slice(0, 5));
+      }
     }
 
     const language = getLanguageFromFilename(fileData.fileName);
-    console.log('[Rifler] Detected language:', language);
+    if (state.profilingEnabled) {
+      console.log('[Rifler] Detected language:', language);
+    }
+
+    const windowState = getPreviewWindowForUri(fileData.uri, totalLines, activeLineStart, activeLineEnd);
+    const windowStart = windowState.start;
+    const windowEnd = windowState.end;
 
     const highlightSegment = (text) => {
       if (text === '') return '';
@@ -4949,7 +5119,12 @@ console.log('[Rifler] Webview script starting...');
     };
 
     let html = '';
-    lines.forEach((line, idx) => {
+    if (windowState.hasTopMore) {
+      html += '<div class="pv-window-hint" data-action="expand-up" style="padding:6px 10px; opacity:.75; font-size:12px; border-bottom:1px solid rgba(255,255,255,.08); cursor:pointer;">Show ' + windowStart + ' lines above...</div>';
+    }
+
+    for (let idx = windowStart; idx <= windowEnd; idx++) {
+      const line = lines[idx];
       const lineMatches = fileData.matches ? fileData.matches.filter(m => m.line === idx) : [];
       const hasMatch = lineMatches.length > 0;
       // For multiline matches, mark all lines in the active range as "active" (styling)
@@ -4957,7 +5132,7 @@ console.log('[Rifler] Webview script starting...');
       const isCurrentLine = idx >= activeLineStart && idx <= activeLineEnd;
 
       // Log lines in the active range to debug multiline active line behavior
-      if (idx >= activeLineStart && idx <= activeLineEnd) {
+      if (state.profilingEnabled && idx >= activeLineStart && idx <= activeLineEnd) {
         console.log('[Rifler] Active range line', idx, '- hasMatch:', hasMatch, 'isCurrentLine:', isCurrentLine, 'lineContent:', JSON.stringify(line.substring(0, 30)));
       }
 
@@ -4972,9 +5147,15 @@ console.log('[Rifler] Webview script starting...');
         '<div class="pvLineNo' + (hasMatch ? ' has-match' : '') + '">' + (idx + 1) + '</div>' +
         '<div class="pvCode hljs">' + lineContent + '</div>' +
       '</div>';
-    });
+    }
 
-    console.log('[Rifler] Generated HTML length:', html.length, 'lines:', lines.length);
+    if (windowState.hasBottomMore) {
+      html += '<div class="pv-window-hint" data-action="expand-down" style="padding:6px 10px; opacity:.75; font-size:12px; border-top:1px solid rgba(255,255,255,.08); cursor:pointer;">Show ' + (totalLines - windowEnd - 1) + ' more lines...</div>';
+    }
+
+    if (state.profilingEnabled) {
+      console.log('[Rifler] Generated HTML length:', html.length, 'windowLines:', (windowEnd - windowStart + 1), 'totalLines:', totalLines);
+    }
     
     // Ensure previewContent is visible and populated
     previewContent.innerHTML = html;
@@ -4986,6 +5167,7 @@ console.log('[Rifler] Webview script starting...');
     
     // Update cache markers to prevent duplicate renders
     previewContent.dataset.lastRenderedCacheKey = cacheKey;
+    previewContent.dataset.previewUri = fileData.uri || '';
     
     // Force a layout recalculation
     previewContent.offsetHeight; 
@@ -4993,7 +5175,9 @@ console.log('[Rifler] Webview script starting...');
     if (currentLine >= 0) {
       const currentLineEl = previewContent.querySelector('[data-line="' + currentLine + '"]');
       if (currentLineEl) {
-        console.log('[Rifler] Scrolling to line:', currentLine);
+        if (state.profilingEnabled) {
+          console.log('[Rifler] Scrolling to line:', currentLine);
+        }
         
         // Use scrollIntoView with a small timeout to ensure layout is ready
         setTimeout(() => {
@@ -5046,6 +5230,31 @@ console.log('[Rifler] Webview script starting...');
       query: query,
       options: state.options,
       activeIndex: state.activeIndex
+    });
+  }
+
+  if (previewContent) {
+    previewContent.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!target || !target.closest) return;
+      const hint = target.closest('.pv-window-hint');
+      if (!hint) return;
+      const action = hint.getAttribute('data-action');
+      const uri = previewContent.dataset.previewUri;
+      if (!uri) return;
+
+      const current = state.previewWindows && state.previewWindows[uri]
+        ? state.previewWindows[uri]
+        : { radius: 120 };
+      const nextRadius = action === 'expand-up' || action === 'expand-down'
+        ? current.radius * 2
+        : current.radius;
+
+      setPreviewWindowRadius(uri, nextRadius);
+      if (state.fileContent && state.fileContent.uri === uri) {
+        previewContent.dataset.lastRenderedCacheKey = '';
+        renderFilePreview(state.fileContent);
+      }
     });
   }
 

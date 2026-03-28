@@ -18,6 +18,17 @@ export class PanelManager {
   private _messageHandler?: MessageHandler;
   private _handlerConfigurator?: (handler: MessageHandler) => void;
 
+  private sanitizeSavedState(state: MinimizeMessage['state'] | undefined): MinimizeMessage['state'] | undefined {
+    if (!state) {
+      return undefined;
+    }
+    const sanitized = { ...state } as MinimizeMessage['state'] & Record<string, unknown>;
+    delete sanitized.results;
+    delete sanitized.lastPreview;
+    delete sanitized.lspResultsCache;
+    return sanitized;
+  }
+
   constructor(
     private context: vscode.ExtensionContext,
     private extensionUri: vscode.Uri,
@@ -32,7 +43,7 @@ export class PanelManager {
     if (persist) {
       const persistedState = store.get<MinimizeMessage['state']>('rifler.persistedSearchState');
       if (persistedState) {
-        this.stateStore.setSavedState(persistedState);
+        this.stateStore.setSavedState(this.sanitizeSavedState(persistedState));
       }
     }
   }
@@ -169,7 +180,7 @@ export class PanelManager {
    */
   minimize(state?: MinimizeMessage['state']): void {
     // Save the state before closing
-    this.stateStore.setSavedState(state);
+    this.stateStore.setSavedState(this.sanitizeSavedState(state));
 
     // Hide the panel
     if (this.currentPanel) {
@@ -270,6 +281,7 @@ export class PanelManager {
     const replaceKeybinding = config.get<string>('replaceInPreviewKeybinding', 'ctrl+shift+r');
     const maxResults = config.get<number>('maxResults', 10000);
     const resultsShowCollapsed = config.get<boolean>('results.showCollapsed', false);
+    const profileSearch = config.get<boolean>('debug.profileSearch', false);
     const contextDefaults = {
       includeCode: config.get<boolean>('searchContext.includeCode', true),
       includeComments: config.get<boolean>('searchContext.includeComments', true),
@@ -285,6 +297,7 @@ export class PanelManager {
       replaceKeybinding,
       maxResults,
       resultsShowCollapsed,
+      profileSearch,
       contextDefaults
     });
 

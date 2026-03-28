@@ -96,48 +96,56 @@ export async function filterResultsByCodeContext(
 
   const contextFiltersActive = !(includeCode && includeComments && includeStrings);
 
-  const resultsByFile = new Map<string, SearchResult[]>();
-  for (const result of results) {
+  const resultsByFile = new Map<string, Array<{ result: SearchResult; index: number }>>();
+  for (let index = 0; index < results.length; index++) {
+    const result = results[index];
     const list = resultsByFile.get(result.uri) || [];
-    list.push(result);
+    list.push({ result, index });
     resultsByFile.set(result.uri, list);
   }
 
-  const filtered: SearchResult[] = [];
+  const entries = Array.from(resultsByFile.entries());
+  const filteredByEntry: Array<Array<{ result: SearchResult; index: number }>> = new Array(entries.length);
+  const concurrency = Math.min(8, entries.length);
+  let nextIndex = 0;
 
-  for (const [uri, fileResults] of resultsByFile.entries()) {
+  const processEntry = async (entry: [string, Array<{ result: SearchResult; index: number }>]): Promise<Array<{ result: SearchResult; index: number }>> => {
+    const [uri, indexedResults] = entry;
+    const fileResults = indexedResults.map((item) => item.result);
     const languageId = getLanguageIdFromFileName(fileResults[0]?.fileName || '');
+
+    const passthrough = (): Array<{ result: SearchResult; index: number }> => indexedResults;
+
     if (!languageId || !SUPPORTED_LANGUAGES.has(languageId)) {
       if (contextFiltersActive && !includeStrings) {
-        continue;
+        return [];
       }
-      filtered.push(...fileResults);
-      continue;
+      return passthrough();
     }
 
     const config = LANGUAGE_CONFIGS[languageId];
     if (!config) {
       if (contextFiltersActive && !includeStrings) {
-        continue;
+        return [];
       }
-      filtered.push(...fileResults);
-      continue;
+      return passthrough();
     }
 
     const content = await readFileContent(uri);
     if (!content) {
-      filtered.push(...fileResults);
-      continue;
+      return passthrough();
     }
 
     const lines = content.split(/\r?\n/);
     const lineContexts = parseLineContexts(lines, config);
+    const filteredLocal: Array<{ result: SearchResult; index: number }> = [];
 
-    for (const result of fileResults) {
+    for (const indexed of indexedResults) {
+      const result = indexed.result;
       const lineIndex = result.line;
       const lineContext = lineContexts[lineIndex];
       if (!lineContext) {
-        filtered.push(result);
+        filteredLocal.push(indexed);
         continue;
       }
 
@@ -181,18 +189,41 @@ export async function filterResultsByCodeContext(
         end: Math.max(0, firstRange.end - leadingWhitespace)
       };
 
-      filtered.push({
-        ...result,
-        character: firstRange.start,
-        length: Math.max(0, firstRange.end - firstRange.start),
-        matchRanges: allowedMatchRanges,
-        previewMatchRanges,
-        previewMatchRange: firstPreviewRange
+      filteredLocal.push({
+        index: indexed.index,
+        result: {
+          ...result,
+          character: firstRange.start,
+          length: Math.max(0, firstRange.end - firstRange.start),
+          matchRanges: allowedMatchRanges,
+          previewMatchRanges,
+          previewMatchRange: firstPreviewRange,
+        }
       });
     }
-  }
 
-  return filtered;
+    return filteredLocal;
+  };
+
+  const worker = async (): Promise<void> => {
+    while (true) {
+      const current = nextIndex;
+      nextIndex += 1;
+      if (current >= entries.length) {
+        return;
+      }
+      filteredByEntry[current] = await processEntry(entries[current]);
+    }
+  };
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
+  const flattened = filteredByEntry
+    .flat()
+    .sort((a, b) => a.index - b.index)
+    .map((item) => item.result);
+
+  return flattened;
 }
 
 function getLanguageIdFromFileName(fileName: string): string | undefined {
@@ -203,6 +234,10 @@ function getLanguageIdFromFileName(fileName: string): string | undefined {
 async function readFileContent(uriString: string): Promise<string> {
   try {
     const uri = vscode.Uri.parse(uriString);
+    const openDoc = vscode.workspace.textDocuments.find((doc) => doc.uri.toString() === uriString);
+    if (openDoc) {
+      return openDoc.getText();
+    }
     const data = await vscode.workspace.fs.readFile(uri);
     return Buffer.from(data).toString('utf8');
   } catch {

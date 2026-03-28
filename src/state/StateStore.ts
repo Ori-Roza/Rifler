@@ -37,6 +37,27 @@ export class StateStore {
   private visibilityCallbacks: Array<(visible: boolean) => void> = [];
   private bottomVisibilityCallbacks: Array<(visible: boolean) => void> = [];
 
+  private sanitizePersistedState(state: MinimizeMessage['state'] | undefined): MinimizeMessage['state'] | undefined {
+    if (!state) {
+      return undefined;
+    }
+    const sanitized = { ...state } as MinimizeMessage['state'] & Record<string, unknown>;
+    delete sanitized.results;
+    delete sanitized.lastPreview;
+    delete sanitized.lspResultsCache;
+    return sanitized;
+  }
+
+  private stateNeedsSanitizing(state: MinimizeMessage['state'] | undefined): boolean {
+    if (!state) {
+      return false;
+    }
+    const raw = state as unknown as Record<string, unknown>;
+    return Object.prototype.hasOwnProperty.call(raw, 'results')
+      || Object.prototype.hasOwnProperty.call(raw, 'lastPreview')
+      || Object.prototype.hasOwnProperty.call(raw, 'lspResultsCache');
+  }
+
   constructor(private readonly context: vscode.ExtensionContext) {
     const cfg = vscode.workspace.getConfiguration('rifler');
     const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
@@ -45,7 +66,10 @@ export class StateStore {
     if (persist) {
       const persisted = store.get<MinimizeMessage['state']>('rifler.persistedSearchState');
       if (persisted) {
-        this.savedState = persisted;
+        this.savedState = this.sanitizePersistedState(persisted);
+        if (this.stateNeedsSanitizing(persisted)) {
+          store.update('rifler.persistedSearchState', this.savedState);
+        }
       }
       
       // Load preview panel collapsed state - default to expanded (false)
@@ -148,13 +172,13 @@ export class StateStore {
   }
 
   setSavedState(state: MinimizeMessage['state'] | undefined): void {
-    this.savedState = state;
+    this.savedState = this.sanitizePersistedState(state);
     const cfg = vscode.workspace.getConfiguration('rifler');
     const scope = cfg.get<'workspace' | 'global' | 'off'>('persistenceScope', 'workspace');
     const persist = cfg.get<boolean>('persistSearchState', true) && scope !== 'off';
     const store = scope === 'global' ? this.context.globalState : this.context.workspaceState;
     if (persist) {
-      store.update('rifler.persistedSearchState', state);
+      store.update('rifler.persistedSearchState', this.savedState);
     }
   }
 

@@ -30,7 +30,17 @@ let lastSearchTelemetry: Record<string, unknown> | undefined;
 
 export function registerCommonHandlers(handler: MessageHandler, deps: CommonHandlerDeps) {
   handler.registerHandler('runSearch', async (message) => {
-    const msg = message as { query: string; scope: SearchScope; options: SearchOptions; directoryPath?: string; modulePath?: string; smartExcludesEnabled?: boolean; exclusionPatterns?: string };
+    const msg = message as {
+      query: string;
+      scope: SearchScope;
+      options: SearchOptions;
+      maxResults?: number;
+      directoryPath?: string;
+      modulePath?: string;
+      smartExcludesEnabled?: boolean;
+      exclusionPatterns?: string;
+      requestId?: string;
+    };
 
     const telemetryLogger = getTelemetryLogger();
 
@@ -39,13 +49,14 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
     const mergedFileMask = (msg.smartExcludesEnabled && msg.exclusionPatterns)
       ? (msg.options.fileMask ? `${msg.options.fileMask},${msg.exclusionPatterns}` : msg.exclusionPatterns)
       : (msg.options.fileMask || '');
+    const effectiveMaxResults = Math.max(1, Math.floor(msg.maxResults ?? 10000));
 
     if (msg.scope === 'directory' && msg.query?.trim().length > 0 && msg.query.trim().length < 3) {
       deps.postMessage({
         type: 'error',
         message: 'Directory scope requires at least 3 characters.'
       });
-      deps.postMessage({ type: 'searchResults', results: [], maxResults: 10000 });
+      deps.postMessage({ type: 'searchResults', results: [], maxResults: effectiveMaxResults });
       return;
     }
 
@@ -59,7 +70,7 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
           type: 'error',
           message: 'Directory path must be within the workspace.'
         });
-        deps.postMessage({ type: 'searchResults', results: [], maxResults: 10000 });
+        deps.postMessage({ type: 'searchResults', results: [], maxResults: effectiveMaxResults });
         return;
       }
     }
@@ -74,8 +85,9 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
         { ...msg.options, fileMask: mergedFileMask },
         directoryPath,
         msg.modulePath,
-        10000,
-        msg.smartExcludesEnabled ?? true
+        effectiveMaxResults,
+        msg.smartExcludesEnabled ?? true,
+        msg.requestId
       );
       results = searchOutcome.results;
       console.log('[Rifler] Search returned', results.length, 'results');
@@ -109,6 +121,12 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
         timed_out: timedOut,
         cancelled,
         result_cap_hit: resultCapHit,
+        request_id: msg.requestId,
+        phase_resolve_roots_ms: searchOutcome?.profile?.durationsMs.resolveRoots,
+        phase_rg_ms: searchOutcome?.profile?.durationsMs.rgSearch,
+        phase_root_filter_ms: searchOutcome?.profile?.durationsMs.rootFilter,
+        phase_context_filter_ms: searchOutcome?.profile?.durationsMs.contextFilter,
+        payload_bytes_estimate: searchOutcome?.profile?.serializedBytes,
         error: searchError,
       });
 
@@ -134,6 +152,12 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
         timed_out: timedOut,
         cancelled,
         result_cap_hit: resultCapHit,
+        request_id: msg.requestId,
+        phase_resolve_roots_ms: searchOutcome?.profile?.durationsMs.resolveRoots,
+        phase_rg_ms: searchOutcome?.profile?.durationsMs.rgSearch,
+        phase_root_filter_ms: searchOutcome?.profile?.durationsMs.rootFilter,
+        phase_context_filter_ms: searchOutcome?.profile?.durationsMs.contextFilter,
+        payload_bytes_estimate: searchOutcome?.profile?.serializedBytes,
         error: searchError,
       };
     }
@@ -157,7 +181,14 @@ export function registerCommonHandlers(handler: MessageHandler, deps: CommonHand
       deps.postMessage({ type: 'searchHistory', entries: deps.stateStore.getSearchHistory() });
     }
 
-    deps.postMessage({ type: 'searchResults', results, maxResults: 10000, telemetry: lastSearchTelemetry });
+    deps.postMessage({
+      type: 'searchResults',
+      results,
+      maxResults: effectiveMaxResults,
+      requestId: msg.requestId,
+      profile: searchOutcome?.profile,
+      telemetry: lastSearchTelemetry,
+    });
   });
 
   handler.registerHandler('__test_clearSearchHistory', async () => {

@@ -28,6 +28,11 @@ type RipgrepMatchEvent = {
 
 type RipgrepJsonEvent = RipgrepMatchEvent | { type: string; data?: unknown };
 
+const PREVIEW_CONTEXT_BEFORE = 40;
+const PREVIEW_CONTEXT_AFTER = 160;
+const PREVIEW_MAX_CHARS = 260;
+const MAX_MATCH_RANGES_PER_RESULT = 24;
+
 export function getRipgrepCommandCandidates(): string[] {
   const exeName = process.platform === 'win32' ? 'rg.exe' : 'rg';
 
@@ -182,18 +187,28 @@ function mapMatchToResult(evt: RipgrepMatchEvent, workspaceFolders: readonly vsc
   const submatches = evt.data.submatches || [];
   if (submatches.length === 0) return null;
 
-  const leadingWhitespace = lineText.length - lineText.trimStart().length;
-  const preview = lineText.trim();
-
-  const previewMatchRanges = submatches.map((m) => {
-    const start = Math.max(0, m.start - leadingWhitespace);
-    const end = Math.max(0, m.end - leadingWhitespace);
-    return { start, end };
-  });
-
-  const matchRanges = submatches.map((m) => ({ start: m.start, end: m.end }));
-
   const first = submatches[0];
+  const previewStart = Math.max(0, first.start - PREVIEW_CONTEXT_BEFORE);
+  const requestedPreviewEnd = Math.max(first.end + PREVIEW_CONTEXT_AFTER, previewStart + 1);
+  const previewEnd = Math.min(lineText.length, Math.min(previewStart + PREVIEW_MAX_CHARS, requestedPreviewEnd));
+
+  const preview = lineText.slice(previewStart, previewEnd);
+
+  const limitedMatchRanges = submatches
+    .slice(0, MAX_MATCH_RANGES_PER_RESULT)
+    .map((m) => ({ start: m.start, end: m.end }));
+
+  const previewMatchRanges = limitedMatchRanges
+    .filter((m) => m.end > previewStart && m.start < previewEnd)
+    .map((m) => ({
+      start: Math.max(0, m.start - previewStart),
+      end: Math.max(0, Math.min(preview.length, m.end - previewStart)),
+    }));
+
+  const firstPreviewRange = previewMatchRanges[0] || {
+    start: Math.max(0, first.start - previewStart),
+    end: Math.max(0, Math.min(preview.length, first.end - previewStart)),
+  };
 
   return {
     uri: vscode.Uri.file(filePath).toString(),
@@ -203,9 +218,10 @@ function mapMatchToResult(evt: RipgrepMatchEvent, workspaceFolders: readonly vsc
     character: first.start,
     length: Math.max(0, first.end - first.start),
     preview,
-    previewMatchRange: previewMatchRanges[0],
+    matchCount: submatches.length,
+    previewMatchRange: firstPreviewRange,
     previewMatchRanges,
-    matchRanges
+    matchRanges: limitedMatchRanges
   };
 }
 

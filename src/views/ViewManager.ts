@@ -20,6 +20,17 @@ export class ViewManager {
   private static readonly RIFLER_VIEWLET_ID = 'workbench.view.extension.rifler-sidebar';
   private static readonly DEFAULT_SIDEBAR_COMMAND = 'workbench.view.explorer';
 
+  private _sanitizeSavedState(state: MinimizeMessage['state'] | undefined): MinimizeMessage['state'] | undefined {
+    if (!state) {
+      return undefined;
+    }
+    const sanitized = { ...state } as MinimizeMessage['state'] & Record<string, unknown>;
+    delete sanitized.results;
+    delete sanitized.lastPreview;
+    delete sanitized.lspResultsCache;
+    return sanitized;
+  }
+
   constructor(context: vscode.ExtensionContext) {
     this._context = context;
     this._lastNonRiflerSidebarCommand =
@@ -248,6 +259,7 @@ export class ViewManager {
     } else if (this._stateStore) {
       savedState = this._stateStore.getSavedState();
     }
+    savedState = this._sanitizeSavedState(savedState);
     
     // Close current view
     if (currentLocation === 'sidebar') {
